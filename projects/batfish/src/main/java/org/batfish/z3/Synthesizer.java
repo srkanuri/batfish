@@ -453,12 +453,10 @@ public class Synthesizer {
           Prefix srcPrefix = srcIpWildcard.toPrefix();
           long srcIp = srcPrefix.getStartIp().asLong();
 
-          int srcIpWildcardBits = IP_BITS - srcPrefix.getPrefixLength();
-          int srcIpStart = srcIpWildcardBits;
-          int srcIpEnd = IP_BITS - 1;
-          if (srcIpStart < IP_BITS) {
-            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, srcIpStart, srcIpEnd);
-            LitIntExpr srcIpMatchLit = new LitIntExpr(srcIp, srcIpStart, srcIpEnd);
+          int srcIpEndBit = srcPrefix.getPrefixLength() - 1;
+          if (srcIpEndBit >= 0) {
+            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, 0, srcIpEndBit);
+            LitIntExpr srcIpMatchLit = new LitIntExpr(srcIp, 0, srcIpEndBit);
             EqExpr matchsrcIp = new EqExpr(extractSrcIp, srcIpMatchLit);
             matchSomeSrcIpRange.addDisjunct(matchsrcIp);
           } else {
@@ -492,13 +490,10 @@ public class Synthesizer {
         if (srcIpWildcard.isPrefix()) {
           Prefix srcPrefix = srcIpWildcard.toPrefix();
           long srcIp = srcPrefix.getStartIp().asLong();
-
-          int srcIpWildcardBits = IP_BITS - srcPrefix.getPrefixLength();
-          int srcIpStart = srcIpWildcardBits;
-          int srcIpEnd = IP_BITS - 1;
-          if (srcIpStart < IP_BITS) {
-            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, srcIpStart, srcIpEnd);
-            LitIntExpr srcIpMatchLit = new LitIntExpr(srcIp, srcIpStart, srcIpEnd);
+          int srcIpEndBit = srcPrefix.getPrefixLength() - 1;
+          if (srcIpEndBit >= 0) {
+            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, 0, srcIpEndBit);
+            LitIntExpr srcIpMatchLit = new LitIntExpr(srcIp, 0, srcIpEndBit);
             EqExpr matchsrcIp = new EqExpr(extractSrcIp, srcIpMatchLit);
             matchSomeSrcIpRange.addDisjunct(matchsrcIp);
           } else {
@@ -532,15 +527,11 @@ public class Synthesizer {
         if (srcOrDstIpWildcard.isPrefix()) {
           Prefix srcOrDstPrefix = srcOrDstIpWildcard.toPrefix();
           long srcOrDstIp = srcOrDstPrefix.getStartIp().asLong();
-
-          int srcOrDstIpWildcardBits = IP_BITS - srcOrDstPrefix.getPrefixLength();
-          int srcOrDstIpStart = srcOrDstIpWildcardBits;
-          int srcOrDstIpEnd = IP_BITS - 1;
-          if (srcOrDstIpStart < IP_BITS) {
-            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, srcOrDstIpStart, srcOrDstIpEnd);
-            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, srcOrDstIpStart, srcOrDstIpEnd);
-            LitIntExpr srcOrDstIpMatchLit =
-                new LitIntExpr(srcOrDstIp, srcOrDstIpStart, srcOrDstIpEnd);
+          int srcOrDstIpEndBit = srcOrDstPrefix.getPrefixLength() - 1;
+          if (srcOrDstIpEndBit >= 0) {
+            IntExpr extractSrcIp = newExtractExpr(SRC_IP_VAR, 0, srcOrDstIpEndBit);
+            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, 0, srcOrDstIpEndBit);
+            LitIntExpr srcOrDstIpMatchLit = new LitIntExpr(srcOrDstIp, 0, srcOrDstIpEndBit);
             EqExpr matchSrcIp = new EqExpr(extractSrcIp, srcOrDstIpMatchLit);
             EqExpr matchDstIp = new EqExpr(extractDstIp, srcOrDstIpMatchLit);
             matchSomeSrcOrDstIpRange.addDisjunct(matchSrcIp);
@@ -582,13 +573,10 @@ public class Synthesizer {
         if (dstIpWildcard.isPrefix()) {
           Prefix dstPrefix = dstIpWildcard.toPrefix();
           long dstIp = dstPrefix.getStartIp().asLong();
-
-          int dstIpWildcardBits = IP_BITS - dstPrefix.getPrefixLength();
-          int dstIpStart = dstIpWildcardBits;
-          int dstIpEnd = IP_BITS - 1;
-          if (dstIpStart < IP_BITS) {
-            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, dstIpStart, dstIpEnd);
-            LitIntExpr dstIpMatchLit = new LitIntExpr(dstIp, dstIpStart, dstIpEnd);
+          int dstIpEndBit = dstPrefix.getPrefixLength() - 1;
+          if (dstIpEndBit >= 0) {
+            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, 0, dstIpEndBit);
+            LitIntExpr dstIpMatchLit = new LitIntExpr(dstIp, 0, dstIpEndBit);
             EqExpr matchDstIp = new EqExpr(extractDstIp, dstIpMatchLit);
             matchSomeDstIpRange.addDisjunct(matchDstIp);
           } else {
@@ -622,13 +610,10 @@ public class Synthesizer {
         if (dstIpWildcard.isPrefix()) {
           Prefix dstPrefix = dstIpWildcard.toPrefix();
           long dstIp = dstPrefix.getStartIp().asLong();
-
-          int dstIpWildcardBits = IP_BITS - dstPrefix.getPrefixLength();
-          int dstIpStart = dstIpWildcardBits;
-          int dstIpEnd = IP_BITS - 1;
-          if (dstIpStart < IP_BITS) {
-            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, dstIpStart, dstIpEnd);
-            LitIntExpr dstIpMatchLit = new LitIntExpr(dstIp, dstIpStart, dstIpEnd);
+          int dstIpEndBit = dstPrefix.getPrefixLength() - 1;
+          if (dstIpEndBit >= 0) {
+            IntExpr extractDstIp = newExtractExpr(DST_IP_VAR, 0, dstIpEndBit);
+            LitIntExpr dstIpMatchLit = new LitIntExpr(dstIp, 0, dstIpEndBit);
             EqExpr matchDstIp = new EqExpr(extractDstIp, dstIpMatchLit);
             matchSomeDstIpRange.addDisjunct(matchDstIp);
           } else {

@@ -1,5 +1,6 @@
 package org.batfish.z3;
 
+import com.google.common.collect.ImmutableMap;
 import com.microsoft.z3.BitVecExpr;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
@@ -8,6 +9,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class NodProgram {
 
@@ -78,5 +83,35 @@ public class NodProgram {
 
   public Map<String, Integer> getVariableSizes() {
     return _variableSizes;
+  }
+
+  public String toSmt2String() {
+    StringBuilder sb = new StringBuilder();
+    Synthesizer.PACKET_VAR_SIZES.forEach(
+        (var, size) -> sb.append(String.format("(declare-var %s (_ BitVec %d))\n", var, size)));
+    StringBuilder sizeSb = new StringBuilder("(");
+    Synthesizer.PACKET_VAR_SIZES
+        .values()
+        .forEach(s -> sizeSb.append(String.format(" (_ BitVec %d)", s)));
+    String sizes = sizeSb.append(")").toString();
+    _relationDeclarations
+        .keySet()
+        .forEach(relation -> sb.append(String.format("(declare-rel %s %s)\n", relation, sizes)));
+    _rules.forEach(r -> sb.append(String.format("(rule %s)\n", r.toString())));
+    
+    sb.append("\n");
+    String[] intermediate = new String[] {sb.toString()};
+    final AtomicInteger currentVar = new AtomicInteger(0);
+    Synthesizer.PACKET_VAR_SIZES
+        .keySet()
+        .stream()
+        .collect(
+            ImmutableMap.toImmutableMap(
+                Function.identity(), v -> String.format("(:var %d)", currentVar.getAndIncrement())))
+        .forEach(
+            (name, var) ->
+                intermediate[0] =
+                    intermediate[0].replaceAll(Pattern.quote(var), Matcher.quoteReplacement(name)));
+    return intermediate[0];
   }
 }

@@ -12,6 +12,7 @@ import com.microsoft.z3.Params;
 import com.microsoft.z3.Solver;
 import com.microsoft.z3.Status;
 import com.microsoft.z3.Z3Exception;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -21,8 +22,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
 import org.batfish.common.Pair;
+import org.batfish.common.util.CommonUtil;
 import org.batfish.config.Settings;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.Ip;
@@ -157,6 +160,30 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       NodProgram baseProgram = _dataPlaneSynthesizer.synthesizeNodDataPlaneProgram(ctx);
       NodProgram queryProgram = _querySynthesizer.getNodProgram(baseProgram);
       NodProgram program = baseProgram.append(queryProgram);
+      //      StringBuilder sb = new StringBuilder();
+      //      sb.append(
+      //          String.join(
+      //              "\n",
+      //              program
+      //                  .getRelationDeclarations()
+      //                  .values()
+      //                  .stream()
+      //                  .map(Object::toString)
+      //                  .collect(Collectors.toList())
+      //                  .toArray(new String[] {})));
+      //      sb.append("\n");
+      //      sb.append(
+      //          String.join(
+      //              "\n",
+      //              program
+      //                  .getRules()
+      //                  .stream()
+      //                  .map(Object::toString)
+      //                  .collect(Collectors.toList())
+      //                  .toArray(new String[] {})));
+      //      sb.append("\n");
+      //      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), sb.toString());
+      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), program.toSmt2String());
       Params p = ctx.mkParams();
       p.add("fixedpoint.engine", "datalog");
       p.add("fixedpoint.datalog.default_relation", "doc");

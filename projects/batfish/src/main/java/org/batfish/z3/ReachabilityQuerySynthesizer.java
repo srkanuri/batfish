@@ -188,7 +188,8 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
     BooleanExpr matchHeaderSpace = Synthesizer.matchHeaderSpace(_headerSpace);
     queryConditions.addConjunct(matchHeaderSpace);
 
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
+    RuleExpr queryRule =
+        (RuleExpr) (new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE).simplify());
     List<BoolExpr> rules = program.getRules();
     for (RuleExpr originateRule : originateRules) {
       BoolExpr originateBoolExpr = originateRule.toBoolExpr(baseProgram);
