@@ -40,7 +40,7 @@ public class BatfishTestUtils {
   }
 
   private static Cache<TestrigSettings, DataPlane> makeDataPlaneCache() {
-    return CacheBuilder.newBuilder().maximumSize(2).softValues().build();
+    return CacheBuilder.newBuilder().maximumSize(2).weakValues().build();
   }
 
   private static Batfish initBatfish(
