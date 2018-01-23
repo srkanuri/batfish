@@ -25,7 +25,6 @@ import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.Ip;
-import org.batfish.datamodel.MultipathEquivalentAsPathMatchMode;
 import org.batfish.datamodel.OspfArea;
 import org.batfish.datamodel.OspfNeighbor;
 import org.batfish.datamodel.OspfProcess;

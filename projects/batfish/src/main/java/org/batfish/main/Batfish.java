@@ -4349,6 +4349,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
       BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
       BdpAnswerElement ae = new BdpAnswerElement();
       DataPlane dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
+      _cachedDataPlanes.put(_testrigSettings,dataPlane);
       dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
     } else {
       DataPlane dataPlane = loadDataPlane();

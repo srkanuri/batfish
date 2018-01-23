@@ -853,6 +853,12 @@ public class Graph {
       }
     }
 
+    _batfish.getLogger().info(
+        String.format(
+            "Graph.initDomains: completed in %d iterations, %d unions",
+            iterations,
+            unions));
+
     int domainId = 0;
     for (String router : _configurations.keySet()) {
       String routerDomain = domains.get(router);
