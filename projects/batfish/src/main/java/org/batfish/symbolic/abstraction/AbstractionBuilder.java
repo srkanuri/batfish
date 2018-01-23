@@ -1,7 +1,9 @@
 package org.batfish.symbolic.abstraction;
 
+import com.google.common.collect.ImmutableSortedMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +16,7 @@ import java.util.SortedSet;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 import org.batfish.common.Pair;
 import org.batfish.common.plugin.IBatfish;
 import org.batfish.datamodel.BgpNeighbor;
@@ -22,6 +25,8 @@ import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.MultipathEquivalentAsPathMatchMode;
+import org.batfish.datamodel.OspfArea;
 import org.batfish.datamodel.OspfNeighbor;
 import org.batfish.datamodel.OspfProcess;
 import org.batfish.datamodel.Prefix;
@@ -147,7 +152,7 @@ class AbstractionBuilder {
         // Helps the next iteration to use the newly reflected information.
         // if (todo.size() > 0) {
         //  break;
-        //}
+        // }
       }
 
       // Now refine the abstraction further
@@ -157,15 +162,15 @@ class AbstractionBuilder {
 
     } while (!todo.isEmpty());
 
-    //System.out.println("EC Devices: " + _destinations);
-    //System.out.println("EC Prefixes: " + _prefixes);
-    //System.out.println("Groups: \n" + _abstractGroups.partitions());
-    //System.out.println("New graph: \n" + abstractGraph);
-    //System.out.println("Num Groups: " + workset.partitions().size());
+    // System.out.println("EC Devices: " + _destinations);
+    // System.out.println("EC Prefixes: " + _prefixes);
+    // System.out.println("Groups: \n" + _abstractGroups.partitions());
+    // System.out.println("New graph: \n" + abstractGraph);
+    // System.out.println("Num Groups: " + workset.partitions().size());
     Tuple<Graph, AbstractionMap> abstractNetwork = createAbstractNetwork();
     Graph abstractGraph = abstractNetwork.getFirst();
     AbstractionMap abstractionMap = abstractNetwork.getSecond();
-    //System.out.println("Num configs: " + abstractGraph.getConfigurations().size());
+    // System.out.println("Num configs: " + abstractGraph.getConfigurations().size());
     Abstraction a = new Abstraction(abstractGraph, abstractionMap);
     return new NetworkSlice(_headerspace, a);
   }
@@ -272,7 +277,6 @@ class AbstractionBuilder {
       }
     }
   }
-
 
   private void collectInterfaceInformation(Set<String> partition, boolean isUniversal) {
     for (String router : partition) {
@@ -424,7 +428,6 @@ class AbstractionBuilder {
     return chosen;
   }
 
-
   /*
    * Creates a new Configuration from an old one for an abstract router
    * by copying the old configuration, but removing any concrete interfaces,
@@ -523,11 +526,37 @@ class AbstractionBuilder {
       OspfProcess ospf = vrf.getOspfProcess();
       if (ospf != null) {
         OspfProcess abstractOspf = new OspfProcess();
-        abstractOspf.setAreas(ospf.getAreas());
+        SortedMap<Long, OspfArea> abstractOspfAreas =
+            ospf.getAreas()
+                .values()
+                .stream()
+                .map(
+                    a -> {
+                      OspfArea abstractArea = new OspfArea(a.getName());
+                      abstractArea.setSummaryFilter(a.getSummaryFilter());
+                      abstractArea.setInterfaces(
+                          a.getInterfaces()
+                              .values()
+                              .stream()
+                              .filter(i -> abstractConf.getInterfaces().containsKey(i.getName()))
+                              .collect(
+                                  ImmutableSortedMap.toImmutableSortedMap(
+                                      Comparator.naturalOrder(),
+                                      Interface::getName,
+                                      Function.identity())));
+                      abstractArea.setSummaries(a.getSummaries());
+                      return abstractArea;
+                    })
+                .collect(
+                    ImmutableSortedMap.toImmutableSortedMap(
+                        Comparator.naturalOrder(), OspfArea::getName, Function.identity()));
+
+        abstractOspf.setAreas(abstractOspfAreas);
         abstractOspf.setExportPolicy(ospf.getExportPolicy());
         abstractOspf.setReferenceBandwidth(ospf.getReferenceBandwidth());
         abstractOspf.setRouterId(ospf.getRouterId());
         // Copy over neighbors
+        // TODO why are we doing this? Shouldn't be needed, and doing this now could cause problems.
         Map<Pair<Ip, Ip>, OspfNeighbor> abstractNeighbors = new HashMap<>();
         if (ospf.getOspfNeighbors() != null) {
           for (Entry<Pair<Ip, Ip>, OspfNeighbor> entry2 : ospf.getOspfNeighbors().entrySet()) {
@@ -549,6 +578,8 @@ class AbstractionBuilder {
         abstractBgp.setMultipathIbgp(bgp.getMultipathIbgp());
         abstractBgp.setRouterId(bgp.getRouterId());
         abstractBgp.setOriginationSpace(bgp.getOriginationSpace());
+        abstractBgp.setMultipathEquivalentAsPathMatchMode(
+            bgp.getMultipathEquivalentAsPathMatchMode());
         // TODO: set bgp neighbors accordingly
         // Copy over neighbors
         SortedMap<Prefix, BgpNeighbor> abstractBgpNeighbors = new TreeMap<>();

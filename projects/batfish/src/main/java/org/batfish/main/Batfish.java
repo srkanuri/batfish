@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
@@ -46,6 +47,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.SystemUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.batfish.bdp.BdpDataPlanePlugin;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -110,6 +112,7 @@ import org.batfish.datamodel.answers.Answer;
 import org.batfish.datamodel.answers.AnswerElement;
 import org.batfish.datamodel.answers.AnswerStatus;
 import org.batfish.datamodel.answers.AnswerSummary;
+import org.batfish.datamodel.answers.BdpAnswerElement;
 import org.batfish.datamodel.answers.ConvertConfigurationAnswerElement;
 import org.batfish.datamodel.answers.DataPlaneAnswerElement;
 import org.batfish.datamodel.answers.FlattenVendorConfigurationAnswerElement;
@@ -165,6 +168,8 @@ import org.batfish.representation.aws.AwsConfiguration;
 import org.batfish.representation.host.HostConfiguration;
 import org.batfish.representation.iptables.IptablesVendorConfiguration;
 import org.batfish.role.InferRoles;
+import org.batfish.symbolic.abstraction.DestinationClasses;
+import org.batfish.symbolic.abstraction.NetworkSlice;
 import org.batfish.symbolic.abstraction.Roles;
 import org.batfish.symbolic.smt.PropertyChecker;
 import org.batfish.vendor.VendorConfiguration;
@@ -1135,7 +1140,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
     return prunedTopology;
   }
 
-  private Topology computeTestrigTopology(Path testRigPath, Map<String, Configuration> configurations) {
+  private Topology computeTestrigTopology(
+      Path testRigPath, Map<String, Configuration> configurations) {
     Path topologyFilePath = testRigPath.resolve(TOPOLOGY_FILENAME);
     Topology topology;
     // Get generated facts from topology file
@@ -4318,7 +4324,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
       NodesSpecifier finalNodeRegex,
       NodesSpecifier notFinalNodeRegex,
       Set<String> transitNodes,
-      Set<String> notTransitNodes) {
+      Set<String> notTransitNodes,
+      boolean useAbstraction) {
     if (SystemUtils.IS_OS_MAC_OSX) {
       // TODO: remove when z3 parallelism bug on OSX is fixed
       _settings.setSequential(true);
@@ -4327,7 +4334,26 @@ public class Batfish extends PluginConsumer implements IBatfish {
     String tag = getFlowTag(_testrigSettings);
     Map<String, Configuration> configurations = loadConfigurations();
     Set<Flow> flows = null;
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer dataPlaneSynthesizer = null;
+
+    // TODO: abstraction gives us multiple slices; run reachability on each slice
+    // and combine the results.
+    if (useAbstraction) {
+      System.out.println("Configurations before abstraction: " + configurations.size());
+      // TODO: what does defaultCase do?
+      DestinationClasses dcs = DestinationClasses.create(this, headerSpace, true);
+      List<Supplier<NetworkSlice>> slices = NetworkSlice.allSlices(dcs, 0);
+      System.out.println("SLICES: " + slices.size());
+      configurations = slices.get(0).get().getGraph().getConfigurations();
+      System.out.println("Configurations after abstraction: " + configurations.size());
+      BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
+      BdpAnswerElement ae = new BdpAnswerElement();
+      DataPlane dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
+      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
+    } else {
+      DataPlane dataPlane = loadDataPlane();
+      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
+    }
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4420,14 +4446,18 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public Synthesizer synthesizeDataPlane() {
+    Map<String, Configuration> configurations = loadConfigurations();
+    DataPlane dataPlane = loadDataPlane();
+    return synthesizeDataPlane(configurations, dataPlane);
+  }
+
+  public Synthesizer synthesizeDataPlane(
+      Map<String, Configuration> configurations, DataPlane dataPlane) {
 
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
 
-    DataPlane dataPlane = loadDataPlane();
-
     _logger.info("Synthesizing Z3 logic...");
-    Map<String, Configuration> configurations = loadConfigurations();
     Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify());
 
     List<String> warnings = s.getWarnings();

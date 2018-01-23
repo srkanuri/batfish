@@ -12,7 +12,10 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.common.plugin.IBatfish;
@@ -212,7 +215,6 @@ public class Graph {
     throw new BatfishException("TODO: findCommonRoutingPolicy for " + proto.name());
   }
 
-
   public static Set<Prefix> getOriginatedNetworks(Configuration conf) {
     Set<Prefix> allNetworks = new HashSet<>();
     Vrf vrf = conf.getDefaultVrf();
@@ -256,7 +258,7 @@ public class Graph {
         v.visit(
             conf,
             defaultPol.getStatements(),
-            stmt -> { },
+            stmt -> {},
             expr -> {
               if (expr instanceof Conjunction) {
                 Conjunction c = (Conjunction) expr;
@@ -735,14 +737,17 @@ public class Graph {
     Set<String> sameDomain = new HashSet<>();
     Queue<String> todo = new ArrayDeque<>();
     todo.add(router);
+    sameDomain.add(router);
+
     while (!todo.isEmpty()) {
       router = todo.remove();
-      sameDomain.add(router);
       for (GraphEdge ge : getEdgeMap().get(router)) {
         String peer = ge.getPeer();
         BgpNeighbor n = _ebgpNeighbors.get(ge);
         if (peer != null && n == null && !sameDomain.contains(peer)) {
           todo.add(peer);
+          // add now, so we don't add more copies before visiting
+          sameDomain.add(peer);
         }
       }
     }
@@ -754,18 +759,113 @@ public class Graph {
    * are in the same autonomous system. This is useful when
    * modeling iBGP since we can restrict
    */
-  private void initDomains() {
+  private void initDomainsOld() {
     int i = 0;
     Set<String> routers = new HashSet<>(_configurations.keySet());
     while (!routers.isEmpty()) {
+      assert i < _configurations.size();
+
       String router = routers.iterator().next();
+      assert !_domainMap.containsKey(router);
+
       Set<String> domain = findDomain(router);
+
+      assert domain.size() > 0;
+
       _domainMapInverse.put(i, domain);
       for (String r : domain) {
+        if (_domainMap.containsKey(r)) {
+          System.out.println("Found a single router in two separate domains! " + r);
+        }
+        // assert !_domainMap.containsKey(r);
+
         _domainMap.put(r, i);
         routers.remove(r);
       }
       i++;
+    }
+  }
+
+  /* new version of initDomains using a union/find algorithm
+   */
+  private void initDomains() {
+    // a domain is represented by a leader.
+    Map<String, String> domains =
+        _configurations.keySet().stream().collect(Collectors.toMap(k -> k, k -> k));
+
+    Function<String, String> getDomain =
+        (r) -> {
+          String d = domains.get(r);
+          while (r != d) {
+            r = d;
+            d = domains.get(r);
+          }
+          return r;
+        };
+
+    BiConsumer<String, String> setDomain =
+        (r, d) -> {
+          assert domains.get(d) == d;
+
+          while (r != d) {
+            String r1 = domains.get(r);
+            domains.put(r, d);
+            r = r1;
+          }
+        };
+
+    boolean fixedPoint = false;
+    int iterations = 0;
+    int unions = 0;
+    while (!fixedPoint) {
+      iterations++;
+      fixedPoint = true;
+
+      for (String router : _configurations.keySet()) {
+        String routerDomain = getDomain.apply(router);
+
+        for (GraphEdge ge : getEdgeMap().get(router)) {
+          String peer = ge.getPeer();
+          if (peer == null) {
+            // Why would this happen?
+            continue;
+          }
+          if (_ebgpNeighbors.get(ge) == null) {
+            continue;
+          }
+          String peerDomain = getDomain.apply(peer);
+          if (peerDomain == routerDomain) {
+            continue;
+          }
+
+          fixedPoint = false;
+          unions++;
+          String unionDomain = routerDomain.compareTo(peerDomain) < 0 ? routerDomain : peerDomain;
+          setDomain.accept(router, unionDomain);
+          setDomain.accept(peer, unionDomain);
+
+          assert domains.get(router) == unionDomain;
+          assert domains.get(peer) == unionDomain;
+
+          routerDomain = unionDomain;
+          assert getDomain.apply(routerDomain) == routerDomain;
+        }
+      }
+    }
+
+    int domainId = 0;
+    for (String router : _configurations.keySet()) {
+      String routerDomain = domains.get(router);
+      if (!_domainMap.containsKey(routerDomain)) {
+        _domainMap.put(routerDomain, domainId);
+        Set<String> s = new HashSet<String>();
+        s.add(routerDomain);
+        _domainMapInverse.put(domainId, s);
+        domainId++;
+      }
+      Integer i = _domainMap.get(routerDomain);
+      _domainMap.put(router, i);
+      _domainMapInverse.get(i).add(router);
     }
   }
 
@@ -777,7 +877,6 @@ public class Graph {
     int idx = _domainMap.get(router);
     return _domainMapInverse.get(idx);
   }
-
 
   private void initAllCommunities() {
     _allCommunities = findAllCommunities();
@@ -808,8 +907,7 @@ public class Graph {
               list.add(c2);
             }
           }
-          if (c2.getType() == CommunityVar.Type.OTHER
-              && c1.getValue().equals(c2.getValue())) {
+          if (c2.getType() == CommunityVar.Type.OTHER && c1.getValue().equals(c2.getValue())) {
             list.add(c2);
           }
         }
@@ -825,7 +923,7 @@ public class Graph {
   private void initNamedCommunities() {
     _namedCommunities = new HashMap<>();
     for (Configuration conf : getConfigurations().values()) {
-      for (Entry<String,CommunityList> entry : conf.getCommunityLists().entrySet()) {
+      for (Entry<String, CommunityList> entry : conf.getCommunityLists().entrySet()) {
         String name = entry.getKey();
         CommunityList cl = entry.getValue();
         if (cl != null && cl.getLines().size() == 1) {
@@ -836,7 +934,6 @@ public class Graph {
     }
   }
 
-
   public Set<CommunityVar> getAllCommunities() {
     return _allCommunities;
   }
@@ -845,7 +942,7 @@ public class Graph {
     return _communityDependencies;
   }
 
-  public Map<String,String> getNamedCommunities() {
+  public Map<String, String> getNamedCommunities() {
     return _namedCommunities;
   }
 

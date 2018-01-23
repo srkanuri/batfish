@@ -40,6 +40,8 @@ public class GraphEdge {
 
   private boolean _isNullEdge;
 
+  private Integer hashCode;
+
   @JsonCreator
   public GraphEdge(
       @JsonProperty(START_VAR) Interface start,
@@ -86,7 +88,8 @@ public class GraphEdge {
     return _isNullEdge;
   }
 
-  @Override public boolean equals(Object o) {
+  @Override
+  public boolean equals(Object o) {
     if (!(o instanceof GraphEdge)) {
       return false;
     }
@@ -101,12 +104,16 @@ public class GraphEdge {
 
   @Override
   public int hashCode() {
+    if (hashCode != null) return hashCode;
+
     int result = _start != null ? _start.hashCode() : 0;
     result = 31 * result + (_end != null ? _end.hashCode() : 0);
     result = 31 * result + (_router != null ? _router.hashCode() : 0);
     result = 31 * result + (_peer != null ? _peer.hashCode() : 0);
     result = 31 * result + (_isAbstract ? 1 : 0);
     result = 31 * result + (_isNullEdge ? 1 : 0);
+
+    hashCode = result;
     return result;
   }
 

@@ -1,5 +1,7 @@
 package org.batfish.symbolic.abstraction;
 
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,6 +11,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.common.plugin.IBatfish;
@@ -94,15 +97,17 @@ public class DestinationClasses {
       List<Prefix> dstIps, List<Prefix> notDstIps, Map<Set<String>, List<Prefix>> destinationMap) {
     HeaderSpace catchAll = createHeaderSpace(dstIps);
     // System.out.println("DstIps: " + dstIps);
-    for (Prefix pfx : notDstIps) {
-      catchAll.getNotDstIps().add(new IpWildcard(pfx));
-    }
+    catchAll.setNotDstIps(
+        Sets.union(
+            catchAll.getNotDstIps(),
+            notDstIps.stream().map(p -> new IpWildcard(p)).collect(Collectors.toSet())));
     for (Entry<Set<String>, List<Prefix>> entry : destinationMap.entrySet()) {
       // Set<String> devices = entry.getKey();
       List<Prefix> prefixes = entry.getValue();
       for (Prefix pfx : prefixes) {
         // System.out.println("Check for: " + devices + " --> " + prefixes);
-        catchAll.getNotDstIps().add(new IpWildcard(pfx));
+        catchAll.setNotDstIps(
+            Sets.union(catchAll.getNotDstIps(), ImmutableSortedSet.of(new IpWildcard(pfx))));
       }
     }
     if (_headerspace != null) {
