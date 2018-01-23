@@ -4336,6 +4336,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Set<Flow> flows = null;
     Synthesizer dataPlaneSynthesizer = null;
 
+    // hold a reference out so the dataPlane doesn't get evicted from the cache.
+    DataPlane dataPlane = null;
+
     // TODO: abstraction gives us multiple slices; run reachability on each slice
     // and combine the results.
     if (useAbstraction) {
@@ -4348,11 +4351,11 @@ public class Batfish extends PluginConsumer implements IBatfish {
       System.out.println("Configurations after abstraction: " + configurations.size());
       BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
       BdpAnswerElement ae = new BdpAnswerElement();
-      DataPlane dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
+      dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
       _cachedDataPlanes.put(_testrigSettings,dataPlane);
       dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
     } else {
-      DataPlane dataPlane = loadDataPlane();
+      dataPlane = loadDataPlane();
       dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
     }
 
