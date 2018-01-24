@@ -171,7 +171,7 @@ class AbstractionBuilder {
     AbstractionMap abstractionMap = abstractNetwork.getSecond();
     // System.out.println("Num configs: " + abstractGraph.getConfigurations().size());
     Abstraction a = new Abstraction(abstractGraph, abstractionMap);
-    return new NetworkSlice(_headerspace, a);
+    return new NetworkSlice(_headerspace, a, _prefixes);
   }
 
   /*

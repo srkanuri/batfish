@@ -19,9 +19,13 @@ public class NetworkSlice {
 
   private Abstraction _abstraction;
 
-  public NetworkSlice(HeaderSpace headerSpace, @Nullable Abstraction abstraction) {
+  private List<Prefix> _destPrefixes;
+
+  public NetworkSlice(
+      HeaderSpace headerSpace, @Nullable Abstraction abstraction, List<Prefix> destPrefixes) {
     this._headerSpace = headerSpace;
     this._abstraction = abstraction;
+    this._destPrefixes = destPrefixes;
   }
 
   public static ArrayList<Supplier<NetworkSlice>> allSlices(DestinationClasses dcs, int fails) {
@@ -47,6 +51,10 @@ public class NetworkSlice {
     return _abstraction;
   }
 
+  public List<Prefix> getDestPrefixes() {
+    return _destPrefixes;
+  }
+
   public Graph getGraph() {
     return _abstraction.getGraph();
   }
@@ -58,5 +66,4 @@ public class NetworkSlice {
     Abstraction abstraction = getAbstraction();
     return abstraction.mapConcreteToAbstract(concreteNodes);
   }
-
 }

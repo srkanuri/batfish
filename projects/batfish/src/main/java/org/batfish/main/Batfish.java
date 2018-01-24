@@ -106,6 +106,7 @@ import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.VrrpGroup;
+import org.batfish.datamodel.answers.AbstractReachabilityAnswerElement;
 import org.batfish.datamodel.answers.AclLinesAnswerElement;
 import org.batfish.datamodel.answers.AclLinesAnswerElement.AclReachabilityEntry;
 import org.batfish.datamodel.answers.Answer;
@@ -4333,8 +4334,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Settings settings = getSettings();
     String tag = getFlowTag(_testrigSettings);
     Map<String, Configuration> configurations = loadConfigurations();
-    Set<Flow> flows = null;
-    Synthesizer dataPlaneSynthesizer = null;
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4349,32 +4348,98 @@ public class Batfish extends PluginConsumer implements IBatfish {
               + "'");
     }
 
-    // hold a reference out so the dataPlane doesn't get evicted from the cache.
-    DataPlane dataPlane = null;
-
-    // TODO: abstraction gives us multiple slices; run reachability on each slice
-    // and combine the results.
     if (useAbstraction) {
-      System.out.println("Configurations before abstraction: " + configurations.size());
+      _logger.debug("Configurations before abstraction: " + configurations.size());
       // TODO: what does defaultCase do?
       DestinationClasses dcs = DestinationClasses.create(this, headerSpace, true);
       List<Supplier<NetworkSlice>> slices = NetworkSlice.allSlices(dcs, 0);
       System.out.println("SLICES: " + slices.size());
-      NetworkSlice slice = slices.get(0).get();
-      activeIngressNodes = slice.mapConcreteToAbstract(activeIngressNodes);
-      configurations = slice.getGraph().getConfigurations();
-      System.out.println("Configurations after abstraction: " + configurations.size());
-      BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
-      BdpAnswerElement ae = new BdpAnswerElement();
-      dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
-      _cachedDataPlanes.put(_testrigSettings,dataPlane);
-      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
-    } else {
-      dataPlane = loadDataPlane();
-      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
-    }
 
-    // collect final nodes
+      if (slices.size() == 0) {
+        return new StringAnswerElement("Abstraction produced zero slices.");
+      }
+
+      AbstractReachabilityAnswerElement answers = new AbstractReachabilityAnswerElement();
+
+      // collect the flows
+      slices
+          .stream()
+          .forEach(
+              sliceSupplier -> {
+                NetworkSlice slice = sliceSupplier.get();
+                List<Prefix> dstPrefixes = slice.getDestPrefixes();
+
+                Set<String> abstractActiveIngressNodes =
+                    slice.mapConcreteToAbstract(activeIngressNodes);
+                Map<String, Configuration> abstractConfigurations =
+                    slice.getGraph().getConfigurations();
+
+                _logger.debug("Configurations after abstraction: " + abstractConfigurations.size());
+                BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
+                DataPlane dataPlane =
+                    bdpDataPlanePlugin.computeDataPlane(
+                        false, abstractConfigurations, new BdpAnswerElement());
+
+                try {
+                  _cachedDataPlanes.put(_testrigSettings, dataPlane);
+                  Synthesizer dataPlaneSynthesizer =
+                      synthesizeDataPlane(abstractConfigurations, dataPlane);
+                  AnswerElement sliceAnswer =
+                      dataplaneReachability(
+                          headerSpace,
+                          actions,
+                          finalNodeRegex,
+                          notFinalNodeRegex,
+                          transitNodes,
+                          notTransitNodes,
+                          settings,
+                          tag,
+                          abstractConfigurations,
+                          dataPlaneSynthesizer,
+                          abstractActiveIngressNodes);
+
+                  answers.addAnswer(dstPrefixes, sliceAnswer);
+                } catch (BatfishException e) {
+                  answers.addAnswer(dstPrefixes, e.getBatfishStackTrace());
+                } finally {
+                  _cachedDataPlanes.invalidate(_testrigSettings);
+                }
+              });
+      return answers;
+    } else {
+      DataPlane dataPlane = loadDataPlane();
+      Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
+      try {
+        return dataplaneReachability(
+            headerSpace,
+            actions,
+            finalNodeRegex,
+            notFinalNodeRegex,
+            transitNodes,
+            notTransitNodes,
+            settings,
+            tag,
+            configurations,
+            dataPlaneSynthesizer,
+            activeIngressNodes);
+      } catch (BatfishException e) {
+        return new StringAnswerElement(e.getMessage());
+      }
+    }
+  }
+
+  private AnswerElement dataplaneReachability(
+      HeaderSpace headerSpace,
+      Set<ForwardingAction> actions,
+      NodesSpecifier finalNodeRegex,
+      NodesSpecifier notFinalNodeRegex,
+      Set<String> transitNodes,
+      Set<String> notTransitNodes,
+      Settings settings,
+      String tag,
+      Map<String, Configuration> configurations,
+      Synthesizer dataPlaneSynthesizer,
+      Set<String> activeIngressNodes) {
     Set<String> finalNodes = finalNodeRegex.getMatchingNodes(configurations);
     Set<String> notFinalNodes = notFinalNodeRegex.getMatchingNodes(configurations);
     Set<String> activeFinalNodes = Sets.difference(finalNodes, notFinalNodes);
@@ -4423,12 +4488,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
     }
 
     // run jobs and get resulting flows
-    flows = computeNodOutput(jobs);
-
+    Set<Flow> flows = computeNodOutput(jobs);
     getDataPlanePlugin().processFlows(flows);
-
-    AnswerElement answerElement = getHistory();
-    return answerElement;
+    return getHistory();
   }
 
   private Synthesizer synthesizeAcls(Map<String, Configuration> configurations) {
