@@ -440,8 +440,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
   private final Map<EnvironmentSettings, SortedMap<String, RoutesByVrf>>
       _cachedEnvironmentRoutingTables;
 
-  private DataPlanePlugin _dataPlanePlugin;
-
   private TestrigSettings _deltaTestrigSettings;
 
   private Set<ExternalBgpAdvertisementPlugin> _externalBgpAdvertisementPlugins;
@@ -459,6 +457,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
   private final List<TestrigSettings> _testrigSettingsStack;
 
   private boolean _monotonicCache;
+
+  private Map<String, DataPlanePlugin> _dataPlanePlugins;
 
   public Batfish(
       Settings settings,
@@ -482,6 +482,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     _terminatedWithException = false;
     _answererCreators = new HashMap<>();
     _testrigSettingsStack = new ArrayList<>();
+    _dataPlanePlugins = new HashMap<>();
   }
 
   private Answer analyze() {
@@ -557,7 +558,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Question question = null;
 
     // return right away if we cannot parse the question successfully
-    try {
+    try (ActiveSpan parseQuestionSpan =
+        GlobalTracer.get().buildSpan("Parse question").startActive()) {
+      assert parseQuestionSpan != null; // avoid not used warning
       question = Question.parseQuestion(_settings.getQuestionPath(), getCurrentClassLoader());
     } catch (Exception e) {
       Answer answer = new Answer();
@@ -576,13 +579,23 @@ public class Batfish extends PluginConsumer implements IBatfish {
     _settings.setDiffActive(diffActive);
     _settings.setDiffQuestion(diff);
 
-    // Ensures configurations are parsed and ready
-    loadConfigurations();
+    try (ActiveSpan loadConfigurationSpan =
+        GlobalTracer.get().buildSpan("Load configurations").startActive()) {
+      assert loadConfigurationSpan != null; // avoid not used warning
+      // Ensures configurations are parsed and ready
+      loadConfigurations();
+    }
 
-    initQuestionEnvironments(question, diff, diffActive, dp);
+    try (ActiveSpan initQuestionEnvSpan =
+        GlobalTracer.get().buildSpan("Init question environment").startActive()) {
+      assert initQuestionEnvSpan != null; // avoid not used warning
+      initQuestionEnvironments(question, diff, diffActive, dp);
+    }
+
     AnswerElement answerElement = null;
     BatfishException exception = null;
-    try {
+    try (ActiveSpan getAnswerSpan = GlobalTracer.get().buildSpan("Get answer").startActive()) {
+      assert getAnswerSpan != null; // avoid not used warning
       if (question.getDifferential()) {
         answerElement = Answerer.create(question, this).answerDiff();
       } else {
@@ -895,7 +908,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   private Answer computeDataPlane(boolean differentialContext) {
     checkEnvironmentExists();
-    return _dataPlanePlugin.computeDataPlane(differentialContext);
+    return getDataPlanePlugin().computeDataPlane(differentialContext);
   }
 
   private void computeEnvironmentBgpTables() {
@@ -1597,7 +1610,14 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public DataPlanePlugin getDataPlanePlugin() {
-    return _dataPlanePlugin;
+    DataPlanePlugin plugin = _dataPlanePlugins.get(_settings.getDataPlaneEngineName());
+    if (plugin == null) {
+      throw new BatfishException(
+          String.format(
+              "Dataplane engine %s is unavailable or unsupported",
+              _settings.getDataPlaneEngineName()));
+    }
+    return plugin;
   }
 
   @Override
@@ -1838,7 +1858,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> getRoutes() {
-    return _dataPlanePlugin.getRoutes();
+    return getDataPlanePlugin().getRoutes();
   }
 
   public Settings getSettings() {
@@ -1933,7 +1953,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public void initBgpAdvertisements(Map<String, Configuration> configurations) {
-    Set<BgpAdvertisement> globalBgpAdvertisements = _dataPlanePlugin.getAdvertisements();
+    Set<BgpAdvertisement> globalBgpAdvertisements = getDataPlanePlugin().getAdvertisements();
     for (Configuration node : configurations.values()) {
       node.initBgpAdvertisements();
       for (Vrf vrf : node.getVrfs().values()) {
@@ -3030,8 +3050,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   private void populateFlowHistory(
       FlowHistory flowHistory, String envTag, Environment environment, String flowTag) {
-    List<Flow> flows = _dataPlanePlugin.getHistoryFlows();
-    List<FlowTrace> flowTraces = _dataPlanePlugin.getHistoryFlowTraces();
+    DataPlanePlugin dataPlanePlugin = getDataPlanePlugin();
+    List<Flow> flows = dataPlanePlugin.getHistoryFlows();
+    List<FlowTrace> flowTraces = dataPlanePlugin.getHistoryFlowTraces();
     int numEntries = flows.size();
     for (int i = 0; i < numEntries; i++) {
       Flow flow = flows.get(i);
@@ -3167,7 +3188,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public void processFlows(Set<Flow> flows) {
-    _dataPlanePlugin.processFlows(flows);
+    getDataPlanePlugin().processFlows(flows);
   }
 
   /**
@@ -3757,7 +3778,12 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Answer answer = new Answer();
     Map<Path, String> configurationData =
         readConfigurationFiles(testRigPath, BfConsts.RELPATH_AWS_CONFIGS_DIR);
-    AwsConfiguration config = parseAwsConfigurations(configurationData);
+    AwsConfiguration config;
+    try (ActiveSpan parseAwsConfigsSpan =
+        GlobalTracer.get().buildSpan("Parse AWS configs").startActive()) {
+      assert parseAwsConfigsSpan != null; // avoid unused warning
+      config = parseAwsConfigurations(configurationData);
+    }
 
     _logger.info("\n*** SERIALIZING AWS CONFIGURATION STRUCTURES ***\n");
     _logger.resetTimer();
@@ -3841,8 +3867,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
     SortedMap<Path, String> configurationData =
         readConfigurationFiles(testRigPath, BfConsts.RELPATH_HOST_CONFIGS_DIR);
     // read the host files
-    SortedMap<String, VendorConfiguration> allHostConfigurations =
-        parseVendorConfigurations(configurationData, answerElement, ConfigurationFormat.HOST);
+    SortedMap<String, VendorConfiguration> allHostConfigurations;
+    try (ActiveSpan parseHostConfigsSpan =
+        GlobalTracer.get().buildSpan("Parse host configs").startActive()) {
+      assert parseHostConfigsSpan != null; // avoid unused warning
+      allHostConfigurations =
+          parseVendorConfigurations(configurationData, answerElement, ConfigurationFormat.HOST);
+    }
     if (allHostConfigurations == null) {
       throw new BatfishException("Exiting due to parser errors");
     }
@@ -3963,8 +3994,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
       SortedMap<String, VendorConfiguration> overlayHostConfigurations) {
     Map<Path, String> configurationData =
         readConfigurationFiles(testRigPath, BfConsts.RELPATH_CONFIGURATIONS_DIR);
-    Map<String, VendorConfiguration> vendorConfigurations =
-        parseVendorConfigurations(configurationData, answerElement, ConfigurationFormat.UNKNOWN);
+    Map<String, VendorConfiguration> vendorConfigurations;
+    try (ActiveSpan parseNetworkConfigsSpan =
+        GlobalTracer.get().buildSpan("Parse network configs").startActive()) {
+      assert parseNetworkConfigsSpan != null; // avoid unused warning
+      vendorConfigurations =
+          parseVendorConfigurations(configurationData, answerElement, ConfigurationFormat.UNKNOWN);
+    }
     if (vendorConfigurations == null) {
       throw new BatfishException("Exiting due to parser errors");
     }
@@ -4074,8 +4110,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   @Override
-  public void setDataPlanePlugin(DataPlanePlugin dataPlanePlugin) {
-    _dataPlanePlugin = dataPlanePlugin;
+  public void registerDataPlanePlugin(DataPlanePlugin plugin, String name) {
+    _dataPlanePlugins.put(name, plugin);
   }
 
   public void setMonotonicCache(boolean monotonicCache) {
@@ -4088,7 +4124,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public AnswerElement smtBlackhole(HeaderQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkBlackHole(q);
   }
 
@@ -4097,49 +4133,49 @@ public class Batfish extends PluginConsumer implements IBatfish {
     if (bound == null) {
       throw new BatfishException("Missing parameter length bound: (e.g., bound=3)");
     }
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkBoundedLength(q, bound);
   }
 
   @Override
   public AnswerElement smtDeterminism(HeaderQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkDeterminism(q);
   }
 
   @Override
   public AnswerElement smtEqualLength(HeaderLocationQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkEqualLength(q);
   }
 
   @Override
   public AnswerElement smtForwarding(HeaderQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkForwarding(q);
   }
 
   @Override
   public AnswerElement smtLoadBalance(HeaderLocationQuestion q, int threshold) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkLoadBalancing(q, threshold);
   }
 
   @Override
   public AnswerElement smtLocalConsistency(Pattern routerRegex, boolean strict, boolean fullModel) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkLocalEquivalence(routerRegex, strict, fullModel);
   }
 
   @Override
   public AnswerElement smtMultipathConsistency(HeaderLocationQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkMultipathConsistency(q);
   }
 
   @Override
   public AnswerElement smtReachability(HeaderLocationQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkReachability(q);
   }
 
@@ -4151,7 +4187,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public AnswerElement smtRoutingLoop(HeaderQuestion q) {
-    PropertyChecker p = new PropertyChecker(this);
+    PropertyChecker p = new PropertyChecker(this, _settings);
     return p.checkRoutingLoop(q);
   }
 

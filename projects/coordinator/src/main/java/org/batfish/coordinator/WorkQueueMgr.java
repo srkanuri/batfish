@@ -73,6 +73,21 @@ public class WorkQueueMgr {
     }
   }
 
+  private void cleanUpEnvMetaDataIfNeeded(String container, String testrig, String environment)
+      throws IOException {
+    EnvironmentMetadata envMetadata =
+        TestrigMetadataMgr.getEnvironmentMetadata(container, testrig, environment);
+    if (envMetadata.getProcessingStatus() == ProcessingStatus.PARSING
+        && getIncompleteWork(container, testrig, environment, WorkType.PARSING) == null) {
+      TestrigMetadataMgr.updateEnvironmentStatus(
+          container, testrig, environment, ProcessingStatus.PARSING_FAIL);
+    } else if (envMetadata.getProcessingStatus() == ProcessingStatus.DATAPLANING
+        && getIncompleteWork(container, testrig, environment, WorkType.DATAPLANING) == null) {
+      TestrigMetadataMgr.updateEnvironmentStatus(
+          container, testrig, environment, ProcessingStatus.DATAPLANING_FAIL);
+    }
+  }
+
   private QueuedWork generateAndQueueDataplaneWork(
       String container, String testrig, String environment) throws Exception {
     WorkItem newWItem =
@@ -333,6 +348,16 @@ public class WorkQueueMgr {
       }
     }
     return workToCheck;
+  }
+
+  public synchronized List<QueuedWork> listIncompleteWork(String containerName) {
+    List<QueuedWork> retList = new LinkedList<>();
+    for (QueuedWork work : _queueIncompleteWork) {
+      if (work.getWorkItem().getContainerName().equals(containerName)) {
+        retList.add(work);
+      }
+    }
+    return retList;
   }
 
   public synchronized void makeWorkUnassigned(QueuedWork work) {
@@ -608,7 +633,13 @@ public class WorkQueueMgr {
     if (previouslyQueuedWork != null) {
       throw new BatfishException("Duplicate work item");
     }
-
+    WorkDetails wDetails = work.getDetails();
+    cleanUpEnvMetaDataIfNeeded(
+        work.getWorkItem().getContainerName(), wDetails.baseTestrig, wDetails.baseEnv);
+    if (work.getDetails().isDifferential) {
+      cleanUpEnvMetaDataIfNeeded(
+          work.getWorkItem().getContainerName(), wDetails.deltaTestrig, wDetails.deltaEnv);
+    }
     switch (work.getDetails().workType) {
       case PARSING:
         return queueParsingWork(work);

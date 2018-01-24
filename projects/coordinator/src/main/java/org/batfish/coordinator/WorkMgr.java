@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.opentracing.ActiveSpan;
 import io.opentracing.References;
 import io.opentracing.SpanContext;
-import io.opentracing.contrib.jaxrs2.client.ClientTracingFeature;
 import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -29,7 +29,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -143,7 +142,7 @@ public class WorkMgr extends AbstractCoordinator {
             .startActive()) {
       assert assignWorkSpan != null; // avoid unused warning
       // get the task and add other standard stuff
-      JSONObject task = work.getWorkItem().toTask();
+      JSONObject task = new JSONObject(work.getWorkItem().getRequestParams());
       Path containerDir =
           Main.getSettings().getContainersLocation().resolve(work.getWorkItem().getContainerName());
       String testrigName = work.getWorkItem().getTestrigName();
@@ -160,20 +159,16 @@ public class WorkMgr extends AbstractCoordinator {
           BfConsts.ARG_ANSWER_JSON_PATH,
           testrigBaseDir.resolve(work.getId() + BfConsts.SUFFIX_ANSWER_JSON_FILE).toString());
 
-      ClientBuilder clientBuilder =
+      client =
           CommonUtil.createHttpClientBuilder(
-              _settings.getSslPoolDisable(),
-              _settings.getSslPoolTrustAllCerts(),
-              _settings.getSslPoolKeystoreFile(),
-              _settings.getSslPoolKeystorePassword(),
-              _settings.getSslPoolTruststoreFile(),
-              _settings.getSslPoolTruststorePassword());
+                  _settings.getSslPoolDisable(),
+                  _settings.getSslPoolTrustAllCerts(),
+                  _settings.getSslPoolKeystoreFile(),
+                  _settings.getSslPoolKeystorePassword(),
+                  _settings.getSslPoolTruststoreFile(),
+                  _settings.getSslPoolTruststorePassword())
+              .build();
 
-      if (GlobalTracer.isRegistered()) {
-        clientBuilder.register(ClientTracingFeature.class);
-      }
-
-      client = clientBuilder.build();
       String protocol = _settings.getSslPoolDisable() ? "http" : "https";
       WebTarget webTarget =
           client
@@ -270,7 +265,13 @@ public class WorkMgr extends AbstractCoordinator {
     task.setStatus(TaskStatus.UnreachableOrBadResponse);
 
     Client client = null;
-    try {
+    SpanContext queueWorkSpan = work.getWorkItem().getSourceSpan();
+    try (ActiveSpan checkTaskSpan =
+        GlobalTracer.get()
+            .buildSpan("Checking Task Status")
+            .addReference(References.FOLLOWS_FROM, queueWorkSpan)
+            .startActive()) {
+      assert checkTaskSpan != null; // avoid unused warning
       client =
           CommonUtil.createHttpClientBuilder(
                   _settings.getSslPoolDisable(),
@@ -280,6 +281,7 @@ public class WorkMgr extends AbstractCoordinator {
                   _settings.getSslPoolTruststoreFile(),
                   _settings.getSslPoolTruststorePassword())
               .build();
+
       String protocol = _settings.getSslPoolDisable() ? "http" : "https";
       WebTarget webTarget =
           client
@@ -1054,6 +1056,10 @@ public class WorkMgr extends AbstractCoordinator {
     return environments;
   }
 
+  public List<QueuedWork> listIncompleteWork(String containerName) {
+    return _workQueueMgr.listIncompleteWork(containerName);
+  }
+
   public SortedSet<String> listQuestions(String containerName) {
     Path containerDir = getdirContainer(containerName);
     Path questionsDir = containerDir.resolve(BfConsts.RELPATH_QUESTIONS_DIR);
@@ -1069,18 +1075,25 @@ public class WorkMgr extends AbstractCoordinator {
     return questions;
   }
 
-  public SortedSet<String> listTestrigs(String containerName) {
+  public List<String> listTestrigs(String containerName) {
     Path containerDir = getdirContainer(containerName);
     Path testrigsDir = containerDir.resolve(BfConsts.RELPATH_TESTRIGS_DIR);
     if (!Files.exists(testrigsDir)) {
-      return new TreeSet<>();
+      return new ArrayList<>();
     }
-    SortedSet<String> testrigs =
-        new TreeSet<>(
-            CommonUtil.getSubdirectories(testrigsDir)
-                .stream()
-                .map(dir -> dir.getFileName().toString())
-                .collect(Collectors.toSet()));
+    List<String> testrigs =
+        CommonUtil.getSubdirectories(testrigsDir)
+            .stream()
+            .map(dir -> dir.getFileName().toString())
+            .sorted(
+                (t1, t2) -> { // reverse sorting by creation-time, name
+                  String key1 =
+                      TestrigMetadataMgr.getTestrigCreationTimeOrMin(containerName, t1) + t1;
+                  String key2 =
+                      TestrigMetadataMgr.getTestrigCreationTimeOrMin(containerName, t2) + t2;
+                  return key2.compareTo(key1);
+                })
+            .collect(Collectors.toList());
     return testrigs;
   }
 

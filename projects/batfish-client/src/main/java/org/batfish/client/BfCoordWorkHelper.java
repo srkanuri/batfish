@@ -1,8 +1,8 @@
 package org.batfish.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import io.opentracing.contrib.jaxrs2.client.ClientTracingFeature;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.HashMap;
@@ -32,6 +32,7 @@ import org.batfish.common.Version;
 import org.batfish.common.WorkItem;
 import org.batfish.common.util.BatfishObjectMapper;
 import org.batfish.common.util.CommonUtil;
+import org.batfish.datamodel.pojo.WorkStatus;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -385,19 +386,14 @@ public class BfCoordWorkHelper {
   }
 
   private ClientBuilder getClientBuilder() {
-    ClientBuilder clientBuilder =
-        CommonUtil.createHttpClientBuilder(
+    return CommonUtil.createHttpClientBuilder(
             _settings.getSslDisable(),
             _settings.getSslTrustAllCerts(),
             _settings.getSslKeystoreFile(),
             _settings.getSslKeystorePassword(),
             _settings.getSslTruststoreFile(),
-            _settings.getSslTruststorePassword());
-    clientBuilder.register(MultiPartFeature.class);
-    if (_settings.getTracingEnable()) {
-      clientBuilder.register(ClientTracingFeature.class);
-    }
-    return clientBuilder;
+            _settings.getSslTruststorePassword())
+        .register(MultiPartFeature.class);
   }
 
   /**
@@ -855,6 +851,41 @@ public class BfCoordWorkHelper {
   }
 
   @Nullable
+  public List<WorkStatus> listIncompleteWork(String containerName) {
+    try {
+      WebTarget webTarget = getTarget(CoordConsts.SVC_RSC_LIST_INCOMPLETE_WORK);
+
+      MultiPart multiPart = new MultiPart();
+      multiPart.setMediaType(MediaType.MULTIPART_FORM_DATA_TYPE);
+
+      addTextMultiPart(multiPart, CoordConsts.SVC_KEY_API_KEY, _settings.getApiKey());
+      addTextMultiPart(multiPart, CoordConsts.SVC_KEY_CONTAINER_NAME, containerName);
+
+      JSONObject jObj = postData(webTarget, multiPart);
+      if (jObj == null) {
+        return null;
+      }
+
+      if (!jObj.has(CoordConsts.SVC_KEY_WORK_LIST)) {
+        _logger.errorf("work list key not found in: %s\n", jObj);
+        return null;
+      }
+
+      BatfishObjectMapper mapper = new BatfishObjectMapper();
+      String result = jObj.getString(CoordConsts.SVC_KEY_WORK_LIST);
+
+      List<WorkStatus> workList =
+          mapper.readValue(result, new TypeReference<List<WorkStatus>>() {});
+
+      return workList;
+    } catch (Exception e) {
+      _logger.errorf("exception: ");
+      _logger.error(ExceptionUtils.getFullStackTrace(e) + "\n");
+      return null;
+    }
+  }
+
+  @Nullable
   public String[] listQuestions(String containerName, String testrigName) {
     try {
       WebTarget webTarget = getTarget(CoordConsts.SVC_RSC_LIST_QUESTIONS);
@@ -975,7 +1006,8 @@ public class BfCoordWorkHelper {
       MultiPart multiPart = new MultiPart();
       multiPart.setMediaType(MediaType.MULTIPART_FORM_DATA_TYPE);
 
-      addTextMultiPart(multiPart, CoordConsts.SVC_KEY_WORKITEM, wItem.toJsonString());
+      BatfishObjectMapper mapper = new BatfishObjectMapper();
+      addTextMultiPart(multiPart, CoordConsts.SVC_KEY_WORKITEM, mapper.writeValueAsString(wItem));
       addTextMultiPart(multiPart, CoordConsts.SVC_KEY_API_KEY, _settings.getApiKey());
 
       JSONObject jObj = postData(webTarget, multiPart);

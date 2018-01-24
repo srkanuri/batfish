@@ -1,5 +1,7 @@
 package org.batfish.symbolic.smt;
 
+import static java.util.stream.Collectors.toMap;
+
 import com.google.common.collect.Comparators;
 import com.google.common.collect.Iterables;
 import com.microsoft.z3.ArithExpr;
@@ -30,6 +32,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.common.plugin.IBatfish;
+import org.batfish.config.Settings;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.FlowHistory;
@@ -68,9 +71,11 @@ import org.batfish.symbolic.utils.Tuple;
 public class PropertyChecker {
 
   private IBatfish _batfish;
+  private final Settings _settings;
 
-  public PropertyChecker(IBatfish batfish) {
+  public PropertyChecker(IBatfish batfish, Settings settings) {
     this._batfish = batfish;
+    this._settings = settings;
   }
 
   private Set<GraphEdge> findFinalInterfaces(Graph g, PathRegexes p) {
@@ -290,7 +295,7 @@ public class PropertyChecker {
     Graph g = ec.getGraph();
     q = new HeaderQuestion(q);
     question.setHeaderSpace(ec.getHeaderSpace());
-    Encoder encoder = new Encoder(g, question);
+    Encoder encoder = new Encoder(_settings, g, question);
     encoder.computeEncoding();
     addEnvironmentConstraints(encoder, question.getBaseEnvironmentType());
     VerificationResult result = encoder.verify().getFirst();
@@ -300,6 +305,11 @@ public class PropertyChecker {
   /*
    * General purpose logic for checking a property that holds that
    * handles the various flags and parameters for a query with endpoints
+   *
+   * q is the question from the user.
+   * instrument instruments each router in the graph as needed to check the property.
+   * answer takes the result from Z3 and produces the answer for the user.
+   *
    */
   private AnswerElement checkProperty(
       HeaderLocationQuestion q,
@@ -348,7 +358,7 @@ public class PropertyChecker {
               Set<String> srcRouters = mapConcreteToAbstract(ec, sourceRouters);
 
               long l1 = System.currentTimeMillis();
-              Encoder enc = new Encoder(g, question);
+              Encoder enc = new Encoder(_settings, g, question);
               enc.computeEncoding();
               if (question.getBenchmark()) {
                 System.out.println("  Base Encoding: " + (System.currentTimeMillis() - l1));
@@ -419,15 +429,18 @@ public class PropertyChecker {
                   }
                   required = enc.mkAnd(required, val);
                 }
-
                 related = enc.mkAnd(related, relatePackets(enc, enc2));
                 enc.add(related);
                 enc.add(enc.mkNot(required));
 
               } else {
+                // Not a differential query; just a query on a single version of the network.
                 BoolExpr allProp = enc.mkTrue();
                 for (String router : srcRouters) {
                   BoolExpr r = prop.get(router);
+                  if (q.getNegate()) {
+                    r = enc.mkNot(r);
+                  }
                   allProp = enc.mkAnd(allProp, r);
                 }
                 enc.add(enc.mkNot(allProp));
@@ -496,7 +509,15 @@ public class PropertyChecker {
                       vp.getProp(),
                       vp.getPropDiff());
             } else {
-              fh = ce.buildFlowHistory(testrigName, vp.getSrcRouters(), vp.getEnc(), vp.getProp());
+              Map<String, Boolean> reachVals =
+                  vp.getProp()
+                      .entrySet()
+                      .stream()
+                      .collect(
+                          toMap(
+                              Map.Entry::getKey,
+                              entry -> ce.isTrue(entry.getValue()) ^ q.getNegate()));
+              fh = ce.buildFlowHistory(testrigName, vp.getSrcRouters(), vp.getEnc(), reachVals);
             }
             return new SmtReachabilityAnswerElement(vp.getResult(), fh);
           }
@@ -572,7 +593,7 @@ public class PropertyChecker {
    */
   public AnswerElement checkDeterminism(HeaderQuestion q) {
     Graph graph = new Graph(_batfish);
-    Encoder enc1 = new Encoder(graph, q);
+    Encoder enc1 = new Encoder(_settings, graph, q);
     Encoder enc2 = new Encoder(enc1, graph, q);
     enc1.computeEncoding();
     enc2.computeEncoding();
@@ -648,7 +669,7 @@ public class PropertyChecker {
    */
   public AnswerElement checkBlackHole(HeaderQuestion q) {
     Graph graph = new Graph(_batfish);
-    Encoder enc = new Encoder(graph, q);
+    Encoder enc = new Encoder(_settings, graph, q);
     enc.computeEncoding();
     Context ctx = enc.getCtx();
     EncoderSlice slice = enc.getMainSlice();
@@ -705,12 +726,16 @@ public class PropertyChecker {
    * (i.e., dropped or accepted by each).
    */
   public AnswerElement checkMultipathConsistency(HeaderLocationQuestion q) {
+    if (q.getNegate()) {
+      throw new BatfishException("Negation not implemented for smt-multipath-consistency.");
+    }
+
     PathRegexes p = new PathRegexes(q);
     Graph graph = new Graph(_batfish);
     Set<GraphEdge> destPorts = findFinalInterfaces(graph, p);
     inferDestinationHeaderSpace(graph, destPorts, q);
 
-    Encoder enc = new Encoder(graph, q);
+    Encoder enc = new Encoder(_settings, graph, q);
     enc.computeEncoding();
     EncoderSlice slice = enc.getMainSlice();
 
@@ -776,7 +801,7 @@ public class PropertyChecker {
         routers.add(router);
       }
     }
-    Encoder enc = new Encoder(graph, q);
+    Encoder enc = new Encoder(_settings, graph, q);
     enc.computeEncoding();
     Context ctx = enc.getCtx();
     EncoderSlice slice = enc.getMainSlice();
@@ -830,7 +855,7 @@ public class PropertyChecker {
       Set<String> toModel1 = new TreeSet<>();
       toModel1.add(r1);
       Graph g1 = new Graph(_batfish, null, toModel1);
-      Encoder e1 = new Encoder(g1, q);
+      Encoder e1 = new Encoder(_settings, g1, q);
       e1.computeEncoding();
 
       Context ctx = e1.getCtx();

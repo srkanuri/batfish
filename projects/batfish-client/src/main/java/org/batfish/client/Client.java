@@ -89,6 +89,7 @@ import org.batfish.datamodel.Protocol;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.answers.Answer;
 import org.batfish.datamodel.collections.NodeInterfacePair;
+import org.batfish.datamodel.pojo.WorkStatus;
 import org.batfish.datamodel.questions.Question;
 import org.batfish.datamodel.questions.Question.InstanceData;
 import org.batfish.datamodel.questions.Question.InstanceData.Variable;
@@ -1961,6 +1962,19 @@ public class Client extends AbstractClient implements IClient {
     return true;
   }
 
+  private boolean listIncompleteWork(List<String> options, List<String> parameters) {
+    if (!isValidArgument(options, parameters, 0, 0, 0, Command.LIST_ENVIRONMENTS)) {
+      return false;
+    }
+    if (!isSetContainer(true)) {
+      return false;
+    }
+    List<WorkStatus> workList = _workHelper.listIncompleteWork(_currContainerName);
+    _logger.outputf("Incomplete works: %s\n", workList);
+
+    return true;
+  }
+
   private boolean listQuestions(List<String> options, List<String> parameters) {
     if (!isValidArgument(options, parameters, 0, 0, 0, Command.LIST_QUESTIONS)) {
       return false;
@@ -2447,6 +2461,8 @@ public class Client extends AbstractClient implements IClient {
         return listContainers(options, parameters);
       case LIST_ENVIRONMENTS:
         return listEnvironments(options, parameters);
+      case LIST_INCOMPLETE_WORK:
+        return listIncompleteWork(options, parameters);
       case LIST_QUESTIONS:
         return listQuestions(options, parameters);
       case LIST_TESTRIGS:
@@ -2592,11 +2608,11 @@ public class Client extends AbstractClient implements IClient {
   }
 
   public void run(List<String> initialCommands) {
-    loadPlugins();
-    initHelpers();
     if (_settings.getTracingEnable() && !GlobalTracer.isRegistered()) {
       initTracer();
     }
+    loadPlugins();
+    initHelpers();
     _logger.debugf(
         "Will use coordinator at %s://%s\n",
         (_settings.getSslDisable()) ? "http" : "https", _settings.getCoordinatorHost());
