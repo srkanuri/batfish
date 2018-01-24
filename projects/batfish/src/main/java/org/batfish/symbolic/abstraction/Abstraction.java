@@ -26,7 +26,8 @@ public class Abstraction {
     return _abstractionMap;
   }
 
-  @Nonnull public Set<String> mapConcreteToAbstract(Collection<String> concreteNodes) {
+  @Nonnull
+  public Set<String> mapConcreteToAbstract(Collection<String> concreteNodes) {
     if (getAbstractionMap() == null) {
       return new HashSet<>(concreteNodes);
     }
