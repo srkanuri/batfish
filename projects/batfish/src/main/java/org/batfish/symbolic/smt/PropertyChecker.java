@@ -267,21 +267,6 @@ public class PropertyChecker {
   }
 
   /*
-   * Apply mapping from concrete to abstract nodes
-   */
-  private Set<String> mapConcreteToAbstract(NetworkSlice slice, List<String> concreteNodes) {
-    if (slice.getAbstraction().getAbstractionMap() == null) {
-      return new HashSet<>(concreteNodes);
-    }
-    Set<String> abstractNodes = new HashSet<>();
-    for (String c : concreteNodes) {
-      Set<String> abs = slice.getAbstraction().getAbstractionMap().getAbstractRepresentatives(c);
-      abstractNodes.addAll(abs);
-    }
-    return abstractNodes;
-  }
-
-  /*
    * Compute the forwarding behavior for the network. This adds no
    * additional constraints on top of the base network encoding.
    * Forwarding will be determined only for a particular network
@@ -382,7 +367,7 @@ public class PropertyChecker {
 
                 // Get the EC graph and mapping
                 Graph g = slice.getGraph();
-                Set<String> srcRouters = mapConcreteToAbstract(slice, sourceRouters);
+                Set<String> srcRouters = slice.mapConcreteToAbstract(sourceRouters);
 
                 System.out.println("Graph size: " + g.getRouters().size());
 
@@ -499,7 +484,7 @@ public class PropertyChecker {
 
                 // Get the EC graph and mapping
                 Graph g = slice.getGraph();
-                Set<String> srcRouters = mapConcreteToAbstract(slice, sourceRouters);
+                Set<String> srcRouters = slice.mapConcreteToAbstract(sourceRouters);
 
                 long timeEncoding = System.currentTimeMillis();
                 Encoder enc = new Encoder(_settings, g, question);
