@@ -4336,29 +4336,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Set<Flow> flows = null;
     Synthesizer dataPlaneSynthesizer = null;
 
-    // hold a reference out so the dataPlane doesn't get evicted from the cache.
-    DataPlane dataPlane = null;
-
-    // TODO: abstraction gives us multiple slices; run reachability on each slice
-    // and combine the results.
-    if (useAbstraction) {
-      System.out.println("Configurations before abstraction: " + configurations.size());
-      // TODO: what does defaultCase do?
-      DestinationClasses dcs = DestinationClasses.create(this, headerSpace, true);
-      List<Supplier<NetworkSlice>> slices = NetworkSlice.allSlices(dcs, 0);
-      System.out.println("SLICES: " + slices.size());
-      configurations = slices.get(0).get().getGraph().getConfigurations();
-      System.out.println("Configurations after abstraction: " + configurations.size());
-      BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
-      BdpAnswerElement ae = new BdpAnswerElement();
-      dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
-      _cachedDataPlanes.put(_testrigSettings,dataPlane);
-      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
-    } else {
-      dataPlane = loadDataPlane();
-      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
-    }
-
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
     Set<String> notIngressNodes = notIngressNodeRegex.getMatchingNodes(configurations);
@@ -4370,6 +4347,31 @@ public class Batfish extends PluginConsumer implements IBatfish {
               + "' and fail to match notIngressNodeRegex: '"
               + notIngressNodeRegex
               + "'");
+    }
+
+    // hold a reference out so the dataPlane doesn't get evicted from the cache.
+    DataPlane dataPlane = null;
+
+    // TODO: abstraction gives us multiple slices; run reachability on each slice
+    // and combine the results.
+    if (useAbstraction) {
+      System.out.println("Configurations before abstraction: " + configurations.size());
+      // TODO: what does defaultCase do?
+      DestinationClasses dcs = DestinationClasses.create(this, headerSpace, true);
+      List<Supplier<NetworkSlice>> slices = NetworkSlice.allSlices(dcs, 0);
+      System.out.println("SLICES: " + slices.size());
+      NetworkSlice slice = slices.get(0).get();
+      activeIngressNodes = slice.mapConcreteToAbstract(activeIngressNodes);
+      configurations = slice.getGraph().getConfigurations();
+      System.out.println("Configurations after abstraction: " + configurations.size());
+      BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) _dataPlanePlugin;
+      BdpAnswerElement ae = new BdpAnswerElement();
+      dataPlane = bdpDataPlanePlugin.computeDataPlane(false, configurations, ae);
+      _cachedDataPlanes.put(_testrigSettings,dataPlane);
+      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
+    } else {
+      dataPlane = loadDataPlane();
+      dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
     }
 
     // collect final nodes

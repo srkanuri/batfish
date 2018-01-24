@@ -1,6 +1,7 @@
 package org.batfish.symbolic.abstraction;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -49,4 +50,13 @@ public class NetworkSlice {
   public Graph getGraph() {
     return _abstraction.getGraph();
   }
+
+  /*
+   * Apply mapping from concrete to abstract nodes
+   */
+  public Set<String> mapConcreteToAbstract(Collection<String> concreteNodes) {
+    Abstraction abstraction = getAbstraction();
+    return abstraction.mapConcreteToAbstract(concreteNodes);
+  }
+
 }
