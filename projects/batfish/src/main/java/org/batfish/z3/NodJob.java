@@ -183,7 +183,7 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       //                  .toArray(new String[] {})));
       //      sb.append("\n");
       //      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), sb.toString());
-      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), program.toSmt2String());
+      CommonUtil.writeFile(Paths.get("/tmp/nodpgm"), program.toSmt2String());
       Params p = ctx.mkParams();
       p.add("timeout", _settings.getZ3timeout());
       p.add("fixedpoint.engine", "datalog");
