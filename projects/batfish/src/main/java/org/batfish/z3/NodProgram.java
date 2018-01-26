@@ -6,6 +6,7 @@ import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
 import com.microsoft.z3.FuncDecl;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.batfish.z3.node.Comment;
+import org.batfish.z3.node.IfExpr;
+import org.batfish.z3.node.RuleExpr;
+import org.batfish.z3.node.Statement;
 
 public class NodProgram {
 
@@ -30,7 +35,12 @@ public class NodProgram {
 
   private final Map<String, Integer> _variableSizes;
 
+  private final boolean _useSMT;
+
   public NodProgram(Context context) {
+    this(context,false);
+  }
+  public NodProgram(Context context, boolean useSMT) {
     _context = context;
     _queries = new ArrayList<>();
     _relationDeclarations = new LinkedHashMap<>();
@@ -38,10 +48,11 @@ public class NodProgram {
     _variables = new LinkedHashMap<>();
     _variableSizes = new LinkedHashMap<>();
     _variablesAsConsts = new LinkedHashMap<>();
+    _useSMT = useSMT;
   }
 
   public NodProgram append(NodProgram queryProgram) {
-    NodProgram result = new NodProgram(_context);
+    NodProgram result = new NodProgram(_context, _useSMT);
     result._queries.addAll(_queries);
     result._relationDeclarations.putAll(_relationDeclarations);
     result._rules.addAll(_rules);
@@ -59,6 +70,10 @@ public class NodProgram {
 
   public Context getContext() {
     return _context;
+  }
+
+  public boolean getUseSMT() {
+    return _useSMT;
   }
 
   public List<BoolExpr> getQueries() {
@@ -90,14 +105,18 @@ public class NodProgram {
     Synthesizer.PACKET_VAR_SIZES.forEach(
         (var, size) -> sb.append(String.format("(declare-var %s (_ BitVec %d))\n", var, size)));
     StringBuilder sizeSb = new StringBuilder("(");
-    Synthesizer.PACKET_VAR_SIZES
-        .values()
-        .forEach(s -> sizeSb.append(String.format(" (_ BitVec %d)", s)));
+    if(!_useSMT) {
+      Synthesizer.PACKET_VAR_SIZES.values()
+          .forEach(s -> sizeSb.append(String.format(" (_ BitVec %d)", s)));
+    }
     String sizes = sizeSb.append(")").toString();
     _relationDeclarations
         .keySet()
-        .forEach(relation -> sb.append(String.format("(declare-rel %s %s)\n", relation, sizes)));
-    _rules.forEach(r -> sb.append(String.format("(rule %s)\n", r.toString())));
+        .forEach(relation -> {
+              String fmt = _useSMT ? "(declare-fun %s %s Bool)\n" : "(declare-rel %s %s)\n";
+              sb.append(String.format(fmt, relation, sizes));
+            });
+    _rules.forEach(r -> sb.append(String.format("(assert %s)\n", r.toString())));
     
     sb.append("\n");
     String[] intermediate = new String[] {sb.toString()};
@@ -113,5 +132,30 @@ public class NodProgram {
                 intermediate[0] =
                     intermediate[0].replaceAll(Pattern.quote(var), Matcher.quoteReplacement(name)));
     return intermediate[0];
+  }
+
+  // for solving with SMT
+  public List<BoolExpr> rewriteRulesForSMT(Context ctx, List<RuleExpr> rules) {
+    assert getUseSMT();
+
+    Map<BoolExpr, BoolExpr> antecedents = new HashMap<>();
+    List<BoolExpr> exprs = new ArrayList<>();
+
+    BoolExpr f = ctx.mkFalse();
+
+    for (RuleExpr rule : rules) {
+      if(rule.getSubExpression() instanceof IfExpr) {
+        IfExpr sub = (IfExpr) rule.getSubExpression();
+        BoolExpr ant = sub.getAntecedent().toBoolExpr(this);
+        BoolExpr con = sub.getConsequent().toBoolExpr(this);
+        antecedents.put(con, ctx.mkOr(ant, antecedents.getOrDefault(con, f)));
+      } else {
+        exprs.add(rule.toBoolExpr(this));
+      }
+    }
+
+    antecedents.forEach((con,ant) -> exprs.add(ctx.mkEq(con,ant)));
+
+    return exprs;
   }
 }

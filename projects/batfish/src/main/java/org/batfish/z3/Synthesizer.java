@@ -49,6 +49,7 @@ import org.batfish.z3.node.AndExpr;
 import org.batfish.z3.node.BooleanExpr;
 import org.batfish.z3.node.Comment;
 import org.batfish.z3.node.DebugExpr;
+import org.batfish.z3.node.DeclareFunExpr;
 import org.batfish.z3.node.DeclareRelExpr;
 import org.batfish.z3.node.DeclareVarExpr;
 import org.batfish.z3.node.DestinationRouteExpr;
@@ -179,7 +180,7 @@ public class Synthesizer {
     return vars;
   }
 
-  public static Map<String, FuncDecl> getRelDeclFuncDecls(
+  public Map<String, FuncDecl> getRelDeclFuncDecls(
       List<Statement> existingStatements, Context ctx) throws Z3Exception {
     Map<String, FuncDecl> funcDecls = new LinkedHashMap<>();
     Set<String> relations = new TreeSet<>();
@@ -189,9 +190,14 @@ public class Synthesizer {
     relations.add(QueryRelationExpr.NAME);
     for (String packetRel : relations) {
       List<Integer> sizes = new ArrayList<>();
-      sizes.addAll(PACKET_VAR_SIZES.values());
-      DeclareRelExpr declaration = new DeclareRelExpr(packetRel, sizes);
-      funcDecls.put(packetRel, declaration.toFuncDecl(ctx));
+      FuncDecl  declaration;
+      if(_useSMT) {
+        declaration = new DeclareFunExpr(packetRel, sizes).toFuncDecl(ctx);
+      } else {
+        sizes.addAll(PACKET_VAR_SIZES.values());
+        declaration = new DeclareRelExpr(packetRel, sizes).toFuncDecl(ctx);
+      }
+      funcDecls.put(packetRel, declaration);
     }
     return funcDecls;
   }
@@ -860,6 +866,8 @@ public class Synthesizer {
 
   private final boolean _simplify;
 
+  private final boolean _useSMT;
+
   private final SortedSet<Edge> _topologyEdges;
 
   private final Map<String, Set<Interface>> _topologyInterfaces;
@@ -869,16 +877,21 @@ public class Synthesizer {
   public Synthesizer(Map<String, Configuration> configurations, boolean simplify) {
     _configurations = configurations;
     _fibs = null;
-    // _prFibs = null;
     _topologyEdges = null;
     _flowSinks = null;
     _simplify = simplify;
     _topologyInterfaces = null;
     _warnings = new ArrayList<>();
+    _useSMT = false;
   }
 
   public Synthesizer(
       Map<String, Configuration> configurations, DataPlane dataPlane, boolean simplify) {
+    this(configurations,dataPlane,simplify,false);
+  }
+
+  public Synthesizer(
+      Map<String, Configuration> configurations, DataPlane dataPlane, boolean simplify,boolean useSMT) {
     _configurations = configurations;
     _fibs = dataPlane.getFibs();
     // _prFibs = dataPlane.getPolicyRouteFibNodeMap();
@@ -887,6 +900,7 @@ public class Synthesizer {
     _simplify = simplify;
     _topologyInterfaces = new TreeMap<>();
     _warnings = new ArrayList<>();
+    _useSMT = useSMT;
     computeTopologyInterfaces();
     pruneInterfaces();
   }
@@ -2224,6 +2238,10 @@ public class Synthesizer {
     return _warnings;
   }
 
+  public boolean getUseSMT() {
+    return _useSMT;
+  }
+
   private boolean isFlowSink(String hostname, String ifaceName) {
     NodeInterfacePair f = new NodeInterfacePair(hostname, ifaceName);
     return _flowSinks.contains(f);
@@ -2264,7 +2282,7 @@ public class Synthesizer {
     return synthesizeNodProgram(ctx, ruleStatements);
   }
 
-  public NodProgram synthesizeNodDataPlaneProgram(Context ctx) throws Z3Exception {
+  public List<Statement> synthesizeNodDataPlaneRules() throws Z3Exception {
     List<Statement> ruleStatements = new ArrayList<>();
     List<Statement> dropRules = getDropRules();
     List<Statement> acceptRules = getAcceptRules();
@@ -2321,11 +2339,15 @@ public class Synthesizer {
     ruleStatements.addAll(postOutIfaceToNodeTransitRules);
     ruleStatements.addAll(roleOriginateToNodeOriginateRules);
 
-    return synthesizeNodProgram(ctx, ruleStatements);
+    return ruleStatements;
   }
 
-  private NodProgram synthesizeNodProgram(Context ctx, List<Statement> ruleStatements) {
-    NodProgram nodProgram = new NodProgram(ctx);
+  public NodProgram synthesizeNodDataPlaneProgram(Context ctx) throws Z3Exception {
+    return synthesizeNodProgram(ctx, synthesizeNodDataPlaneRules());
+  }
+
+  public NodProgram synthesizeNodProgram(Context ctx, List<Statement> ruleStatements) {
+    NodProgram nodProgram = new NodProgram(ctx, _useSMT);
     Map<String, FuncDecl> relDeclFuncDecls = getRelDeclFuncDecls(ruleStatements, ctx);
     nodProgram.getRelationDeclarations().putAll(relDeclFuncDecls);
     Map<String, BitVecExpr> variables = nodProgram.getVariables();
@@ -2354,6 +2376,8 @@ public class Synthesizer {
         rules.add(rule);
       }
     }
+
     return nodProgram;
   }
+
 }

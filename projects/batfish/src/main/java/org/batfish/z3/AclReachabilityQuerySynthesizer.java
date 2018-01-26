@@ -2,11 +2,14 @@ package org.batfish.z3;
 
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.FuncDecl;
 import com.microsoft.z3.Z3Exception;
 import java.util.ArrayList;
 import java.util.List;
 import org.batfish.z3.node.AclMatchExpr;
 import org.batfish.z3.node.AndExpr;
+import org.batfish.z3.node.DeclareFunExpr;
+//import org.batfish.z3.node.DeclareRelExpr;
 import org.batfish.z3.node.DeclareRelExpr;
 import org.batfish.z3.node.NumberedQueryExpr;
 import org.batfish.z3.node.QueryExpr;
@@ -21,10 +24,17 @@ public final class AclReachabilityQuerySynthesizer extends SatQuerySynthesizer<A
 
   private final int _numLines;
 
+  private final boolean _useSMT;
+
   public AclReachabilityQuerySynthesizer(String hostname, String aclName, int numLines) {
+    this(hostname,aclName,numLines,false);
+  }
+
+  public AclReachabilityQuerySynthesizer(String hostname, String aclName, int numLines, boolean useSMT) {
     _hostname = hostname;
     _aclName = aclName;
     _numLines = numLines;
+    _useSMT = useSMT;
   }
 
   @Override
@@ -39,9 +49,14 @@ public final class AclReachabilityQuerySynthesizer extends SatQuerySynthesizer<A
       NumberedQueryExpr queryRel = new NumberedQueryExpr(line);
       String queryRelName = queryRel.getRelations().toArray(new String[] {})[0];
       List<Integer> sizes = new ArrayList<>();
-      sizes.addAll(Synthesizer.PACKET_VAR_SIZES.values());
-      DeclareRelExpr declaration = new DeclareRelExpr(queryRelName, sizes);
-      baseProgram.getRelationDeclarations().put(queryRelName, declaration.toFuncDecl(ctx));
+      FuncDecl declaration;
+      if(_useSMT) {
+         declaration = new DeclareFunExpr(queryRelName, sizes).toFuncDecl(ctx);
+      } else {
+        sizes.addAll(Synthesizer.PACKET_VAR_SIZES.values());
+        declaration = new DeclareRelExpr(queryRelName, sizes).toFuncDecl(ctx);
+      }
+      baseProgram.getRelationDeclarations().put(queryRelName, declaration);
       RuleExpr queryRule = new RuleExpr(queryConditions, queryRel);
       List<BoolExpr> rules = program.getRules();
       rules.add(queryRule.toBoolExpr(baseProgram));

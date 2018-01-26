@@ -4200,7 +4200,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
       NodesSpecifier finalNodeRegex,
       NodesSpecifier notFinalNodeRegex,
       Set<String> transitNodes,
-      Set<String> notTransitNodes) {
+      Set<String> notTransitNodes,
+      boolean useSMT) {
     if (SystemUtils.IS_OS_MAC_OSX) {
       // TODO: remove when z3 parallelism bug on OSX is fixed
       _settings.setSequential(true);
@@ -4209,7 +4210,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     String tag = getFlowTag(_testrigSettings);
     Map<String, Configuration> configurations = loadConfigurations();
     Set<Flow> flows = null;
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(useSMT);
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4264,7 +4265,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
         nodeVrfs.put(ingressNode, Collections.singleton(ingressVrf));
         ReachabilityQuerySynthesizer query =
             new ReachabilityQuerySynthesizer(
-                actions, headerSpace, activeFinalNodes, nodeVrfs, transitNodes, notTransitNodes);
+                actions, headerSpace, activeFinalNodes, nodeVrfs, transitNodes, notTransitNodes,
+                useSMT);
         SortedSet<Pair<String, String>> nodes = new TreeSet<>();
         nodes.add(new Pair<>(ingressNode, ingressVrf));
         NodJob job = new NodJob(settings, dataPlaneSynthesizer, query, nodes, tag);
@@ -4302,6 +4304,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public Synthesizer synthesizeDataPlane() {
+    return synthesizeDataPlane(false);
+  }
+
+  public Synthesizer synthesizeDataPlane(boolean useSMT) {
 
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
@@ -4310,7 +4316,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     _logger.info("Synthesizing Z3 logic...");
     Map<String, Configuration> configurations = loadConfigurations();
-    Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify());
+    Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify(), useSMT);
 
     List<String> warnings = s.getWarnings();
     int numWarnings = warnings.size();

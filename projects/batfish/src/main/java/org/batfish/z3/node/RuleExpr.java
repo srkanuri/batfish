@@ -38,6 +38,8 @@ public class RuleExpr extends Statement implements ComplexExpr {
     return _subExpressions;
   }
 
+  public BooleanExpr getSubExpression() { return _subExpression; }
+
   private void init() {
     _subExpressions = new ArrayList<>();
     _subExpressions.add(new IdExpr("rule"));
@@ -46,11 +48,11 @@ public class RuleExpr extends Statement implements ComplexExpr {
   }
 
   @Override
-  public Statement simplify() {
+  public RuleExpr simplify() {
     BooleanExpr newSubExpression = _subExpression.simplify();
     if (newSubExpression != _subExpression) {
       if (newSubExpression == TrueExpr.INSTANCE) {
-        return new Comment("(vacuous rule)");
+        return null;
       } else if (newSubExpression == FalseExpr.INSTANCE) {
         throw new BatfishException("Unsatisfiable!");
       } else {

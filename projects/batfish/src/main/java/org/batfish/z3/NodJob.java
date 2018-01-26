@@ -1,6 +1,5 @@
 package org.batfish.z3;
 
-import com.microsoft.z3.BitVecExpr;
 import com.microsoft.z3.BitVecNum;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
@@ -32,6 +31,8 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpProtocol;
 import org.batfish.datamodel.State;
 import org.batfish.job.BatfishJob;
+import org.batfish.z3.node.RuleExpr;
+import org.batfish.z3.node.Statement;
 
 public final class NodJob extends BatfishJob<NodJobResult> {
 
@@ -157,7 +158,8 @@ public final class NodJob extends BatfishJob<NodJobResult> {
     long startTime = System.currentTimeMillis();
     long elapsedTime;
     try (Context ctx = new Context()) {
-      NodProgram baseProgram = _dataPlaneSynthesizer.synthesizeNodDataPlaneProgram(ctx);
+      List<Statement> ruleStatements = _dataPlaneSynthesizer.synthesizeNodDataPlaneRules();
+      NodProgram baseProgram = _dataPlaneSynthesizer.synthesizeNodProgram(ctx,ruleStatements);
       NodProgram queryProgram = _querySynthesizer.getNodProgram(baseProgram);
       NodProgram program = baseProgram.append(queryProgram);
       //      StringBuilder sb = new StringBuilder();
@@ -183,23 +185,45 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       //                  .toArray(new String[] {})));
       //      sb.append("\n");
       //      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), sb.toString());
-      CommonUtil.writeFile(Paths.get("/tmp/nodpgm"), program.toSmt2String());
+      //CommonUtil.writeFile(Paths.get("/tmp/nodpgm"), program.toSmt2String());
       Params p = ctx.mkParams();
       p.add("timeout", _settings.getZ3timeout());
-      p.add("fixedpoint.engine", "datalog");
-      p.add("fixedpoint.datalog.default_relation", "doc");
-      p.add("fixedpoint.print_answer", true);
-      Fixedpoint fix = ctx.mkFixedpoint();
-      fix.setParameters(p);
-      for (FuncDecl relationDeclaration : program.getRelationDeclarations().values()) {
-        fix.registerRelation(relationDeclaration);
-      }
-      for (BoolExpr rule : program.getRules()) {
-        fix.addRule(rule, null);
-      }
-      for (BoolExpr query : program.getQueries()) {
-        Status status = fix.query(query);
-        switch (status) {
+
+      Solver solver = ctx.mkSolver();
+      if(_dataPlaneSynthesizer.getUseSMT()) {
+        // rewrite rules for SMT
+        List<RuleExpr> rules =
+            ruleStatements.stream()
+                .filter(r -> r instanceof RuleExpr)
+                .map(r -> (RuleExpr)r)
+                .collect(Collectors.toList());
+
+        // each consequent is true if and only if the disjunction of its antecedents is
+        // (i.e. they are equal)
+        program.rewriteRulesForSMT(ctx,rules).forEach(e -> solver.add(e));
+
+        // TODO: what to do about multiple queries?
+        // the case below looks wrong too; fix that also
+
+        ReachabilityQuerySynthesizer rqs = (ReachabilityQuerySynthesizer) _querySynthesizer;
+        program.rewriteRulesForSMT(ctx,rqs.getAllRules()).forEach(e -> solver.add(e));
+
+        solver.add(program.getQueries().get(0));
+      } else {
+        p.add("fixedpoint.engine", "datalog");
+        p.add("fixedpoint.datalog.default_relation", "doc");
+        p.add("fixedpoint.print_answer", true);
+        Fixedpoint fix = ctx.mkFixedpoint();
+        fix.setParameters(p);
+        for (FuncDecl relationDeclaration : program.getRelationDeclarations().values()) {
+          fix.registerRelation(relationDeclaration);
+        }
+        for (BoolExpr rule : program.getRules()) {
+          fix.addRule(rule, null);
+        }
+        for (BoolExpr query : program.getQueries()) {
+          Status status = fix.query(query);
+          switch (status) {
           case SATISFIABLE:
             break;
           case UNKNOWN:
@@ -208,32 +232,33 @@ public final class NodJob extends BatfishJob<NodJobResult> {
             break;
           default:
             throw new BatfishException("invalid status");
+          }
         }
+        Expr answer = fix.getAnswer();
+        BoolExpr solverInput = null;
+        if (answer.getArgs().length > 0) {
+          List<Expr> reversedVarList = new ArrayList<>();
+          reversedVarList.addAll(program.getVariablesAsConsts().values());
+          Collections.reverse(reversedVarList);
+          Expr[] reversedVars = reversedVarList.toArray(new Expr[] {});
+          Expr substitutedAnswer = answer.substituteVars(reversedVars);
+          solverInput = (BoolExpr) substitutedAnswer;
+        } else {
+          solverInput = (BoolExpr) answer;
+        }
+        if (_querySynthesizer.getNegate()) {
+          solverInput = ctx.mkNot(solverInput);
+        }
+        solver.add(solverInput);
       }
-      Expr answer = fix.getAnswer();
-      BoolExpr solverInput;
-      if (answer.getArgs().length > 0) {
-        List<Expr> reversedVarList = new ArrayList<>();
-        reversedVarList.addAll(program.getVariablesAsConsts().values());
-        Collections.reverse(reversedVarList);
-        Expr[] reversedVars = reversedVarList.toArray(new Expr[] {});
-        Expr substitutedAnswer = answer.substituteVars(reversedVars);
-        solverInput = (BoolExpr) substitutedAnswer;
-      } else {
-        solverInput = (BoolExpr) answer;
-      }
-      if (_querySynthesizer.getNegate()) {
-        solverInput = ctx.mkNot(solverInput);
-      }
-      Solver solver = ctx.mkSolver();
-      solver.add(solverInput);
+      CommonUtil.writeFile(Paths.get("/tmp/smtquery.smt"), solver.toString());
       Status solverStatus = solver.check();
       switch (solverStatus) {
         case SATISFIABLE:
           break;
 
         case UNKNOWN:
-          throw new BatfishException("Stage 2 query satisfiability unknown");
+          throw new BatfishException("Stage 2 query satisfiability unknown:\n" + solver.getReasonUnknown());
 
         case UNSATISFIABLE:
           elapsedTime = System.currentTimeMillis() - startTime;
@@ -244,12 +269,14 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       }
       Model model = solver.getModel();
       Map<String, Long> constraints = new LinkedHashMap<>();
-      for (FuncDecl constDecl : model.getConstDecls()) {
-        String name = constDecl.getName().toString();
-        BitVecExpr varConstExpr = program.getVariablesAsConsts().get(name);
-        long val = ((BitVecNum) model.getConstInterp(varConstExpr)).getLong();
-        constraints.put(name, val);
-      }
+      program.getVariablesAsConsts().entrySet().forEach(entry -> {
+        BitVecNum v = (BitVecNum) model.getConstInterp(entry.getValue());
+        // null means the constant is unconstrained
+        if(v != null) {
+          long val = v.getLong();
+          constraints.put(entry.getKey(), val);
+        }
+      });
       Set<Flow> flows = new HashSet<>();
       for (Pair<String, String> nodeVrf : _nodeVrfSet) {
         String node = nodeVrf.getFirst();
@@ -265,6 +292,8 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           elapsedTime,
           _logger.getHistory(),
           new BatfishException("Error running NoD on concatenated data plane", e));
+    } catch (Exception e) {
+      throw new BatfishException("Query failed.", e);
     }
   }
 

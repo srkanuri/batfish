@@ -179,7 +179,8 @@ public interface IBatfish extends IPluginConsumer {
       NodesSpecifier finalNodeRegex,
       NodesSpecifier notFinalNodeRegex,
       Set<String> transitNodes,
-      Set<String> notTransitNodes);
+      Set<String> notTransitNodes,
+      boolean useSMT);
 
   void writeDataPlane(DataPlane dp, DataPlaneAnswerElement ae);
 

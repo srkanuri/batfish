@@ -91,7 +91,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
           question.getFinalNodeRegex(),
           question.getNotFinalNodeRegex(),
           question.getTransitNodes(),
-          question.getNotTransitNodes());
+          question.getNotTransitNodes(),
+          question.getUseSMT());
     }
   }
 
@@ -197,6 +198,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private static final String PROP_NOT_TRANSIT_NODES = "notTransitNodes";
 
+    private static final String PROP_USE_SMT = "useSMT";
+
     private SortedSet<ForwardingAction> _actions;
 
     private NodesSpecifier _finalNodeRegex;
@@ -215,6 +218,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private ReachabilityType _reachabilityType;
 
+    private boolean _useSMT;
+
     public ReachabilityQuestion() {
       _actions = new TreeSet<>(Collections.singleton(ForwardingAction.ACCEPT));
       _finalNodeRegex = new NodesSpecifier(DEFAULT_FINAL_NODE_REGEX);
@@ -225,6 +230,7 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
       _notIngressNodeRegex = new NodesSpecifier(DEFAULT_NOT_INGRESS_NODE_REGEX);
       _transitNodes = DEFAULT_TRANSIT_NODES;
       _notTransitNodes = DEFAULT_NOT_TRANSIT_NODES;
+      _useSMT = false;
     }
 
     @JsonProperty(PROP_ACTIONS)
@@ -410,6 +416,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_SRC_PROTOCOLS)
     public SortedSet<Protocol> getSrcProtocols() {
       return _headerSpace.getSrcProtocols();
+    }
+
+    @JsonProperty(PROP_USE_SMT)
+    public boolean getUseSMT() {
+      return _useSMT;
     }
 
     @Override
@@ -704,6 +715,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_SRC_PROTOCOLS)
     public void setSrcProtocols(SortedSet<Protocol> srcProtocols) {
       _headerSpace.setSrcProtocols(new TreeSet<>(srcProtocols));
+    }
+
+    @JsonProperty(PROP_USE_SMT)
+    public void setUseSMT(boolean useSMT) {
+      _useSMT = useSMT;
     }
   }
 

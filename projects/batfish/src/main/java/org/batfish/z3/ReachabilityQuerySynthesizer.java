@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.batfish.common.BatfishException;
 import org.batfish.datamodel.ForwardingAction;
 import org.batfish.datamodel.HeaderSpace;
@@ -37,6 +38,8 @@ import org.batfish.z3.node.SaneExpr;
 
 public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
 
+  private final boolean _useSMT;
+
   private Set<ForwardingAction> _actions;
 
   private Set<String> _finalNodes;
@@ -56,28 +59,54 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
       Map<String, Set<String>> ingressNodeVrfs,
       Set<String> transitNodes,
       Set<String> notTransitNodes) {
+    this(actions,headerSpace,finalNodes,ingressNodeVrfs,transitNodes,notTransitNodes,false);
+  }
+
+  public ReachabilityQuerySynthesizer(
+      Set<ForwardingAction> actions,
+      HeaderSpace headerSpace,
+      Set<String> finalNodes,
+      Map<String, Set<String>> ingressNodeVrfs,
+      Set<String> transitNodes,
+      Set<String> notTransitNodes,
+      boolean useSMT) {
     _actions = actions;
     _finalNodes = finalNodes;
     _headerSpace = headerSpace;
     _ingressNodeVrfs = ingressNodeVrfs;
     _transitNodes = transitNodes;
     _notTransitNodes = notTransitNodes;
+    _useSMT = useSMT;
   }
 
   @Override
   public NodProgram getNodProgram(NodProgram baseProgram) throws Z3Exception {
-    NodProgram program = new NodProgram(baseProgram.getContext());
+    NodProgram program = new NodProgram(baseProgram.getContext(),_useSMT);
+    List<RuleExpr> rules = getAllRules();
 
-    // create rules for injecting symbolic packets into ingress node(s)
-    List<RuleExpr> originateRules = new ArrayList<>();
-    for (String ingressNode : _ingressNodeVrfs.keySet()) {
-      for (String ingressVrf : _ingressNodeVrfs.get(ingressNode)) {
-        OriginateVrfExpr originate = new OriginateVrfExpr(ingressNode, ingressVrf);
-        RuleExpr originateRule = new RuleExpr(originate);
-        originateRules.add(originateRule);
-      }
+    // TODO why are we doing this? is there a side effect?
+    List<BoolExpr> exprs = program.getRules();
+    for (RuleExpr rule : rules) {
+      BoolExpr originateBoolExpr = rule.toBoolExpr(baseProgram);
+      exprs.add(originateBoolExpr);
     }
 
+    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
+    program.getQueries().add(queryBoolExpr);
+    return program;
+  }
+
+  public List<RuleExpr> getAllRules() {
+    List<RuleExpr> rules = getOriginateRules();
+    RuleExpr rule = getQueryRule();
+    if(rule != null) {
+      rules.add(getQueryRule());
+    }
+    return rules;
+  }
+
+  private RuleExpr getQueryRule() {
     AndExpr queryConditions = new AndExpr();
 
     // create query condition for action at final node(s)
@@ -188,17 +217,19 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
     BooleanExpr matchHeaderSpace = Synthesizer.matchHeaderSpace(_headerSpace);
     queryConditions.addConjunct(matchHeaderSpace);
 
-    RuleExpr queryRule =
-        (RuleExpr) (new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE).simplify());
-    List<BoolExpr> rules = program.getRules();
-    for (RuleExpr originateRule : originateRules) {
-      BoolExpr originateBoolExpr = originateRule.toBoolExpr(baseProgram);
-      rules.add(originateBoolExpr);
+    return new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE).simplify();
+  }
+
+  @Nonnull private List<RuleExpr> getOriginateRules() {
+    // create rules for injecting symbolic packets into ingress node(s)
+    List<RuleExpr> originateRules = new ArrayList<>();
+    for (String ingressNode : _ingressNodeVrfs.keySet()) {
+      for (String ingressVrf : _ingressNodeVrfs.get(ingressNode)) {
+        OriginateVrfExpr originate = new OriginateVrfExpr(ingressNode, ingressVrf);
+        RuleExpr originateRule = new RuleExpr(originate);
+        originateRules.add(originateRule);
+      }
     }
-    rules.add(queryRule.toBoolExpr(baseProgram));
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
-    BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
-    program.getQueries().add(queryBoolExpr);
-    return program;
+    return originateRules;
   }
 }

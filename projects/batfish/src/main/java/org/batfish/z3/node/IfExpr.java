@@ -69,6 +69,14 @@ public class IfExpr extends BooleanExpr implements ComplexExpr {
     refreshSubExpressions();
   }
 
+  public BooleanExpr getAntecedent() {
+    return _antecedent;
+  }
+
+  public BooleanExpr getConsequent() {
+    return _consequent;
+  }
+
   @Override
   public BooleanExpr simplify() {
     BooleanExpr newAntecedent = _antecedent.simplify();
