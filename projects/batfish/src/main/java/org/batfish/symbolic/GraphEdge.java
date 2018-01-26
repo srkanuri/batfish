@@ -40,6 +40,8 @@ public class GraphEdge {
 
   private boolean _isNullEdge;
 
+  private Integer _hashCode;
+
   @JsonCreator
   public GraphEdge(
       @JsonProperty(START_VAR) Interface start,
@@ -102,20 +104,23 @@ public class GraphEdge {
 
   @Override
   public int hashCode() {
-    int result = _start != null ? _start.hashCode() : 0;
-    result = 31 * result + (_end != null ? _end.hashCode() : 0);
-    result = 31 * result + (_router != null ? _router.hashCode() : 0);
-    result = 31 * result + (_peer != null ? _peer.hashCode() : 0);
-    result = 31 * result + (_isAbstract ? 1 : 0);
-    result = 31 * result + (_isNullEdge ? 1 : 0);
-    return result;
+    if (_hashCode == null) {
+      int result = _start != null ? _start.hashCode() : 0;
+      result = 31 * result + (_end != null ? _end.hashCode() : 0);
+      result = 31 * result + (_router != null ? _router.hashCode() : 0);
+      result = 31 * result + (_peer != null ? _peer.hashCode() : 0);
+      result = 31 * result + (_isAbstract ? 1 : 0);
+      result = 31 * result + (_isNullEdge ? 1 : 0);
+      _hashCode = result;
+    }
+    return _hashCode;
   }
 
   @Override
   public String toString() {
     return _router
         + ","
-        + _start.getName()
+        + (_start == null ? "_" : _start.getName())
         + " --> "
         + (_peer == null ? "_" : _peer)
         + ","

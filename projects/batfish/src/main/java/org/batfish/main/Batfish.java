@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
@@ -45,6 +47,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.SystemUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.batfish.bdp.BdpDataPlanePlugin;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -98,15 +101,19 @@ import org.batfish.datamodel.OspfProcess;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.RipNeighbor;
 import org.batfish.datamodel.RipProcess;
+import org.batfish.datamodel.Route;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.Vrf;
+import org.batfish.datamodel.VrrpGroup;
+import org.batfish.datamodel.answers.AbstractReachabilityAnswerElement;
 import org.batfish.datamodel.answers.AclLinesAnswerElement;
 import org.batfish.datamodel.answers.AclLinesAnswerElement.AclReachabilityEntry;
 import org.batfish.datamodel.answers.Answer;
 import org.batfish.datamodel.answers.AnswerElement;
 import org.batfish.datamodel.answers.AnswerStatus;
 import org.batfish.datamodel.answers.AnswerSummary;
+import org.batfish.datamodel.answers.BdpAnswerElement;
 import org.batfish.datamodel.answers.ConvertConfigurationAnswerElement;
 import org.batfish.datamodel.answers.DataPlaneAnswerElement;
 import org.batfish.datamodel.answers.FlattenVendorConfigurationAnswerElement;
@@ -135,9 +142,9 @@ import org.batfish.datamodel.collections.TreeMultiSet;
 import org.batfish.datamodel.pojo.Environment;
 import org.batfish.datamodel.questions.NodesSpecifier;
 import org.batfish.datamodel.questions.Question;
-import org.batfish.datamodel.questions.smt.EquivalenceType;
 import org.batfish.datamodel.questions.smt.HeaderLocationQuestion;
 import org.batfish.datamodel.questions.smt.HeaderQuestion;
+import org.batfish.datamodel.questions.smt.RoleQuestion;
 import org.batfish.grammar.BatfishCombinedParser;
 import org.batfish.grammar.BgpTableFormat;
 import org.batfish.grammar.GrammarSettings;
@@ -162,6 +169,8 @@ import org.batfish.representation.aws.AwsConfiguration;
 import org.batfish.representation.host.HostConfiguration;
 import org.batfish.representation.iptables.IptablesVendorConfiguration;
 import org.batfish.role.InferRoles;
+import org.batfish.symbolic.abstraction.DestinationClasses;
+import org.batfish.symbolic.abstraction.NetworkSlice;
 import org.batfish.symbolic.abstraction.Roles;
 import org.batfish.symbolic.smt.PropertyChecker;
 import org.batfish.vendor.VendorConfiguration;
@@ -985,6 +994,94 @@ public class Batfish extends PluginConsumer implements IBatfish {
     return flowSinksBuilder.build();
   }
 
+  @Override
+  public Map<Ip, Set<String>> computeIpOwners(
+      Map<String, Configuration> configurations, boolean excludeInactive) {
+    // TODO: confirm VRFs are handled correctly
+    Map<Ip, Set<String>> ipOwners = new HashMap<>();
+    Map<Pair<Prefix, Integer>, Set<Interface>> vrrpGroups = new HashMap<>();
+    configurations.forEach(
+        (hostname, c) -> {
+          for (Interface i : c.getInterfaces().values()) {
+            if (i.getActive() || (!excludeInactive && i.getBlacklisted())) {
+              // collect vrrp info
+              i.getVrrpGroups()
+                  .forEach(
+                      (groupNum, vrrpGroup) -> {
+                        Prefix prefix = vrrpGroup.getVirtualAddress().getPrefix();
+                        if (prefix == null) {
+                          // This Vlan Interface has invalid configuration. The VRRP has no source
+                          // IP address that would be used for VRRP election. This interface could
+                          // never win the election, so is not a candidate.
+                          return;
+                        }
+                        Pair<Prefix, Integer> key = new Pair<>(prefix, groupNum);
+                        Set<Interface> candidates =
+                            vrrpGroups.computeIfAbsent(
+                                key, k -> Collections.newSetFromMap(new IdentityHashMap<>()));
+                        candidates.add(i);
+                      });
+              // collect prefixes
+              i.getAllAddresses()
+                  .stream()
+                  .map(a -> a.getIp())
+                  .forEach(
+                      ip -> {
+                        Set<String> owners = ipOwners.computeIfAbsent(ip, k -> new HashSet<>());
+                        owners.add(hostname);
+                      });
+            }
+          }
+        });
+    vrrpGroups.forEach(
+        (p, candidates) -> {
+          int groupNum = p.getSecond();
+          Prefix prefix = p.getFirst();
+          Ip ip = prefix.getStartIp();
+          int lowestPriority = Integer.MAX_VALUE;
+          String bestCandidate = null;
+          SortedSet<String> bestCandidates = new TreeSet<>();
+          for (Interface candidate : candidates) {
+            VrrpGroup group = candidate.getVrrpGroups().get(groupNum);
+            int currentPriority = group.getPriority();
+            if (currentPriority < lowestPriority) {
+              lowestPriority = currentPriority;
+              bestCandidates.clear();
+              bestCandidate = candidate.getOwner().getHostname();
+            }
+            if (currentPriority == lowestPriority) {
+              bestCandidates.add(candidate.getOwner().getHostname());
+            }
+          }
+          if (bestCandidates.size() != 1) {
+            String deterministicBestCandidate = bestCandidates.first();
+            bestCandidate = deterministicBestCandidate;
+            _logger.redflag(
+                "Arbitrarily choosing best vrrp candidate: '"
+                    + deterministicBestCandidate
+                    + " for prefix/groupNumber: '"
+                    + p.toString()
+                    + "' among multiple best candidates: "
+                    + bestCandidates);
+          }
+          Set<String> owners = ipOwners.computeIfAbsent(ip, k -> new HashSet<>());
+          owners.add(bestCandidate);
+        });
+    return ipOwners;
+  }
+
+  @Override
+  public Map<Ip, String> computeIpOwnersSimple(Map<Ip, Set<String>> ipOwners) {
+    Map<Ip, String> ipOwnersSimple = new HashMap<>();
+    ipOwners.forEach(
+        (ip, owners) -> {
+          String hostname =
+              owners.size() == 1 ? owners.iterator().next() : Route.AMBIGUOUS_NEXT_HOP;
+          ipOwnersSimple.put(ip, hostname);
+        });
+    return ipOwnersSimple;
+  }
+
   public <KeyT, ResultT> void computeNodFirstUnsatOutput(
       List<NodFirstUnsatJob<KeyT, ResultT>> jobs, Map<KeyT, ResultT> output) {
     _logger.info("\n*** EXECUTING NOD UNSAT JOBS ***\n");
@@ -1016,6 +1113,33 @@ public class Batfish extends PluginConsumer implements IBatfish {
     BatfishJobExecutor.runJobsInExecutor(
         _settings, _logger, jobs, output, new NodSatAnswerElement(), true, "NOD SAT");
     _logger.printElapsedTime();
+  }
+
+  // TODO: should this be moved out of batfish class?
+  @Override
+  public Topology computeTopology(Map<String, Configuration> configurations) {
+    _logger.resetTimer();
+    Topology topology = computeTestrigTopology(_testrigSettings.getTestRigPath(), configurations);
+    SortedSet<Edge> blacklistEdges = getEdgeBlacklist();
+    if (blacklistEdges != null) {
+      SortedSet<Edge> edges = topology.getEdges();
+      edges.removeAll(blacklistEdges);
+    }
+    SortedSet<String> blacklistNodes = getNodeBlacklist();
+    if (blacklistNodes != null) {
+      for (String blacklistNode : blacklistNodes) {
+        topology.removeNode(blacklistNode);
+      }
+    }
+    Set<NodeInterfacePair> blacklistInterfaces = getInterfaceBlacklist();
+    if (blacklistInterfaces != null) {
+      for (NodeInterfacePair blacklistInterface : blacklistInterfaces) {
+        topology.removeInterface(blacklistInterface);
+      }
+    }
+    Topology prunedTopology = new Topology(topology.getEdges());
+    _logger.printElapsedTime();
+    return prunedTopology;
   }
 
   private Topology computeTestrigTopology(
@@ -4180,9 +4304,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   @Override
-  public AnswerElement smtRoles(EquivalenceType t, NodesSpecifier nodeRegex) {
-    Roles roles = Roles.create(this, nodeRegex);
-    return roles.asAnswer(t);
+  public AnswerElement smtRoles(RoleQuestion q) {
+    Roles roles = Roles.create(this, q.getDstIps(), new NodesSpecifier(q.getNodeRegex()));
+    return roles.asAnswer(q.getType());
   }
 
   @Override
@@ -4201,6 +4325,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
       NodesSpecifier notFinalNodeRegex,
       Set<String> transitNodes,
       Set<String> notTransitNodes,
+      boolean useAbstraction,
       boolean useSMT) {
     if (SystemUtils.IS_OS_MAC_OSX) {
       // TODO: remove when z3 parallelism bug on OSX is fixed
@@ -4209,8 +4334,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Settings settings = getSettings();
     String tag = getFlowTag(_testrigSettings);
     Map<String, Configuration> configurations = loadConfigurations();
-    Set<Flow> flows = null;
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(useSMT);
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4225,7 +4348,101 @@ public class Batfish extends PluginConsumer implements IBatfish {
               + "'");
     }
 
-    // collect final nodes
+    if (useAbstraction) {
+      _logger.debug("Configurations before abstraction: " + configurations.size());
+      // TODO: what does defaultCase do?
+      DestinationClasses dcs = DestinationClasses.create(this, headerSpace, true);
+      List<Supplier<NetworkSlice>> slices = NetworkSlice.allSlices(dcs, 0);
+      System.out.println("SLICES: " + slices.size());
+
+      if (slices.size() == 0) {
+        return new StringAnswerElement("Abstraction produced zero slices.");
+      }
+
+      AbstractReachabilityAnswerElement answers = new AbstractReachabilityAnswerElement();
+
+      // collect the flows
+      slices
+          .stream()
+          .forEach(
+              sliceSupplier -> {
+                NetworkSlice slice = sliceSupplier.get();
+                List<Prefix> dstPrefixes = slice.getDestPrefixes();
+
+                Set<String> abstractActiveIngressNodes =
+                    slice.mapConcreteToAbstract(activeIngressNodes);
+                Map<String, Configuration> abstractConfigurations =
+                    slice.getGraph().getConfigurations();
+
+                _logger.debug("Configurations after abstraction: " + abstractConfigurations.size());
+                BdpDataPlanePlugin bdpDataPlanePlugin = (BdpDataPlanePlugin) getDataPlanePlugin();
+                DataPlane dataPlane =
+                    bdpDataPlanePlugin.computeDataPlane(
+                        false, abstractConfigurations, new BdpAnswerElement());
+
+                try {
+                  _cachedDataPlanes.put(_testrigSettings, dataPlane);
+                  Synthesizer dataPlaneSynthesizer =
+                      synthesizeDataPlane(abstractConfigurations, dataPlane, useSMT);
+                  AnswerElement sliceAnswer =
+                      dataplaneReachability(
+                          headerSpace,
+                          actions,
+                          finalNodeRegex,
+                          notFinalNodeRegex,
+                          transitNodes,
+                          notTransitNodes,
+                          settings,
+                          tag,
+                          abstractConfigurations,
+                          dataPlaneSynthesizer,
+                          abstractActiveIngressNodes,
+                          useSMT);
+
+                  answers.addAnswer(dstPrefixes, sliceAnswer);
+                } catch (BatfishException e) {
+                  answers.addAnswer(dstPrefixes, e.getBatfishStackTrace());
+                } finally {
+                  _cachedDataPlanes.invalidate(_testrigSettings);
+                }
+              });
+      return answers;
+    } else {
+      DataPlane dataPlane = loadDataPlane();
+      Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane, useSMT);
+      try {
+        return dataplaneReachability(
+            headerSpace,
+            actions,
+            finalNodeRegex,
+            notFinalNodeRegex,
+            transitNodes,
+            notTransitNodes,
+            settings,
+            tag,
+            configurations,
+            dataPlaneSynthesizer,
+            activeIngressNodes,
+            useSMT);
+      } catch (BatfishException e) {
+        return new StringAnswerElement(e.getMessage());
+      }
+    }
+  }
+
+  private AnswerElement dataplaneReachability(
+      HeaderSpace headerSpace,
+      Set<ForwardingAction> actions,
+      NodesSpecifier finalNodeRegex,
+      NodesSpecifier notFinalNodeRegex,
+      Set<String> transitNodes,
+      Set<String> notTransitNodes,
+      Settings settings,
+      String tag,
+      Map<String, Configuration> configurations,
+      Synthesizer dataPlaneSynthesizer,
+      Set<String> activeIngressNodes,
+      boolean useSMT) {
     Set<String> finalNodes = finalNodeRegex.getMatchingNodes(configurations);
     Set<String> notFinalNodes = notFinalNodeRegex.getMatchingNodes(configurations);
     Set<String> activeFinalNodes = Sets.difference(finalNodes, notFinalNodes);
@@ -4275,12 +4492,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
     }
 
     // run jobs and get resulting flows
-    flows = computeNodOutput(jobs);
-
+    Set<Flow> flows = computeNodOutput(jobs);
     getDataPlanePlugin().processFlows(flows);
-
-    AnswerElement answerElement = getHistory();
-    return answerElement;
+    return getHistory();
   }
 
   private Synthesizer synthesizeAcls(Map<String, Configuration> configurations) {
@@ -4308,14 +4522,18 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public Synthesizer synthesizeDataPlane(boolean useSMT) {
+    Map<String, Configuration> configurations = loadConfigurations();
+    DataPlane dataPlane = loadDataPlane();
+    return synthesizeDataPlane(configurations, dataPlane, useSMT);
+  }
+
+  public Synthesizer synthesizeDataPlane(
+      Map<String, Configuration> configurations, DataPlane dataPlane, boolean useSMT) {
 
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
 
-    DataPlane dataPlane = loadDataPlane();
-
     _logger.info("Synthesizing Z3 logic...");
-    Map<String, Configuration> configurations = loadConfigurations();
     Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify(), useSMT);
 
     List<String> warnings = s.getWarnings();

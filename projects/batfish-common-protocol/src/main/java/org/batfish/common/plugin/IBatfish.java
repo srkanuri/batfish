@@ -36,9 +36,9 @@ import org.batfish.datamodel.collections.RoutesByVrf;
 import org.batfish.datamodel.pojo.Environment;
 import org.batfish.datamodel.questions.NodesSpecifier;
 import org.batfish.datamodel.questions.Question;
-import org.batfish.datamodel.questions.smt.EquivalenceType;
 import org.batfish.datamodel.questions.smt.HeaderLocationQuestion;
 import org.batfish.datamodel.questions.smt.HeaderQuestion;
+import org.batfish.datamodel.questions.smt.RoleQuestion;
 import org.batfish.grammar.BgpTableFormat;
 import org.batfish.grammar.GrammarSettings;
 
@@ -53,6 +53,13 @@ public interface IBatfish extends IPluginConsumer {
 
   Set<NodeInterfacePair> computeFlowSinks(
       Map<String, Configuration> configurations, boolean differentialContext, Topology topology);
+
+  Map<Ip, Set<String>> computeIpOwners(
+      Map<String, Configuration> configurations, boolean excludeInactive);
+
+  Map<Ip, String> computeIpOwnersSimple(Map<Ip, Set<String>> ipOwners);
+
+  Topology computeTopology(Map<String, Configuration> configurations);
 
   Map<String, BiFunction<Question, IBatfish, Answerer>> getAnswererCreators();
 
@@ -167,7 +174,7 @@ public interface IBatfish extends IPluginConsumer {
 
   AnswerElement smtReachability(HeaderLocationQuestion q);
 
-  AnswerElement smtRoles(EquivalenceType t, NodesSpecifier nodeRegex);
+  AnswerElement smtRoles(RoleQuestion q);
 
   AnswerElement smtRoutingLoop(HeaderQuestion q);
 
@@ -180,6 +187,7 @@ public interface IBatfish extends IPluginConsumer {
       NodesSpecifier notFinalNodeRegex,
       Set<String> transitNodes,
       Set<String> notTransitNodes,
+      boolean useAbstraction,
       boolean useSMT);
 
   void writeDataPlane(DataPlane dp, DataPlaneAnswerElement ae);

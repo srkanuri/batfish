@@ -13,6 +13,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import org.batfish.common.plugin.DataPlanePlugin;
 import org.batfish.common.plugin.Plugin;
+import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.AbstractRoute;
 import org.batfish.datamodel.BgpAdvertisement;
 import org.batfish.datamodel.Configuration;
@@ -35,6 +36,16 @@ public class BdpDataPlanePlugin extends DataPlanePlugin {
 
   public BdpDataPlanePlugin() {
     _flowTraces = new HashMap<>();
+  }
+
+  public BdpDataPlane computeDataPlane(
+      boolean differentialContext, Map<String, Configuration> configurations, BdpAnswerElement ae) {
+    Topology topology = CommonUtil.synthesizeTopology(configurations);
+    Set<BgpAdvertisement> externalAdverts = _batfish.loadExternalBgpAnnouncements(configurations);
+    Set<NodeInterfacePair> flowSinks =
+        _batfish.computeFlowSinks(configurations, differentialContext, topology);
+    return _engine.computeDataPlane(
+        differentialContext, configurations, topology, externalAdverts, flowSinks, ae);
   }
 
   @Override
