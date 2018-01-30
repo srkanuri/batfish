@@ -905,6 +905,14 @@ public class Synthesizer {
     pruneInterfaces();
   }
 
+  public Map<String,Set<Interface>> getTopologyInterfaces() {
+    return _topologyInterfaces;
+  }
+
+  public Set<Edge> getTopologyEdges() {
+    return _topologyEdges;
+  }
+
   private void computeTopologyInterfaces() {
     for (String hostname : _configurations.keySet()) {
       _topologyInterfaces.put(hostname, new TreeSet<Interface>());
@@ -2365,7 +2373,7 @@ public class Synthesizer {
     List<BoolExpr> rules = nodProgram.getRules();
     for (Statement rawStatement : ruleStatements) {
       Statement statement;
-      if (_simplify) {
+      if (false){ //_simplify) {
         statement = rawStatement.simplify();
       } else {
         statement = rawStatement;

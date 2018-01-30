@@ -7,17 +7,17 @@ import com.microsoft.z3.Context;
 import com.microsoft.z3.FuncDecl;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.batfish.z3.node.Comment;
 import org.batfish.z3.node.IfExpr;
 import org.batfish.z3.node.RuleExpr;
-import org.batfish.z3.node.Statement;
 
 public class NodProgram {
 
@@ -116,7 +116,10 @@ public class NodProgram {
               String fmt = _useSMT ? "(declare-fun %s %s Bool)\n" : "(declare-rel %s %s)\n";
               sb.append(String.format(fmt, relation, sizes));
             });
-    _rules.forEach(r -> sb.append(String.format("(assert %s)\n", r.toString())));
+    _rules.forEach(r -> sb.append(
+        String.format(
+            _useSMT ? "(assert %s)\n" : "(rule %s)\n",
+            r.toString())));
     
     sb.append("\n");
     String[] intermediate = new String[] {sb.toString()};
@@ -135,27 +138,37 @@ public class NodProgram {
   }
 
   // for solving with SMT
-  public List<BoolExpr> rewriteRulesForSMT(Context ctx, List<RuleExpr> rules) {
+  public Map<String,BoolExpr> getRuleAntecedents(Context ctx, List<RuleExpr> rules) {
     assert getUseSMT();
 
-    Map<BoolExpr, BoolExpr> antecedents = new HashMap<>();
+    Map<String, BoolExpr> antecedents = new HashMap<>();
     List<BoolExpr> exprs = new ArrayList<>();
 
+    BoolExpr t = ctx.mkTrue();
     BoolExpr f = ctx.mkFalse();
+
+    // default everything other than query_relation and originate relations to false.
+    // something else has to make them true
+    getRelationDeclarations().values().stream()
+        .map(d -> d.getName().toString())
+        .filter(nm -> !nm.equals("query_relation"))
+        .filter(nm -> !nm.startsWith("R_originate_"))
+        .forEach(nm -> antecedents.put(nm,f));
 
     for (RuleExpr rule : rules) {
       if(rule.getSubExpression() instanceof IfExpr) {
+        // conditionally true
         IfExpr sub = (IfExpr) rule.getSubExpression();
         BoolExpr ant = sub.getAntecedent().toBoolExpr(this);
-        BoolExpr con = sub.getConsequent().toBoolExpr(this);
+        String con = sub.getConsequent().toBoolExpr(this).toString();
         antecedents.put(con, ctx.mkOr(ant, antecedents.getOrDefault(con, f)));
       } else {
-        exprs.add(rule.toBoolExpr(this));
+        // unconditionally true
+        antecedents.put(rule.toBoolExpr(this).toString(),t);
       }
     }
 
-    antecedents.forEach((con,ant) -> exprs.add(ctx.mkEq(con,ant)));
+    return antecedents;
 
-    return exprs;
   }
 }

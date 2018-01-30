@@ -1,5 +1,7 @@
 package org.batfish.z3;
 
+import com.google.common.math.LongMath;
+import com.microsoft.z3.BitVecExpr;
 import com.microsoft.z3.BitVecNum;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
@@ -11,16 +13,22 @@ import com.microsoft.z3.Params;
 import com.microsoft.z3.Solver;
 import com.microsoft.z3.Status;
 import com.microsoft.z3.Z3Exception;
+import java.math.RoundingMode;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
 import org.batfish.common.Pair;
@@ -31,6 +39,7 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpProtocol;
 import org.batfish.datamodel.State;
 import org.batfish.job.BatfishJob;
+import org.batfish.z3.node.PreOutEdgeExpr;
 import org.batfish.z3.node.RuleExpr;
 import org.batfish.z3.node.Statement;
 
@@ -156,7 +165,7 @@ public final class NodJob extends BatfishJob<NodJobResult> {
   @Override
   public NodJobResult call() {
     long startTime = System.currentTimeMillis();
-    long elapsedTime;
+    long elapsedTime = 0;
     try (Context ctx = new Context()) {
       List<Statement> ruleStatements = _dataPlaneSynthesizer.synthesizeNodDataPlaneRules();
       NodProgram baseProgram = _dataPlaneSynthesizer.synthesizeNodProgram(ctx,ruleStatements);
@@ -185,28 +194,156 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       //                  .toArray(new String[] {})));
       //      sb.append("\n");
       //      CommonUtil.writeFile(Paths.get("/home/arifogel/scratch/dump"), sb.toString());
-      //CommonUtil.writeFile(Paths.get("/tmp/nodpgm"), program.toSmt2String());
+      //CommonUtil.writeFile(Paths.get("/tmp/nodpgm" + System.currentTimeMillis()), program.toSmt2String());
       Params p = ctx.mkParams();
       p.add("timeout", _settings.getZ3timeout());
 
       Solver solver = ctx.mkSolver();
       if(_dataPlaneSynthesizer.getUseSMT()) {
         // rewrite rules for SMT
+        ReachabilityQuerySynthesizer rqs = (ReachabilityQuerySynthesizer) _querySynthesizer;
+        List<Statement> stmts = new LinkedList<>();
+        stmts.addAll(ruleStatements);
+        stmts.addAll(rqs.getAllRules());
+
         List<RuleExpr> rules =
-            ruleStatements.stream()
+            stmts.stream()
                 .filter(r -> r instanceof RuleExpr)
                 .map(r -> (RuleExpr)r)
                 .collect(Collectors.toList());
 
         // each consequent is true if and only if the disjunction of its antecedents is
         // (i.e. they are equal)
-        program.rewriteRulesForSMT(ctx,rules).forEach(e -> solver.add(e));
+        Map<String,BoolExpr> antecedents = program.getRuleAntecedents(ctx,rules);
 
         // TODO: what to do about multiple queries?
         // the case below looks wrong too; fix that also
 
-        ReachabilityQuerySynthesizer rqs = (ReachabilityQuerySynthesizer) _querySynthesizer;
-        program.rewriteRulesForSMT(ctx,rqs.getAllRules()).forEach(e -> solver.add(e));
+        Function<String,Expr> rel = nm ->
+            ctx.mkApp( program.getRelationDeclarations().get(nm));
+        Function<String,BoolExpr> varExpr = nm -> ctx.mkEq(rel.apply(nm), ctx.mkTrue());
+        BiFunction<BoolExpr,BoolExpr,BoolExpr> eqNeg = (e1,e2) -> ctx.mkEq(e1, ctx.mkNot(e2));
+        Function<Collection<BoolExpr>,BoolExpr> all = es ->
+            es.stream().reduce(ctx.mkTrue(),(a,b) -> ctx.mkAnd(a,b));
+        Function<Collection<BoolExpr>,BoolExpr> any = es ->
+            es.stream().reduce(ctx.mkFalse(),(a,b) -> ctx.mkOr(a,b));
+        Function<Collection<BoolExpr>,BoolExpr> none = es ->
+            //ctx.mkNot(any.apply(es));
+            all.apply(es.stream().map(e -> ctx.mkNot(e)).collect(Collectors.toList()));
+
+        // Disposition sanity constraints
+        // TODO: handle other dispositions
+        // solver.add(ctx.mkNot(ctx.mkEq(rel.apply("R_accept"), rel.apply("R_drop"))));
+
+        // Originate sanity constraints
+        // 1. traffic must originate somewhere
+        // 2. traffic can only originate from one place
+        Set<BoolExpr> R_originates_vrfs =
+            program.getRelationDeclarations().keySet().stream()
+            .filter(nm -> nm.startsWith("R_originate_vrf_"))
+            .map(varExpr)
+            .collect(Collectors.toSet());
+
+        int selectOriginateVrfBits = LongMath.log2(R_originates_vrfs.size(), RoundingMode.CEILING);
+        BitVecExpr selectOriginateVrf =
+            ctx.mkBVConst("Select_originate_vrf", selectOriginateVrfBits);
+
+        // one of R_originates_vrfs must be true
+        solver.add(any.apply(R_originates_vrfs));
+
+        // only one of R_originates_vrfs must be true: each one implies none others
+        /*
+        int selectOriginateVrfValue = 0;
+        for (BoolExpr orig : R_originates_vrfs) {
+          solver.add(
+              ctx.mkImplies(orig,
+                  ctx.mkEq(selectOriginateVrf,
+                      ctx.mkBV(selectOriginateVrfValue,selectOriginateVrfBits)
+                      )));
+          selectOriginateVrfValue++;
+        }
+        */
+        R_originates_vrfs.forEach(orig -> {
+          Set<BoolExpr> others = R_originates_vrfs.stream().collect(Collectors.toSet());
+          others.remove(orig);
+          solver.add(ctx.mkImplies(orig, none.apply(others)));
+        });
+
+        // ACL sanity constraints
+        // TODO this should not be necessary.
+        /*
+        program.getRelationDeclarations().keySet().forEach(nm -> {
+          if (nm.startsWith("P_acl_")) {
+            // ACLs cannot both A (accept) and D (drop)
+            String deniedNm = "D" + nm.substring(1);
+            solver.add(eqNeg.apply(varExpr.apply(nm), varExpr.apply(deniedNm)));
+          } else if (nm.startsWith("M_acl")) {
+            // ACL filter lines cannot be both M (matched) and N (nonmatched)
+            String nonmatchNm = "N" + nm.substring(1);
+            solver.add(eqNeg.apply(varExpr.apply(nm), varExpr.apply(nonmatchNm)));
+          }
+        });
+        */
+
+
+        // Hop count constraints. 1 per node
+        Map<String,BitVecExpr> hopCounts = new HashMap<>();
+        BitVecExpr bv1 = ctx.mkBV(1, 8);
+        Function<String,BitVecExpr> getHopCount = n -> {
+          if(!hopCounts.containsKey(n)) {
+            hopCounts.put(n, ctx.mkBVConst("HopCount_" + n, 8));
+          }
+          return hopCounts.get(n);
+        };
+
+        Map<String,Set<BoolExpr>> nodePreoutEdges = new HashMap<>();
+        Function<String,Set<BoolExpr>> getNodePreoutEdges = n -> {
+          if(!nodePreoutEdges.containsKey(n)) {
+            nodePreoutEdges.put(n, new HashSet<>());
+          }
+          return nodePreoutEdges.get(n);
+        };
+
+        _dataPlaneSynthesizer.getTopologyEdges().forEach(e -> {
+          String
+              n1 = e.getNode1(), i1 = e.getInt1(),
+              n2 = e.getNode2(), i2 = e.getInt2();
+          BitVecExpr hc1 = getHopCount.apply(n1), hc2 = getHopCount.apply(n2);
+          BoolExpr preOutExpr = new PreOutEdgeExpr(n1,i1,n2,i2).toBoolExpr(program);
+          getNodePreoutEdges.apply(n1).add(preOutExpr);
+          solver.add(ctx.mkEq(preOutExpr, ctx.mkEq(hc2, ctx.mkBVAdd(hc1, bv1))));
+        });
+
+        // Allow only one R_preout_edge variable to be true for each node
+        nodePreoutEdges.forEach((n,edges) -> {
+          edges.forEach(e -> {
+            Set<BoolExpr> others = edges.stream().collect(Collectors.toSet());
+            others.remove(e);
+
+            String eNm = e.toString();
+            BoolExpr ant = antecedents.get(eNm);
+            ant = ctx.mkAnd(ant, none.apply(others));
+            antecedents.put(eNm, ant);
+          });
+          /*
+          if(edges.size() > 1) {
+            int bvSize = LongMath.log2(edges.size(), RoundingMode.CEILING);
+            BitVecExpr preOutSel = ctx.mkBVConst("Select_PreOut_" + n, bvSize);
+            int i = 0;
+            for (BoolExpr e : edges) {
+              String eNm = e.toString();
+              BoolExpr ant = antecedents.get(eNm);
+              ant = ctx.mkAnd(ant, ctx.mkEq(preOutSel, ctx.mkBV(i, bvSize)));
+              antecedents.put(eNm, ant);
+              i++;
+            }
+          }
+          */
+        });
+
+        antecedents.forEach((con,ant) -> {
+          solver.add(ctx.mkEq(ctx.mkBoolConst(con), ant));
+        });
 
         solver.add(program.getQueries().get(0));
       } else {
@@ -222,7 +359,11 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           fix.addRule(rule, null);
         }
         for (BoolExpr query : program.getQueries()) {
+          //CommonUtil.writeFile(Paths.get("/tmp/nodpgm2." + System.currentTimeMillis()), fix.toString());
+          Long nodStart = System.currentTimeMillis();
           Status status = fix.query(query);
+          Long nodEnd = System.currentTimeMillis();
+          System.out.println("NOD query time = " + String.valueOf(nodEnd - nodStart));
           switch (status) {
           case SATISFIABLE:
             break;
@@ -251,8 +392,11 @@ public final class NodJob extends BatfishJob<NodJobResult> {
         }
         solver.add(solverInput);
       }
-      CommonUtil.writeFile(Paths.get("/tmp/smtquery.smt"), solver.toString());
+      CommonUtil.writeFile(Paths.get("/tmp/smtquery.smt." + System.currentTimeMillis()), solver.toString());
+      Long solverStart = System.currentTimeMillis();
       Status solverStatus = solver.check();
+      Long solverEnd = System.currentTimeMillis();
+      System.out.println("SMT solver time = " + String.valueOf(solverEnd - solverStart));
       switch (solverStatus) {
         case SATISFIABLE:
           break;
@@ -268,6 +412,7 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           throw new BatfishException("invalid status");
       }
       Model model = solver.getModel();
+      Long flowsStartTime = System.currentTimeMillis();
       Map<String, Long> constraints = new LinkedHashMap<>();
       program.getVariablesAsConsts().entrySet().forEach(entry -> {
         BitVecNum v = (BitVecNum) model.getConstInterp(entry.getValue());
@@ -284,6 +429,8 @@ public final class NodJob extends BatfishJob<NodJobResult> {
         Flow flow = createFlow(node, vrf, constraints);
         flows.add(flow);
       }
+      Long flowsElapsedTime = System.currentTimeMillis() - flowsStartTime;
+      System.out.println("Flows time = " + String.valueOf(flowsElapsedTime));
       elapsedTime = System.currentTimeMillis() - startTime;
       return new NodJobResult(elapsedTime, _logger.getHistory(), flows);
     } catch (Z3Exception e) {
@@ -294,6 +441,10 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           new BatfishException("Error running NoD on concatenated data plane", e));
     } catch (Exception e) {
       throw new BatfishException("Query failed.", e);
+    } finally {
+      Pair<String,String> p = _nodeVrfSet.first();
+      String endPoint = p.getFirst() + "_" + p.getSecond();
+      System.out.println("NOD query for " + endPoint + " elapsed time = " + String.valueOf(elapsedTime));
     }
   }
 

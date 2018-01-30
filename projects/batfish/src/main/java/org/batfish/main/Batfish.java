@@ -4474,10 +4474,14 @@ public class Batfish extends PluginConsumer implements IBatfish {
               "Same node %s can not be in both transit and notTransit", illegalTransitNodes));
     }
 
+
+    Set<String> origNodes = new HashSet<String>();
+
     // build query jobs
     List<NodJob> jobs = new ArrayList<>();
     for (String ingressNode : activeIngressNodes) {
       for (String ingressVrf : configurations.get(ingressNode).getVrfs().keySet()) {
+        origNodes.add(ingressNode + "_" + ingressVrf);
         Map<String, Set<String>> nodeVrfs = new TreeMap<>();
         nodeVrfs.put(ingressNode, Collections.singleton(ingressVrf));
         ReachabilityQuerySynthesizer query =
@@ -4491,9 +4495,15 @@ public class Batfish extends PluginConsumer implements IBatfish {
       }
     }
 
+    CommonUtil.writeFile(Paths.get("/tmp/originateNodes"),
+        origNodes.stream().reduce("", (s1,s2) -> s1 + "\n" + s2));
+
     // run jobs and get resulting flows
     Set<Flow> flows = computeNodOutput(jobs);
+    Long processFlowsStart = System.currentTimeMillis();
     getDataPlanePlugin().processFlows(flows);
+    Long processFlowsElapsed = System.currentTimeMillis() - processFlowsStart;
+    System.out.println("processFlows time = " + String.valueOf(processFlowsElapsed));
     return getHistory();
   }
 
