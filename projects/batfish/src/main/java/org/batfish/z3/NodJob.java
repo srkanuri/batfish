@@ -296,6 +296,18 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           return hopCounts.get(n);
         };
 
+        /*
+        // Each hop count can only be used once. Don't really care.
+        Set<BitVecExpr> hopCountsSet = hopCounts.values().stream().collect(Collectors.toSet());
+        hopCountsSet.forEach(hc1 -> {
+          hopCountsSet.forEach(hc2 -> {
+            if(!hc1.equals(hc2)) {
+              solver.add(ctx.mkNot(ctx.mkEq(hc1,hc2)));
+            }
+          });
+        });
+        */
+
         Map<String,Set<BoolExpr>> nodePreoutEdges = new HashMap<>();
         Function<String,Set<BoolExpr>> getNodePreoutEdges = n -> {
           if(!nodePreoutEdges.containsKey(n)) {
@@ -311,11 +323,16 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           BitVecExpr hc1 = getHopCount.apply(n1), hc2 = getHopCount.apply(n2);
           BoolExpr preOutExpr = new PreOutEdgeExpr(n1,i1,n2,i2).toBoolExpr(program);
           getNodePreoutEdges.apply(n1).add(preOutExpr);
-          solver.add(ctx.mkEq(preOutExpr, ctx.mkEq(hc2, ctx.mkBVAdd(hc1, bv1))));
+          //solver.add(ctx.mkEq(preOutExpr, ctx.mkEq(hc2, ctx.mkBVAdd(hc1, bv1))));
+
+          String preOutNm = preOutExpr.toString();
+          antecedents.put(preOutNm,
+              ctx.mkAnd(antecedents.get(preOutNm), ctx.mkEq(hc2, ctx.mkBVAdd(hc1, bv1))));
         });
 
         // Allow only one R_preout_edge variable to be true for each node
         nodePreoutEdges.forEach((n,edges) -> {
+          /*
           edges.forEach(e -> {
             Set<BoolExpr> others = edges.stream().collect(Collectors.toSet());
             others.remove(e);
@@ -325,6 +342,8 @@ public final class NodJob extends BatfishJob<NodJobResult> {
             ant = ctx.mkAnd(ant, none.apply(others));
             antecedents.put(eNm, ant);
           });
+          */
+
           /*
           if(edges.size() > 1) {
             int bvSize = LongMath.log2(edges.size(), RoundingMode.CEILING);
