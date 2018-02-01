@@ -19,6 +19,10 @@ import org.batfish.z3.node.DropAclOutExpr;
 import org.batfish.z3.node.DropExpr;
 import org.batfish.z3.node.DropNoRouteExpr;
 import org.batfish.z3.node.DropNullRouteExpr;
+import org.batfish.z3.node.EqExpr;
+import org.batfish.z3.node.IfExpr;
+import org.batfish.z3.node.IntExpr;
+import org.batfish.z3.node.LitIntExpr;
 import org.batfish.z3.node.NodeAcceptExpr;
 import org.batfish.z3.node.NodeDropAclExpr;
 import org.batfish.z3.node.NodeDropAclInExpr;
@@ -34,6 +38,7 @@ import org.batfish.z3.node.QueryExpr;
 import org.batfish.z3.node.QueryRelationExpr;
 import org.batfish.z3.node.RuleExpr;
 import org.batfish.z3.node.SaneExpr;
+import org.batfish.z3.node.VarIntExpr;
 
 public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
 
@@ -48,8 +53,10 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
   private Set<String> _transitNodes;
 
   private Set<String> _notTransitNodes;
+  private Synthesizer _synthesizer;
 
   public ReachabilityQuerySynthesizer(
+      Synthesizer synthesizer,
       Set<ForwardingAction> actions,
       HeaderSpace headerSpace,
       Set<String> finalNodes,
@@ -62,6 +69,7 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
     _ingressNodeVrfs = ingressNodeVrfs;
     _transitNodes = transitNodes;
     _notTransitNodes = notTransitNodes;
+    _synthesizer = synthesizer;
   }
 
   @Override
@@ -70,11 +78,26 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
 
     // create rules for injecting symbolic packets into ingress node(s)
     List<RuleExpr> originateRules = new ArrayList<>();
+    int origChoiceBits = _synthesizer.getOriginationChoiceBits();
+    int origChoice = 0;
     for (String ingressNode : _ingressNodeVrfs.keySet()) {
       for (String ingressVrf : _ingressNodeVrfs.get(ingressNode)) {
-        OriginateVrfExpr originate = new OriginateVrfExpr(ingressNode, ingressVrf);
-        RuleExpr originateRule = new RuleExpr(originate);
-        originateRules.add(originateRule);
+        OriginateVrfExpr originate = new OriginateVrfExpr(_synthesizer, ingressNode, ingressVrf);
+
+        if(origChoiceBits > 0) {
+          BooleanExpr guard =
+              new EqExpr(
+                  new VarIntExpr(_synthesizer.ORIGINATION_CHOICE_VAR),
+                  new LitIntExpr(origChoice, origChoiceBits)
+                  );
+          IfExpr ifExpr = new IfExpr(guard, originate);
+          RuleExpr originateRule = new RuleExpr(ifExpr);
+          originateRules.add(originateRule);
+          origChoice ++;
+        } else {
+          RuleExpr originateRule = new RuleExpr(originate);
+          originateRules.add(originateRule);
+        }
       }
     }
 
@@ -87,81 +110,81 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
         case ACCEPT:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeAcceptExpr accept = new NodeAcceptExpr(finalNode);
+              NodeAcceptExpr accept = new NodeAcceptExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(accept);
             }
           } else {
-            finalActions.addDisjunct(AcceptExpr.INSTANCE);
+            finalActions.addDisjunct(new AcceptExpr(_synthesizer));
           }
           break;
 
         case DEBUG:
-          finalActions.addDisjunct(DebugExpr.INSTANCE);
+          finalActions.addDisjunct(new DebugExpr(_synthesizer));
           break;
 
         case DROP:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropExpr drop = new NodeDropExpr(finalNode);
+              NodeDropExpr drop = new NodeDropExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropExpr.INSTANCE);
+            finalActions.addDisjunct(new DropExpr(_synthesizer));
           }
           break;
 
         case DROP_ACL:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropAclExpr drop = new NodeDropAclExpr(finalNode);
+              NodeDropAclExpr drop = new NodeDropAclExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropAclExpr.INSTANCE);
+            finalActions.addDisjunct(new DropAclExpr(_synthesizer));
           }
           break;
 
         case DROP_ACL_IN:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropAclInExpr drop = new NodeDropAclInExpr(finalNode);
+              NodeDropAclInExpr drop = new NodeDropAclInExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropAclInExpr.INSTANCE);
+            finalActions.addDisjunct(new DropAclInExpr(_synthesizer));
           }
           break;
 
         case DROP_ACL_OUT:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropAclOutExpr drop = new NodeDropAclOutExpr(finalNode);
+              NodeDropAclOutExpr drop = new NodeDropAclOutExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropAclOutExpr.INSTANCE);
+            finalActions.addDisjunct(new DropAclOutExpr(_synthesizer));
           }
           break;
 
         case DROP_NO_ROUTE:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropNoRouteExpr drop = new NodeDropNoRouteExpr(finalNode);
+              NodeDropNoRouteExpr drop = new NodeDropNoRouteExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropNoRouteExpr.INSTANCE);
+            finalActions.addDisjunct(new DropNoRouteExpr(_synthesizer));
           }
           break;
 
         case DROP_NULL_ROUTE:
           if (_finalNodes.size() > 0) {
             for (String finalNode : _finalNodes) {
-              NodeDropNullRouteExpr drop = new NodeDropNullRouteExpr(finalNode);
+              NodeDropNullRouteExpr drop = new NodeDropNullRouteExpr(_synthesizer, finalNode);
               finalActions.addDisjunct(drop);
             }
           } else {
-            finalActions.addDisjunct(DropNullRouteExpr.INSTANCE);
+            finalActions.addDisjunct(new DropNullRouteExpr(_synthesizer));
           }
           break;
 
@@ -171,31 +194,31 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
       }
     }
     queryConditions.addConjunct(finalActions);
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
+    queryConditions.addConjunct(new SaneExpr(_synthesizer));
 
     // check transit constraints (unordered)
     NodeTransitExpr transitExpr = null;
     for (String nodeName : _transitNodes) {
-      transitExpr = new NodeTransitExpr(nodeName);
+      transitExpr = new NodeTransitExpr(_synthesizer, nodeName);
       queryConditions.addConjunct(transitExpr);
     }
     for (String nodeName : _notTransitNodes) {
-      transitExpr = new NodeTransitExpr(nodeName);
+      transitExpr = new NodeTransitExpr(_synthesizer, nodeName);
       queryConditions.addConjunct(new NotExpr(transitExpr));
     }
 
     // add headerSpace constraints
-    BooleanExpr matchHeaderSpace = Synthesizer.matchHeaderSpace(_headerSpace);
+    BooleanExpr matchHeaderSpace = _synthesizer.matchHeaderSpace(_headerSpace);
     queryConditions.addConjunct(matchHeaderSpace);
 
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(_synthesizer));
     List<BoolExpr> rules = program.getRules();
     for (RuleExpr originateRule : originateRules) {
       BoolExpr originateBoolExpr = originateRule.toBoolExpr(baseProgram);
       rules.add(originateBoolExpr);
     }
     rules.add(queryRule.toBoolExpr(baseProgram));
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(_synthesizer));
     BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
     program.getQueries().add(queryBoolExpr);
     return program;

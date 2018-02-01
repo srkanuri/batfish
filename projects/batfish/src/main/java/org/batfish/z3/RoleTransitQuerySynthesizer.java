@@ -13,17 +13,17 @@ import org.batfish.z3.node.SaneExpr;
 
 public class RoleTransitQuerySynthesizer extends BaseQuerySynthesizer {
 
-  public RoleTransitQuerySynthesizer(String sourceRole, String transitNode) {
-    RoleOriginateExpr roleOriginate = new RoleOriginateExpr(sourceRole);
-    NodeTransitExpr nodeTransit = new NodeTransitExpr(transitNode);
+  public RoleTransitQuerySynthesizer(Synthesizer synthesizer, String sourceRole, String transitNode) {
+    RoleOriginateExpr roleOriginate = new RoleOriginateExpr(synthesizer, sourceRole);
+    NodeTransitExpr nodeTransit = new NodeTransitExpr(synthesizer, transitNode);
     RuleExpr injectSymbolicPackets = new RuleExpr(roleOriginate);
     AndExpr queryConditions = new AndExpr();
     queryConditions.addConjunct(nodeTransit);
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
-    queryConditions.addConjunct(ExternalSourceIpExpr.INSTANCE);
-    queryConditions.addConjunct(ExternalDestinationIpExpr.INSTANCE);
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    queryConditions.addConjunct(new SaneExpr(synthesizer));
+    queryConditions.addConjunct(new ExternalSourceIpExpr(synthesizer));
+    queryConditions.addConjunct(new ExternalDestinationIpExpr(synthesizer));
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(synthesizer));
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(synthesizer));
     StringBuilder sb = new StringBuilder();
     injectSymbolicPackets.print(sb, 0);
     sb.append("\n");

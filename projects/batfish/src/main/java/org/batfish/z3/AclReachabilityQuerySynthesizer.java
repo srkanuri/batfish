@@ -20,11 +20,13 @@ public final class AclReachabilityQuerySynthesizer extends SatQuerySynthesizer<A
   private final String _hostname;
 
   private final int _numLines;
+  private final Synthesizer _synthesizer;
 
-  public AclReachabilityQuerySynthesizer(String hostname, String aclName, int numLines) {
+  public AclReachabilityQuerySynthesizer(Synthesizer synthesizer, String hostname, String aclName, int numLines) {
     _hostname = hostname;
     _aclName = aclName;
     _numLines = numLines;
+    _synthesizer = synthesizer;
   }
 
   @Override
@@ -32,14 +34,14 @@ public final class AclReachabilityQuerySynthesizer extends SatQuerySynthesizer<A
     Context ctx = baseProgram.getContext();
     NodProgram program = new NodProgram(ctx);
     for (int line = 0; line < _numLines; line++) {
-      AclMatchExpr matchAclLine = new AclMatchExpr(_hostname, _aclName, line);
+      AclMatchExpr matchAclLine = new AclMatchExpr(_synthesizer, _hostname, _aclName, line);
       AndExpr queryConditions = new AndExpr();
       queryConditions.addConjunct(matchAclLine);
-      queryConditions.addConjunct(SaneExpr.INSTANCE);
-      NumberedQueryExpr queryRel = new NumberedQueryExpr(line);
+      queryConditions.addConjunct(new SaneExpr(_synthesizer));
+      NumberedQueryExpr queryRel = new NumberedQueryExpr(_synthesizer, line);
       String queryRelName = queryRel.getRelations().toArray(new String[] {})[0];
       List<Integer> sizes = new ArrayList<>();
-      sizes.addAll(Synthesizer.PACKET_VAR_SIZES.values());
+      sizes.addAll(_synthesizer.PACKET_VAR_SIZES.values());
       DeclareRelExpr declaration = new DeclareRelExpr(queryRelName, sizes);
       baseProgram.getRelationDeclarations().put(queryRelName, declaration.toFuncDecl(ctx));
       RuleExpr queryRule = new RuleExpr(queryConditions, queryRel);

@@ -1,12 +1,12 @@
 package org.batfish.z3.node;
 
-public class ExternalSourceIpExpr extends PacketRelExpr {
+import org.batfish.z3.Synthesizer;
 
-  public static final ExternalSourceIpExpr INSTANCE = new ExternalSourceIpExpr();
+public class ExternalSourceIpExpr extends PacketRelExpr {
 
   private static final String NAME = "External_source_ip";
 
-  private ExternalSourceIpExpr() {
-    super(NAME);
+  public ExternalSourceIpExpr(Synthesizer synthesizer) {
+    super(synthesizer, NAME);
   }
 }

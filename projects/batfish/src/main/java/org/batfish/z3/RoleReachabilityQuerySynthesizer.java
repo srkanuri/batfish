@@ -13,17 +13,18 @@ import org.batfish.z3.node.SaneExpr;
 
 public class RoleReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
 
-  public RoleReachabilityQuerySynthesizer(String hostname, String vrf, String role) {
-    OriginateVrfExpr originate = new OriginateVrfExpr(hostname, vrf);
-    RoleAcceptExpr roleAccept = new RoleAcceptExpr(role);
+  public RoleReachabilityQuerySynthesizer(Synthesizer synthesizer,
+      String hostname, String vrf, String role) {
+    OriginateVrfExpr originate = new OriginateVrfExpr(synthesizer, hostname, vrf);
+    RoleAcceptExpr roleAccept = new RoleAcceptExpr(synthesizer, role);
     RuleExpr injectSymbolicPackets = new RuleExpr(originate);
     AndExpr queryConditions = new AndExpr();
     queryConditions.addConjunct(roleAccept);
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
-    queryConditions.addConjunct(ExternalSourceIpExpr.INSTANCE);
-    queryConditions.addConjunct(ExternalDestinationIpExpr.INSTANCE);
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    queryConditions.addConjunct(new SaneExpr(synthesizer));
+    queryConditions.addConjunct(new ExternalSourceIpExpr(synthesizer));
+    queryConditions.addConjunct(new ExternalDestinationIpExpr(synthesizer));
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(synthesizer));
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(synthesizer));
     StringBuilder sb = new StringBuilder();
     injectSymbolicPackets.print(sb, 0);
     sb.append("\n");

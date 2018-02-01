@@ -28,13 +28,13 @@ import org.batfish.z3.node.VarIntExpr;
 public class BlacklistDstIpQuerySynthesizer extends BaseQuerySynthesizer {
 
   private Set<Ip> _blacklistIps;
+  private Synthesizer _synthesizer;
 
-  public BlacklistDstIpQuerySynthesizer(
-      @Nullable Set<Ip> explicitBlacklistIps,
-      Set<String> blacklistNodes,
-      Set<NodeInterfacePair> blacklistInterfaces,
-      SortedSet<Edge> blacklistEdges,
-      Map<String, Configuration> configurations) {
+  public BlacklistDstIpQuerySynthesizer(@Nullable Set<Ip> explicitBlacklistIps,
+      Set<String> blacklistNodes, Set<NodeInterfacePair> blacklistInterfaces,
+      SortedSet<Edge> blacklistEdges, Map<String, Configuration> configurations,
+      Synthesizer synthesizer) {
+    _synthesizer = synthesizer;
     _blacklistIps = new TreeSet<>();
     if (explicitBlacklistIps != null) {
       _blacklistIps.addAll(explicitBlacklistIps);
@@ -92,17 +92,17 @@ public class BlacklistDstIpQuerySynthesizer extends BaseQuerySynthesizer {
   public NodProgram getNodProgram(NodProgram baseProgram) throws Z3Exception {
     NodProgram program = new NodProgram(baseProgram.getContext());
     AndExpr queryConditions = new AndExpr();
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
+    queryConditions.addConjunct(new SaneExpr(_synthesizer));
     for (Ip blacklistIp : _blacklistIps) {
       BooleanExpr blacklistIpCondition =
           new NotExpr(
               new EqExpr(new VarIntExpr(Synthesizer.DST_IP_VAR), new LitIntExpr(blacklistIp)));
       queryConditions.addConjunct(blacklistIpCondition);
     }
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(_synthesizer));
     List<BoolExpr> rules = program.getRules();
     rules.add(queryRule.toBoolExpr(baseProgram));
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(_synthesizer));
     BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
     program.getQueries().add(queryBoolExpr);
     return program;

@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
@@ -663,9 +664,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
           _logger.redflag("RED_FLAG: Acl \"" + hostname + ":" + aclName + "\" contains no lines\n");
           continue;
         }
-        AclReachabilityQuerySynthesizer query =
-            new AclReachabilityQuerySynthesizer(hostname, aclName, numLines);
         Synthesizer aclSynthesizer = synthesizeAcls(Collections.singletonMap(hostname, c));
+        AclReachabilityQuerySynthesizer query =
+            new AclReachabilityQuerySynthesizer(aclSynthesizer, hostname, aclName, numLines);
         NodSatJob<AclLine> job = new NodSatJob<>(_settings, aclSynthesizer, query);
         jobs.add(job);
       }
@@ -710,7 +711,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
               }
             }
             EarliestMoreGeneralReachableLineQuerySynthesizer query =
-                new EarliestMoreGeneralReachableLineQuerySynthesizer(line, toCheck, ipAccessList);
+                new EarliestMoreGeneralReachableLineQuerySynthesizer(aclSynthesizer, line, toCheck, ipAccessList);
             NodFirstUnsatJob<AclLine, Integer> job =
                 new NodFirstUnsatJob<>(_settings, aclSynthesizer, query);
             step2Jobs.add(job);
@@ -2747,8 +2748,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
           }
           for (String vrf : configuration.getVrfs().keySet()) {
             MultipathInconsistencyQuerySynthesizer query =
-                new MultipathInconsistencyQuerySynthesizer(node, vrf, headerSpace);
-            SortedSet<Pair<String, String>> nodes = new TreeSet<>();
+                new MultipathInconsistencyQuerySynthesizer(dataPlaneSynthesizer, node, vrf, headerSpace);
+            List<Pair<String, String>> nodes = new ArrayList<>();
             nodes.add(new Pair<>(node, vrf));
             NodJob job = new NodJob(settings, dataPlaneSynthesizer, query, nodes, tag);
             jobs.add(job);
@@ -3066,7 +3067,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     BlacklistDstIpQuerySynthesizer blacklistQuery =
         new BlacklistDstIpQuerySynthesizer(
-            null, blacklistNodes, blacklistInterfaces, blacklistEdges, baseConfigurations);
+            null, blacklistNodes, blacklistInterfaces, blacklistEdges, baseConfigurations,
+            baseDataPlaneSynthesizer);
 
     // compute composite program and flows
     List<Synthesizer> commonEdgeSynthesizers = new ArrayList<>();
@@ -3084,9 +3086,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
       String vrf =
           diffConfigurations.get(ingressNode).getInterfaces().get(outInterface).getVrf().getName();
       ReachEdgeQuerySynthesizer reachQuery =
-          new ReachEdgeQuerySynthesizer(ingressNode, vrf, edge, true, headerSpace);
+          new ReachEdgeQuerySynthesizer(
+              baseDataPlaneSynthesizer,
+              ingressNode, vrf, edge, true, headerSpace);
       ReachEdgeQuerySynthesizer noReachQuery =
-          new ReachEdgeQuerySynthesizer(ingressNode, vrf, edge, true, new HeaderSpace());
+          new ReachEdgeQuerySynthesizer(
+              baseDataPlaneSynthesizer,
+              ingressNode, vrf, edge, true, new HeaderSpace());
       noReachQuery.setNegate(true);
       List<QuerySynthesizer> queries = new ArrayList<>();
       queries.add(reachQuery);
@@ -3121,7 +3127,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 .getVrf()
                 .getName();
         ReachEdgeQuerySynthesizer reachQuery =
-            new ReachEdgeQuerySynthesizer(ingressNode, vrf, missingEdge, true, headerSpace);
+            new ReachEdgeQuerySynthesizer(
+                baseDataPlaneSynthesizer,
+                ingressNode, vrf, missingEdge, true, headerSpace);
         List<QuerySynthesizer> queries = new ArrayList<>();
         queries.add(reachQuery);
         queries.add(blacklistQuery);
@@ -3543,7 +3551,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     BlacklistDstIpQuerySynthesizer blacklistQuery =
         new BlacklistDstIpQuerySynthesizer(
-            null, blacklistNodes, blacklistInterfaces, blacklistEdges, baseConfigurations);
+            null, blacklistNodes, blacklistInterfaces, blacklistEdges, baseConfigurations,
+            baseDataPlaneSynthesizer);
 
     // compute composite program and flows
     List<Synthesizer> synthesizers = new ArrayList<>();
@@ -3566,11 +3575,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
         nodeVrfs.put(node, Collections.singleton(vrf));
         ReachabilityQuerySynthesizer acceptQuery =
             new ReachabilityQuerySynthesizer(
+                baseDataPlaneSynthesizer, // either synthesizer will work
                 Collections.singleton(ForwardingAction.ACCEPT), headerSpace,
                 Collections.<String>emptySet(), nodeVrfs,
                 Collections.<String>emptySet(), Collections.<String>emptySet());
         ReachabilityQuerySynthesizer notAcceptQuery =
             new ReachabilityQuerySynthesizer(
+                baseDataPlaneSynthesizer, // either synthesizer will work
                 Collections.singleton(ForwardingAction.ACCEPT),
                 new HeaderSpace(),
                 Collections.<String>emptySet(),
@@ -4303,10 +4314,12 @@ public class Batfish extends PluginConsumer implements IBatfish {
       Set<String> transitNodes,
       Set<String> notTransitNodes) {
     Settings settings = getSettings();
-    String tag = getFlowTag(_testrigSettings);
     Map<String, Configuration> configurations = loadConfigurations();
     Set<Flow> flows = null;
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane();
+
+    int maxBatchSize = 16;
+
+    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(maxBatchSize);
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4354,20 +4367,22 @@ public class Batfish extends PluginConsumer implements IBatfish {
     }
 
     // build query jobs
-    List<NodJob> jobs = new ArrayList<>();
-    for (String ingressNode : activeIngressNodes) {
-      for (String ingressVrf : configurations.get(ingressNode).getVrfs().keySet()) {
-        Map<String, Set<String>> nodeVrfs = new TreeMap<>();
-        nodeVrfs.put(ingressNode, Collections.singleton(ingressVrf));
-        ReachabilityQuerySynthesizer query =
-            new ReachabilityQuerySynthesizer(
-                actions, headerSpace, activeFinalNodes, nodeVrfs, transitNodes, notTransitNodes);
-        SortedSet<Pair<String, String>> nodes = new TreeSet<>();
-        nodes.add(new Pair<>(ingressNode, ingressVrf));
-        NodJob job = new NodJob(settings, dataPlaneSynthesizer, query, nodes, tag);
-        jobs.add(job);
-      }
-    }
+    List<List<Pair<String,String>>> batches = standard_batchIngressNodesVrfs(
+        configurations,
+        activeIngressNodes,
+        maxBatchSize);
+
+    List<NodJob> jobs = batches.stream().map(batch ->
+        standard_makeNodJob(
+            settings,
+            headerSpace,
+            activeFinalNodes,
+            batch,
+            transitNodes,
+            notTransitNodes,
+            actions,
+            dataPlaneSynthesizer))
+        .collect(Collectors.toList());
 
     // run jobs and get resulting flows
     flows = computeNodOutput(jobs);
@@ -4376,6 +4391,61 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     AnswerElement answerElement = getHistory();
     return answerElement;
+  }
+
+  private NodJob standard_makeNodJob(Settings settings, HeaderSpace headerSpace,
+      Set<String> activeFinalNodes, List<Pair<String, String>> ingressNodeVrfs,
+      Set<String> transitNodes, Set<String> notTransitNodes, Set<ForwardingAction> actions,
+      Synthesizer dataPlaneSynthesizer) {
+    // construct nodeVrfs for the synthesizer
+    Map<String,Set<String>> nodeVrfs = new TreeMap<>();
+    for(Pair<String,String> p : ingressNodeVrfs) {
+      String node = p.getFirst();
+      String vrf = p.getSecond();
+      if(nodeVrfs.containsKey(node)) {
+        nodeVrfs.get(node).add(vrf);
+      } else {
+        Set<String> s = new TreeSet<>();
+        s.add(vrf);
+        nodeVrfs.put(node,s);
+      }
+    }
+
+    ReachabilityQuerySynthesizer query =
+        new ReachabilityQuerySynthesizer(
+            dataPlaneSynthesizer,
+            actions, headerSpace, activeFinalNodes, nodeVrfs, transitNodes, notTransitNodes);
+
+    return new NodJob(settings, dataPlaneSynthesizer, query, ingressNodeVrfs,
+        getFlowTag(_testrigSettings)
+        );
+  }
+
+  private List<List<Pair<String,String>>> standard_batchIngressNodesVrfs(
+      Map<String, Configuration> configurations,
+      Set<String> activeIngressNodes,
+      int maxBatchSize) {
+    List<List<Pair<String,String>>> batches = new ArrayList<>();
+
+    batches.add(0,new ArrayList<>());
+    Consumer<Pair<String,String>> addPair = (p) -> {
+      List<Pair<String,String>> batch = batches.get(0);
+      batch.add(p);
+      if(batch.size() > maxBatchSize) {
+        batches.add(0,new ArrayList<>());
+      }
+    };
+
+    activeIngressNodes.stream()
+        .map(ingressNode -> configurations.get(ingressNode)
+            .getVrfs()
+            .keySet()
+            .stream()
+            .map(ingressVrf -> new Pair<>(ingressNode, ingressVrf)))
+        .reduce(Stream::concat).get()
+        .forEach(addPair);
+
+    return batches;
   }
 
   private Synthesizer synthesizeAcls(Map<String, Configuration> configurations) {
@@ -4399,6 +4469,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public Synthesizer synthesizeDataPlane() {
+    return synthesizeDataPlane(1);
+  }
+
+  public Synthesizer synthesizeDataPlane(int maxBatchSize) {
 
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
@@ -4407,7 +4481,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     _logger.info("Synthesizing Z3 logic...");
     Map<String, Configuration> configurations = loadConfigurations();
-    Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify());
+    Synthesizer s = new Synthesizer(configurations, dataPlane, _settings.getSimplify(), maxBatchSize);
 
     List<String> warnings = s.getWarnings();
     int numWarnings = warnings.size();

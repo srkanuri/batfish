@@ -28,10 +28,13 @@ public class EarliestMoreGeneralReachableLineQuerySynthesizer
   private IpAccessList _list;
 
   private AclLine _unreachableLine;
+  private Synthesizer _synthesizer;
 
   public EarliestMoreGeneralReachableLineQuerySynthesizer(
+      Synthesizer synthesizer,
       AclLine unreachableLine, List<AclLine> earlierReachableLines, IpAccessList list) {
     super(unreachableLine);
+    _synthesizer = synthesizer;
     _unreachableLine = unreachableLine;
     _earlierReachableLines = earlierReachableLines;
     _hostname = _unreachableLine.getHostname();
@@ -45,19 +48,19 @@ public class EarliestMoreGeneralReachableLineQuerySynthesizer
     NodProgram program = new NodProgram(ctx);
     int unreachableLineIndex = _unreachableLine.getLine();
     IpAccessListLine unreachableLine = _list.getLines().get(unreachableLineIndex);
-    BooleanExpr matchUnreachableLineHeaderSpace = Synthesizer.matchHeaderSpace(unreachableLine);
+    BooleanExpr matchUnreachableLineHeaderSpace = _synthesizer.matchHeaderSpace(unreachableLine);
     for (AclLine earlierReachableLine : _earlierReachableLines) {
       int earlierLineIndex = earlierReachableLine.getLine();
       IpAccessListLine earlierLine = _list.getLines().get(earlierLineIndex);
-      BooleanExpr matchEarlierLineHeaderSpace = Synthesizer.matchHeaderSpace(earlierLine);
+      BooleanExpr matchEarlierLineHeaderSpace = _synthesizer.matchHeaderSpace(earlierLine);
       AndExpr queryConditions = new AndExpr();
       queryConditions.addConjunct(new NotExpr(matchEarlierLineHeaderSpace));
       queryConditions.addConjunct(matchUnreachableLineHeaderSpace);
-      queryConditions.addConjunct(SaneExpr.INSTANCE);
-      NumberedQueryExpr queryRel = new NumberedQueryExpr(earlierLineIndex);
+      queryConditions.addConjunct(new SaneExpr(_synthesizer));
+      NumberedQueryExpr queryRel = new NumberedQueryExpr(_synthesizer, earlierLineIndex);
       String queryRelName = queryRel.getRelations().toArray(new String[] {})[0];
       List<Integer> sizes = new ArrayList<>();
-      sizes.addAll(Synthesizer.PACKET_VAR_SIZES.values());
+      sizes.addAll(_synthesizer.PACKET_VAR_SIZES.values());
       DeclareRelExpr declaration = new DeclareRelExpr(queryRelName, sizes);
       baseProgram.getRelationDeclarations().put(queryRelName, declaration.toFuncDecl(ctx));
       RuleExpr queryRule = new RuleExpr(queryConditions, queryRel);

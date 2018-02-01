@@ -27,12 +27,16 @@ public class ReachEdgeQuerySynthesizer extends BaseQuerySynthesizer {
 
   private boolean _requireAcceptance;
 
+  private Synthesizer _synthesizer;
+
   public ReachEdgeQuerySynthesizer(
+      Synthesizer synthesizer,
       String originationNode,
       String ingressVrf,
       Edge edge,
       boolean requireAcceptance,
       HeaderSpace headerSpace) {
+    _synthesizer = synthesizer;
     _originationNode = originationNode;
     _ingressVrf = ingressVrf;
     _edge = edge;
@@ -43,22 +47,22 @@ public class ReachEdgeQuerySynthesizer extends BaseQuerySynthesizer {
   @Override
   public NodProgram getNodProgram(NodProgram baseProgram) throws Z3Exception {
     NodProgram program = new NodProgram(baseProgram.getContext());
-    OriginateVrfExpr originate = new OriginateVrfExpr(_originationNode, _ingressVrf);
+    OriginateVrfExpr originate = new OriginateVrfExpr(_synthesizer, _originationNode, _ingressVrf);
     RuleExpr injectSymbolicPackets = new RuleExpr(originate);
     AndExpr queryConditions = new AndExpr();
-    queryConditions.addConjunct(new PreOutEdgeExpr(_edge));
-    queryConditions.addConjunct(new PreInInterfaceExpr(_edge.getNode2(), _edge.getInt2()));
-    queryConditions.addConjunct(Synthesizer.matchHeaderSpace(_headerSpace));
+    queryConditions.addConjunct(new PreOutEdgeExpr(_synthesizer, _edge));
+    queryConditions.addConjunct(new PreInInterfaceExpr(_synthesizer, _edge.getNode2(), _edge.getInt2()));
+    queryConditions.addConjunct(_synthesizer.matchHeaderSpace(_headerSpace));
     if (_requireAcceptance) {
-      queryConditions.addConjunct(AcceptExpr.INSTANCE);
+      queryConditions.addConjunct(new AcceptExpr(_synthesizer));
     }
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
+    queryConditions.addConjunct(new SaneExpr(_synthesizer));
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(_synthesizer));
     List<BoolExpr> rules = program.getRules();
     BoolExpr injectSymbolicPacketsBoolExpr = injectSymbolicPackets.toBoolExpr(baseProgram);
     rules.add(injectSymbolicPacketsBoolExpr);
     rules.add(queryRule.toBoolExpr(baseProgram));
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(_synthesizer));
     BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
     program.getQueries().add(queryBoolExpr);
     return program;

@@ -8,7 +8,7 @@ public class TrueExpr extends BooleanExpr {
 
   public static final TrueExpr INSTANCE = new TrueExpr();
 
-  private TrueExpr() {}
+  public TrueExpr() {}
 
   @Override
   public void print(StringBuilder sb, int indent) {

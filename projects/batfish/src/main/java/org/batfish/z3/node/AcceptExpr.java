@@ -1,12 +1,12 @@
 package org.batfish.z3.node;
 
-public class AcceptExpr extends PacketRelExpr {
+import org.batfish.z3.Synthesizer;
 
-  public static final AcceptExpr INSTANCE = new AcceptExpr();
+public class AcceptExpr extends PacketRelExpr {
 
   public static final String NAME = "R_accept";
 
-  private AcceptExpr() {
-    super(NAME);
+  public AcceptExpr(Synthesizer synthesizer) {
+    super(synthesizer, NAME);
   }
 }

@@ -1,12 +1,12 @@
 package org.batfish.z3.node;
 
-public class QueryRelationExpr extends PacketRelExpr {
+import org.batfish.z3.Synthesizer;
 
-  public static final QueryRelationExpr INSTANCE = new QueryRelationExpr();
+public class QueryRelationExpr extends PacketRelExpr {
 
   public static final String NAME = "query_relation";
 
-  private QueryRelationExpr() {
-    super(NAME);
+  public QueryRelationExpr(Synthesizer synthesizer) {
+    super(synthesizer, NAME);
   }
 }

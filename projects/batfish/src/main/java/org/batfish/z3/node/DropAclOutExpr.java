@@ -1,12 +1,12 @@
 package org.batfish.z3.node;
 
-public class DropAclOutExpr extends PacketRelExpr {
+import org.batfish.z3.Synthesizer;
 
-  public static final DropAclOutExpr INSTANCE = new DropAclOutExpr();
+public class DropAclOutExpr extends PacketRelExpr {
 
   public static final String NAME = "R_drop_acl_out";
 
-  private DropAclOutExpr() {
-    super(NAME);
+  public DropAclOutExpr(Synthesizer synthesizer) {
+    super(synthesizer, NAME);
   }
 }

@@ -1,10 +1,12 @@
 package org.batfish.z3.node;
 
+import org.batfish.z3.Synthesizer;
+
 public class NodeDropAclOutExpr extends NodePacketRelExpr {
 
   public static final String BASE_NAME = "R_node_drop_acl_out";
 
-  public NodeDropAclOutExpr(String nodeArg) {
-    super(BASE_NAME, nodeArg);
+  public NodeDropAclOutExpr(Synthesizer synthesizer, String nodeArg) {
+    super(synthesizer, BASE_NAME, nodeArg);
   }
 }

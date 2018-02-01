@@ -1,5 +1,7 @@
 package org.batfish.z3;
 
+import static com.microsoft.z3.Status.SATISFIABLE;
+
 import com.microsoft.z3.BitVecExpr;
 import com.microsoft.z3.BitVecNum;
 import com.microsoft.z3.BoolExpr;
@@ -12,6 +14,7 @@ import com.microsoft.z3.Params;
 import com.microsoft.z3.Solver;
 import com.microsoft.z3.Status;
 import com.microsoft.z3.Z3Exception;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,10 +22,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeSet;
 import org.batfish.common.BatfishException;
 import org.batfish.common.Pair;
+import org.batfish.common.util.CommonUtil;
 import org.batfish.config.Settings;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.Ip;
@@ -120,6 +123,9 @@ public final class NodJob extends BatfishJob<NodJobResult> {
           flowBuilder.setTcpFlagsFin(value.intValue());
           break;
 
+        case Synthesizer.ORIGINATION_CHOICE_VAR:
+          break;
+
         default:
           throw new BatfishException("invalid variable name");
       }
@@ -129,7 +135,7 @@ public final class NodJob extends BatfishJob<NodJobResult> {
 
   private Synthesizer _dataPlaneSynthesizer;
 
-  private final SortedSet<Pair<String, String>> _nodeVrfSet;
+  private final List<Pair<String, String>> _nodeVrfSet;
 
   private QuerySynthesizer _querySynthesizer;
 
@@ -139,12 +145,12 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       Settings settings,
       Synthesizer dataPlaneSynthesizer,
       QuerySynthesizer querySynthesizer,
-      SortedSet<Pair<String, String>> nodeVrfSet,
+      List<Pair<String, String>> nodeVrfSet,
       String tag) {
     super(settings);
     _dataPlaneSynthesizer = dataPlaneSynthesizer;
     _querySynthesizer = querySynthesizer;
-    _nodeVrfSet = new TreeSet<>();
+    _nodeVrfSet = new ArrayList<>();
     _nodeVrfSet.addAll(nodeVrfSet);
     _tag = tag;
   }
@@ -171,6 +177,9 @@ public final class NodJob extends BatfishJob<NodJobResult> {
         fix.addRule(rule, null);
       }
       for (BoolExpr query : program.getQueries()) {
+        CommonUtil.writeFile(
+            new File("/tmp/nodJob." + String.valueOf(System.currentTimeMillis())).toPath(),
+            fix.toString());
         Status status = fix.query(query);
         switch (status) {
           case SATISFIABLE:
@@ -200,8 +209,11 @@ public final class NodJob extends BatfishJob<NodJobResult> {
       }
       Solver solver = ctx.mkSolver();
       solver.add(solverInput);
-      Status solverStatus = solver.check();
-      switch (solverStatus) {
+      Status solverStatus = SATISFIABLE;
+      Set<Flow> flows = new HashSet<>();
+      while(solverStatus == SATISFIABLE) {
+        solverStatus = solver.check();
+        switch (solverStatus) {
         case SATISFIABLE:
           break;
 
@@ -210,25 +222,37 @@ public final class NodJob extends BatfishJob<NodJobResult> {
 
         case UNSATISFIABLE:
           elapsedTime = System.currentTimeMillis() - startTime;
-          return new NodJobResult(elapsedTime, _logger.getHistory());
+          return new NodJobResult(elapsedTime, _logger.getHistory(), flows);
 
         default:
           throw new BatfishException("invalid status");
-      }
-      Model model = solver.getModel();
-      Map<String, Long> constraints = new LinkedHashMap<>();
-      for (FuncDecl constDecl : model.getConstDecls()) {
-        String name = constDecl.getName().toString();
-        BitVecExpr varConstExpr = program.getVariablesAsConsts().get(name);
-        long val = ((BitVecNum) model.getConstInterp(varConstExpr)).getLong();
-        constraints.put(name, val);
-      }
-      Set<Flow> flows = new HashSet<>();
-      for (Pair<String, String> nodeVrf : _nodeVrfSet) {
+        }
+        Model model = solver.getModel();
+        Map<String, Long> constraints = new LinkedHashMap<>();
+        for (FuncDecl constDecl : model.getConstDecls()) {
+          String name = constDecl.getName().toString();
+          BitVecExpr varConstExpr = program.getVariablesAsConsts().get(name);
+          long val = ((BitVecNum) model.getConstInterp(varConstExpr)).getLong();
+          constraints.put(name, val);
+        }
+        Pair<String,String> nodeVrf;
+        if(_dataPlaneSynthesizer._originationChoiceBits > 0) {
+          nodeVrf = _nodeVrfSet.get(constraints.get(Synthesizer.ORIGINATION_CHOICE_VAR).intValue());
+        } else {
+          nodeVrf = _nodeVrfSet.get(0);
+        }
         String node = nodeVrf.getFirst();
         String vrf = nodeVrf.getSecond();
         Flow flow = createFlow(node, vrf, constraints);
         flows.add(flow);
+
+        // refine the model: ask for a new origination choice.
+        if(_dataPlaneSynthesizer._originationChoiceBits > 0) {
+          BitVecExpr varConstExpr = program.getVariablesAsConsts().get(Synthesizer.ORIGINATION_CHOICE_VAR);
+          solver.add(ctx.mkNot(ctx.mkEq(varConstExpr, model.getConstInterp(varConstExpr))));
+        } else {
+          break;
+        }
       }
       elapsedTime = System.currentTimeMillis() - startTime;
       return new NodJobResult(elapsedTime, _logger.getHistory(), flows);

@@ -1,12 +1,12 @@
 package org.batfish.z3.node;
 
-public class DebugExpr extends PacketRelExpr {
+import org.batfish.z3.Synthesizer;
 
-  public static final DebugExpr INSTANCE = new DebugExpr();
+public class DebugExpr extends PacketRelExpr {
 
   public static final String NAME = "R_debug";
 
-  public DebugExpr() {
-    super(NAME);
+  public DebugExpr(Synthesizer synthesizer) {
+    super(synthesizer, NAME);
   }
 }

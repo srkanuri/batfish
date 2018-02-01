@@ -20,30 +20,32 @@ public class MultipathInconsistencyQuerySynthesizer extends BaseQuerySynthesizer
   private String _hostname;
 
   private String _vrf;
+  private Synthesizer _synthesizer;
 
   public MultipathInconsistencyQuerySynthesizer(
-      String hostname, String vrf, HeaderSpace headerSpace) {
+      Synthesizer synthesizer, String hostname, String vrf, HeaderSpace headerSpace) {
     _hostname = hostname;
     _vrf = vrf;
     _headerSpace = headerSpace;
+    _synthesizer = synthesizer;
   }
 
   @Override
   public NodProgram getNodProgram(NodProgram baseProgram) throws Z3Exception {
     NodProgram program = new NodProgram(baseProgram.getContext());
-    OriginateVrfExpr originate = new OriginateVrfExpr(_hostname, _vrf);
+    OriginateVrfExpr originate = new OriginateVrfExpr(_synthesizer, _hostname, _vrf);
     RuleExpr injectSymbolicPackets = new RuleExpr(originate);
     AndExpr queryConditions = new AndExpr();
-    queryConditions.addConjunct(AcceptExpr.INSTANCE);
-    queryConditions.addConjunct(DropExpr.INSTANCE);
-    queryConditions.addConjunct(SaneExpr.INSTANCE);
-    queryConditions.addConjunct(Synthesizer.matchHeaderSpace(_headerSpace));
-    RuleExpr queryRule = new RuleExpr(queryConditions, QueryRelationExpr.INSTANCE);
+    queryConditions.addConjunct(new AcceptExpr(_synthesizer));
+    queryConditions.addConjunct(new DropExpr(_synthesizer));
+    queryConditions.addConjunct(new SaneExpr(_synthesizer));
+    queryConditions.addConjunct(_synthesizer.matchHeaderSpace(_headerSpace));
+    RuleExpr queryRule = new RuleExpr(queryConditions, new QueryRelationExpr(_synthesizer));
     List<BoolExpr> rules = program.getRules();
     BoolExpr injectSymbolicPacketsBoolExpr = injectSymbolicPackets.toBoolExpr(baseProgram);
     rules.add(injectSymbolicPacketsBoolExpr);
     rules.add(queryRule.toBoolExpr(baseProgram));
-    QueryExpr query = new QueryExpr(QueryRelationExpr.INSTANCE);
+    QueryExpr query = new QueryExpr(new QueryRelationExpr(_synthesizer));
     BoolExpr queryBoolExpr = query.toBoolExpr(baseProgram);
     program.getQueries().add(queryBoolExpr);
     return program;
