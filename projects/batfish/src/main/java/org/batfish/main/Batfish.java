@@ -4304,22 +4304,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   @Override
-  public AnswerElement standard(
-      HeaderSpace headerSpace,
-      Set<ForwardingAction> actions,
-      NodesSpecifier ingressNodeRegex,
-      NodesSpecifier notIngressNodeRegex,
-      NodesSpecifier finalNodeRegex,
-      NodesSpecifier notFinalNodeRegex,
-      Set<String> transitNodes,
-      Set<String> notTransitNodes) {
+  public AnswerElement standard(HeaderSpace headerSpace, Set<ForwardingAction> actions,
+      NodesSpecifier ingressNodeRegex, NodesSpecifier notIngressNodeRegex,
+      NodesSpecifier finalNodeRegex, NodesSpecifier notFinalNodeRegex, Set<String> transitNodes,
+      Set<String> notTransitNodes, int maxBatchSize) {
     Settings settings = getSettings();
     Map<String, Configuration> configurations = loadConfigurations();
     Set<Flow> flows = null;
-
-    int maxBatchSize = 16;
-
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(maxBatchSize);
 
     // collect ingress nodes
     Set<String> ingressNodes = ingressNodeRegex.getMatchingNodes(configurations);
@@ -4366,11 +4357,16 @@ public class Batfish extends PluginConsumer implements IBatfish {
               "Same node %s can not be in both transit and notTransit", illegalTransitNodes));
     }
 
+    int threadBatchSize = activeIngressNodes.size() / Runtime.getRuntime().availableProcessors();
+    int batchSize = maxBatchSize < threadBatchSize ? maxBatchSize : threadBatchSize;
+
+    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(batchSize);
+
     // build query jobs
     List<List<Pair<String,String>>> batches = standard_batchIngressNodesVrfs(
         configurations,
         activeIngressNodes,
-        maxBatchSize);
+        batchSize);
 
     List<NodJob> jobs = batches.stream().map(batch ->
         standard_makeNodJob(
@@ -4424,14 +4420,14 @@ public class Batfish extends PluginConsumer implements IBatfish {
   private List<List<Pair<String,String>>> standard_batchIngressNodesVrfs(
       Map<String, Configuration> configurations,
       Set<String> activeIngressNodes,
-      int maxBatchSize) {
+      int batchSize) {
     List<List<Pair<String,String>>> batches = new ArrayList<>();
 
     batches.add(0,new ArrayList<>());
     Consumer<Pair<String,String>> addPair = (p) -> {
       List<Pair<String,String>> batch = batches.get(0);
       batch.add(p);
-      if(batch.size() > maxBatchSize) {
+      if(batch.size() >= batchSize) {
         batches.add(0,new ArrayList<>());
       }
     };

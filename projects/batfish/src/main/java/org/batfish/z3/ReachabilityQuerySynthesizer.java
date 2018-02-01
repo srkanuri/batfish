@@ -87,7 +87,7 @@ public class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
         if(origChoiceBits > 0) {
           BooleanExpr guard =
               new EqExpr(
-                  new VarIntExpr(_synthesizer.ORIGINATION_CHOICE_VAR),
+                  new VarIntExpr(Synthesizer.ORIGINATION_CHOICE_VAR),
                   new LitIntExpr(origChoice, origChoiceBits)
                   );
           IfExpr ifExpr = new IfExpr(guard, originate);

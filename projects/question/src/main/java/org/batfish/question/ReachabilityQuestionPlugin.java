@@ -91,7 +91,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
           question.getFinalNodeRegex(),
           question.getNotFinalNodeRegex(),
           question.getTransitNodes(),
-          question.getNotTransitNodes());
+          question.getNotTransitNodes(),
+          question.getMaxBatchSize());
     }
   }
 
@@ -130,6 +131,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private static final SortedSet<String> DEFAULT_NOT_TRANSIT_NODES =
         Collections.<String>emptySortedSet();
+
+    private static final int DEFAULT_MAX_BATCH_SIZE = 16;
 
     private static final String PROP_DST_IPS = "dstIps";
 
@@ -197,6 +200,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private static final String PROP_NOT_TRANSIT_NODES = "notTransitNodes";
 
+    private static final String PROP_MAX_BATCH_SIZE = "maxBatchSize";
+
     private SortedSet<ForwardingAction> _actions;
 
     private NodesSpecifier _finalNodeRegex;
@@ -215,6 +220,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private ReachabilityType _reachabilityType;
 
+    private int _maxBatchSize;
+
     public ReachabilityQuestion() {
       _actions = new TreeSet<>(Collections.singleton(ForwardingAction.ACCEPT));
       _finalNodeRegex = new NodesSpecifier(DEFAULT_FINAL_NODE_REGEX);
@@ -225,6 +232,7 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
       _notIngressNodeRegex = new NodesSpecifier(DEFAULT_NOT_INGRESS_NODE_REGEX);
       _transitNodes = DEFAULT_TRANSIT_NODES;
       _notTransitNodes = DEFAULT_NOT_TRANSIT_NODES;
+      _maxBatchSize = DEFAULT_MAX_BATCH_SIZE;
     }
 
     @JsonProperty(PROP_ACTIONS)
@@ -410,6 +418,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_SRC_PROTOCOLS)
     public SortedSet<Protocol> getSrcProtocols() {
       return _headerSpace.getSrcProtocols();
+    }
+
+    @JsonProperty(PROP_MAX_BATCH_SIZE)
+    public int getMaxBatchSize() {
+      return _maxBatchSize;
     }
 
     @Override
@@ -704,6 +717,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_SRC_PROTOCOLS)
     public void setSrcProtocols(SortedSet<Protocol> srcProtocols) {
       _headerSpace.setSrcProtocols(new TreeSet<>(srcProtocols));
+    }
+
+    @JsonProperty(PROP_MAX_BATCH_SIZE)
+    public void setMaxBatchSize(int maxBatchSize) {
+      _maxBatchSize = maxBatchSize;
     }
   }
 

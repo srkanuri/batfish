@@ -178,15 +178,10 @@ public interface IBatfish extends IPluginConsumer {
 
   AnswerElement smtRoutingLoop(HeaderQuestion q);
 
-  AnswerElement standard(
-      HeaderSpace headerSpace,
-      Set<ForwardingAction> actions,
-      NodesSpecifier ingressNodeRegex,
-      NodesSpecifier notIngressNodeRegex,
-      NodesSpecifier finalNodeRegex,
-      NodesSpecifier notFinalNodeRegex,
-      Set<String> transitNodes,
-      Set<String> notTransitNodes);
+  AnswerElement standard(HeaderSpace headerSpace, Set<ForwardingAction> actions,
+      NodesSpecifier ingressNodeRegex, NodesSpecifier notIngressNodeRegex,
+      NodesSpecifier finalNodeRegex, NodesSpecifier notFinalNodeRegex, Set<String> transitNodes,
+      Set<String> notTransitNodes, int maxBatchSize);
 
   void writeDataPlane(DataPlane dp, DataPlaneAnswerElement ae);
 
