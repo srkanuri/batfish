@@ -954,7 +954,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
   @Override
   public DataPlaneAnswerElement computeDataPlane(boolean differentialContext) {
     checkEnvironmentExists();
-    ComputeDataPlaneResult result = getDataPlanePlugin().computeDataPlane(differentialContext);
+    DataPlanePlugin plugin = getDataPlanePlugin();
+    _logger.debugf("Using %s plugin to generate dataplane", plugin.getName());
+    ComputeDataPlaneResult result = plugin.computeDataPlane(differentialContext);
     saveDataPlane(result._dataPlane, result._answerElement, false);
     return result._answerElement;
   }
