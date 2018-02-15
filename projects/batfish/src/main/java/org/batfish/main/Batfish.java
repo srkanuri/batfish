@@ -2241,7 +2241,11 @@ public class Batfish extends PluginConsumer implements IBatfish {
       }
 
       if (!compressedDataPlaneDependenciesExist(_testrigSettings)) {
-        computeCompressedDataPlane();
+        try {
+          computeCompressedDataPlane();
+        } catch(BatfishException e) {
+          _logger.error("computeCompressedDataPlane failed\n" + e.toString());
+        }
       }
     }
   }
