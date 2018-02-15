@@ -460,7 +460,6 @@ public class Graph {
           if (hereName.equals(sr.getNextHopInterface())) {
             List<StaticRoute> srs = map.computeIfAbsent(hereName, k -> new ArrayList<>());
             srs.add(sr);
-            map.put(hereName, srs);
           }
 
           // Check if next-hop ip corresponds to direct interface
@@ -475,7 +474,6 @@ public class Graph {
             someIface = true;
             List<StaticRoute> srs = map.computeIfAbsent(hereName, k -> new ArrayList<>());
             srs.add(sr);
-            map.put(here.getName(), srs);
           }
         }
 
