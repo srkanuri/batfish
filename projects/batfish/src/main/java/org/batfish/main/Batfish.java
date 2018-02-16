@@ -940,6 +940,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     _cachedConfigurations.invalidate(_testrigSettings);
     loadConfigurations();
 
+    newBatch("Compressing configs", 0);
     Map<String, Configuration> configs = new BatfishCompressor(this).compress(headerSpace);
     Topology topo = CommonUtil.synthesizeTopology(configs);
     DataPlanePlugin dataPlanePlugin = getDataPlanePlugin();
