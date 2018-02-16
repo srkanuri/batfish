@@ -1944,11 +1944,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   @Override
-  public SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> getRoutes() {
-    return getRoutes(false);
-  }
-
-  @Override
   public SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> getRoutes(
       boolean useCompression) {
     return getDataPlanePlugin().getRoutes(loadDataPlane(useCompression));
@@ -2677,7 +2672,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 })
             .collect(Collectors.toList());
     flows = computeNodOutput(jobs);
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
     AnswerElement answerElement = getHistory();
     return answerElement;
   }
@@ -3044,10 +3039,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
     // TODO: maybe do something with nod answer element
     Set<Flow> flows = computeCompositeNodOutput(jobs, new NodAnswerElement());
     pushBaseEnvironment();
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
     popEnvironment();
     pushDeltaEnvironment();
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
     popEnvironment();
 
     AnswerElement answerElement = getHistory();
@@ -3064,8 +3059,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
   private void populateFlowHistory(
       FlowHistory flowHistory, String envTag, Environment environment, String flowTag) {
     DataPlanePlugin dataPlanePlugin = getDataPlanePlugin();
-    List<Flow> flows = dataPlanePlugin.getHistoryFlows();
-    List<FlowTrace> flowTraces = dataPlanePlugin.getHistoryFlowTraces();
+    List<Flow> flows = dataPlanePlugin.getHistoryFlows(loadDataPlane());
+    List<FlowTrace> flowTraces = dataPlanePlugin.getHistoryFlowTraces(loadDataPlane());
     int numEntries = flows.size();
     for (int i = 0; i < numEntries; i++) {
       Flow flow = flows.get(i);
@@ -3201,7 +3196,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public void processFlows(Set<Flow> flows) {
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
   }
 
   /**
@@ -3502,10 +3497,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
     // TODO: maybe do something with nod answer element
     Set<Flow> flows = computeCompositeNodOutput(jobs, new NodAnswerElement());
     pushBaseEnvironment();
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
     popEnvironment();
     pushDeltaEnvironment();
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
     popEnvironment();
 
     AnswerElement answerElement = getHistory();
@@ -4315,7 +4310,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     // run jobs and get resulting flows
     flows = computeNodOutput(jobs);
 
-    getDataPlanePlugin().processFlows(flows);
+    getDataPlanePlugin().processFlows(flows, loadDataPlane());
 
     AnswerElement answerElement = getHistory();
     return answerElement;
