@@ -944,6 +944,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Map<String, Configuration> configs = new BatfishCompressor(this).compress(headerSpace);
     Topology topo = CommonUtil.synthesizeTopology(configs);
     DataPlanePlugin dataPlanePlugin = getDataPlanePlugin();
+    newBatch("Computing compressed dataplane", 0);
     ComputeDataPlaneResult result = dataPlanePlugin.computeDataPlane(false, configs, topo);
 
     // Throw the mutated configurations away.
@@ -2239,7 +2240,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
       if (!compressedDataPlaneDependenciesExist(_testrigSettings)) {
         try {
           computeCompressedDataPlane();
-        } catch(BatfishException e) {
+        } catch (BatfishException e) {
           _logger.error("computeCompressedDataPlane failed\n" + e.toString());
         }
       }
