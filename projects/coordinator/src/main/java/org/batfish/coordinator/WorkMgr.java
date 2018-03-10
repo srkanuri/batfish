@@ -41,6 +41,7 @@ import javax.ws.rs.client.Client;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
@@ -558,8 +559,20 @@ public class WorkMgr extends AbstractCoordinator {
   }
 
   public void delTestrig(String containerName, String testrigName) {
-    Path testrigDir = getdirTestrig(containerName, testrigName);
-    CommonUtil.deleteDirectory(testrigDir);
+    try {
+      Path testrigDir = getdirTestrig(containerName, testrigName);
+      //    CommonUtil.deleteDirectory(testrigDir);
+      FileUtils.cleanDirectory(testrigDir.toFile());
+      FileUtils.cleanDirectory(testrigDir.toFile());
+      List<String> paths =
+          Files.list(testrigDir)
+              .map(path -> path.toAbsolutePath().toString())
+              .collect(Collectors.toList());
+      _logger.info("testrig contents not cleaned: " + String.join(", ", paths));
+      Files.delete(testrigDir);
+    } catch (IOException e) {
+      throw new BatfishException("Could not delete testrig: " + testrigName, e);
+    }
   }
 
   public void delQuestion(String containerName, String qName) {

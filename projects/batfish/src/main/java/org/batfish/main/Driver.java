@@ -707,7 +707,13 @@ public class Driver {
                       task.setErrMessage(errMsg);
                     }
                     task.setTerminated(new Date());
+                  } finally {
                     jobLogger.close();
+                    _mainLogger.warn(
+                        "job logger: "
+                            + settings.getLogFile()
+                            + " status "
+                            + jobLogger.getPrintStream().checkError());
                     makeIdle();
                   }
                 }

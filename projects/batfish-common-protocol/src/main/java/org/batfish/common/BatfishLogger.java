@@ -225,6 +225,13 @@ public class BatfishLogger {
 
   public void close() {
     if (_logFile != null) {
+      if (_ps instanceof CompositePrintStream) {
+        warn("Composite print stream: " + _logFile + "\n");
+      } else {
+        warn("File print stream: " + _logFile + "\n");
+      }
+      warn("Closing the print stream: " + _logFile + "\n");
+      _ps.flush();
       _ps.close();
     }
   }
