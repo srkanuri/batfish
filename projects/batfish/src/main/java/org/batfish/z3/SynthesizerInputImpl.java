@@ -3,6 +3,7 @@ package org.batfish.z3;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
@@ -14,18 +15,23 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
 import org.batfish.common.Pair;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.Edge;
+import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.IpAccessListLine;
+import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.NetworkFactory;
+import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.PrefixTrie;
 import org.batfish.datamodel.collections.FibRow;
 import org.batfish.datamodel.collections.NodeInterfacePair;
 import org.batfish.z3.expr.BooleanExpr;
@@ -59,6 +65,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     private Map<String, Set<String>> _disabledVrfs;
 
+    private HeaderSpace _headerSpace;
+
     private boolean _simplify;
 
     private Set<Type> _vectorizedParameters;
@@ -68,6 +76,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
       _disabledInterfaces = ImmutableMap.of();
       _disabledNodes = ImmutableSet.of();
       _disabledVrfs = ImmutableMap.of();
+      _headerSpace = new HeaderSpace();
       _simplify = false;
       _vectorizedParameters = ImmutableSet.of();
     }
@@ -80,6 +89,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
           _disabledInterfaces,
           _disabledNodes,
           _disabledVrfs,
+          _headerSpace,
           _simplify,
           _vectorizedParameters);
     }
@@ -111,6 +121,11 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     public Builder setDisabledVrfs(Map<String, Set<String>> disabledVrfs) {
       _disabledVrfs = disabledVrfs;
+      return this;
+    }
+
+    public Builder setHeaderSpace(HeaderSpace headerSpace) {
+      _headerSpace = headerSpace;
       return this;
     }
 
@@ -148,6 +163,10 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Map<String, Set<String>> _disabledVrfs;
 
+  private final PrefixTrie _dstIpBlacklist;
+
+  private final PrefixTrie _dstIpWhitelist;
+
   private final Set<Edge> _edges;
 
   private final Map<String, Map<String, IpAccessList>> _enabledAcls;
@@ -177,6 +196,9 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Map<String, Map<String, String>> _outgoingAcls;
 
+  // Diagnostics: keep track of how many fib rows we remove
+  int _removedFibRows;
+
   private final boolean _simplify;
 
   private final Map<String, Map<String, List<Entry<AclPermit, BooleanExpr>>>> _sourceNats;
@@ -192,6 +214,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
       Map<String, Set<String>> disabledInterfaces,
       Set<String> disabledNodes,
       Map<String, Set<String>> disabledVrfs,
+      HeaderSpace headerSpace,
       boolean simplify,
       Set<Type> vectorizedParameters) {
     if (configurations == null) {
@@ -202,6 +225,26 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _disabledInterfaces = ImmutableMap.copyOf(disabledInterfaces);
     _disabledNodes = ImmutableSet.copyOf(disabledNodes);
     _disabledVrfs = ImmutableMap.copyOf(disabledVrfs);
+    if (headerSpace.getDstIps().isEmpty()) {
+      _dstIpWhitelist = new PrefixTrie(ImmutableSortedSet.of(Prefix.ZERO));
+    } else {
+      _dstIpWhitelist =
+          new PrefixTrie(
+              ImmutableSortedSet.copyOf(
+                  headerSpace
+                      .getDstIps()
+                      .stream()
+                      .map(IpWildcard::toPrefix)
+                      .collect(ImmutableList.toImmutableList())));
+    }
+    _dstIpBlacklist =
+        new PrefixTrie(
+            ImmutableSortedSet.copyOf(
+                headerSpace
+                    .getNotDstIps()
+                    .stream()
+                    .map(IpWildcard::toPrefix)
+                    .collect(ImmutableList.toImmutableList())));
     _enabledNodes = computeEnabledNodes();
     _enabledVrfs = computeEnabledVrfs();
     _enabledInterfacesByNodeVrf = computeEnabledInterfacesByNodeVrf();
@@ -234,6 +277,9 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _enabledAcls = computeEnabledAcls();
     _aclActions = computeAclActions();
     _aclConditions = computeAclConditions();
+
+    // TODO use a logger
+    System.out.println(String.format("SynthesizerInputImpl removed %d fib rows", _removedFibRows));
   }
 
   private Map<String, Map<String, List<LineAction>>> computeAclActions() {
@@ -302,10 +348,10 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                               ImmutableList.Builder<Pair<String, IpAccessList>> interfaceAcls =
                                   ImmutableList.builder();
                               IpAccessList aclIn = i.getIncomingFilter();
-                              IpAccessList aclOut = i.getOutgoingFilter();
                               if (aclIn != null) {
                                 interfaceAcls.add(new Pair<>(aclIn.getName(), aclIn));
                               }
+                              IpAccessList aclOut = i.getOutgoingFilter();
                               if (aclOut != null) {
                                 interfaceAcls.add(new Pair<>(aclOut.getName(), aclOut));
                               }
@@ -486,7 +532,12 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     Map<String, Map<NodeInterfacePair, ImmutableList.Builder<BooleanExpr>>> conditionsByInterface =
         new HashMap<>();
     SortedSet<FibRow> fibSet = _fibs.get(hostname).get(vrfName);
-    List<FibRow> fib = ImmutableList.copyOf(fibSet);
+    List<FibRow> fib =
+        fibSet
+            .stream()
+            .filter(fibRow -> CommonUtil.isRelevantFor(fibRow, _dstIpWhitelist, _dstIpBlacklist))
+            .collect(Collectors.toList());
+    _removedFibRows += fibSet.size() - fib.size();
     for (int i = 0; i < fib.size(); i++) {
       FibRow currentRow = fib.get(i);
       String ifaceOutName = currentRow.getInterface();

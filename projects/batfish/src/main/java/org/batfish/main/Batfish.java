@@ -2872,14 +2872,16 @@ public class Batfish extends PluginConsumer implements IBatfish {
     // load base configurations and generate base data plane
     pushBaseEnvironment();
     Map<String, Configuration> baseConfigurations = loadConfigurations();
-    Synthesizer baseDataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer baseDataPlaneSynthesizer =
+        synthesizeDataPlane(reachabilitySettings.getHeaderSpace());
     Topology baseTopology = getEnvironmentTopology();
     popEnvironment();
 
     // load diff configurations and generate diff data plane
     pushDeltaEnvironment();
     Map<String, Configuration> diffConfigurations = loadConfigurations();
-    Synthesizer diffDataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer diffDataPlaneSynthesizer =
+        synthesizeDataPlane(reachabilitySettings.getHeaderSpace());
     Topology diffTopology = getEnvironmentTopology();
     popEnvironment();
 
@@ -3344,13 +3346,15 @@ public class Batfish extends PluginConsumer implements IBatfish {
     // load base configurations and generate base data plane
     pushBaseEnvironment();
     Map<String, Configuration> baseConfigurations = loadConfigurations();
-    Synthesizer baseDataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer baseDataPlaneSynthesizer =
+        synthesizeDataPlane(reachabilitySettings.getHeaderSpace());
     popEnvironment();
 
     // load diff configurations and generate diff data plane
     pushDeltaEnvironment();
     Map<String, Configuration> diffConfigurations = loadConfigurations();
-    Synthesizer diffDataPlaneSynthesizer = synthesizeDataPlane();
+    Synthesizer diffDataPlaneSynthesizer =
+        synthesizeDataPlane(reachabilitySettings.getHeaderSpace());
     popEnvironment();
 
     Set<String> ingressNodes;
@@ -4093,7 +4097,11 @@ public class Batfish extends PluginConsumer implements IBatfish {
     List<List<Pair<String, String>>> originateNodeVrfChunks =
         Lists.partition(originateNodeVrfs, chunkSize);
 
-    Synthesizer dataPlaneSynthesizer = synthesizeDataPlane(configurations, dataPlane);
+    Synthesizer dataPlaneSynthesizer =
+        synthesizeDataPlane(
+            configurations, dataPlane, reachabilitySettings.getHeaderSpace()
+            // new HeaderSpace()
+            );
 
     // build query jobs
     List<NodJob> jobs =
@@ -4240,13 +4248,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
     return s;
   }
 
-  public Synthesizer synthesizeDataPlane() {
-    return synthesizeDataPlane(loadConfigurations(), loadDataPlane());
+  public Synthesizer synthesizeDataPlane(HeaderSpace headerSpace) {
+    return synthesizeDataPlane(loadConfigurations(), loadDataPlane(), headerSpace);
   }
 
   @Nonnull
   public Synthesizer synthesizeDataPlane(
-      Map<String, Configuration> configurations, DataPlane dataPlane) {
+      Map<String, Configuration> configurations, DataPlane dataPlane, HeaderSpace headerSpace) {
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
 
@@ -4256,6 +4264,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
             SynthesizerInputImpl.builder()
                 .setConfigurations(configurations)
                 .setDataPlane(dataPlane)
+                .setHeaderSpace(headerSpace)
                 .setSimplify(_settings.getSimplify())
                 .build());
 

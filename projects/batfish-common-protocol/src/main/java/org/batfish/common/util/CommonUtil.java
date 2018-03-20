@@ -94,10 +94,12 @@ import org.batfish.datamodel.OspfArea;
 import org.batfish.datamodel.OspfNeighbor;
 import org.batfish.datamodel.OspfProcess;
 import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.PrefixTrie;
 import org.batfish.datamodel.Route;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.VrrpGroup;
+import org.batfish.datamodel.collections.FibRow;
 import org.batfish.datamodel.collections.NodeInterfacePair;
 import org.glassfish.grizzly.ssl.SSLContextConfigurator;
 import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
@@ -225,6 +227,19 @@ public class CommonUtil {
             .stream()
             .collect(
                 ImmutableMap.toImmutableMap(Entry::getKey, e -> e.getValue().getInterfaces())));
+  }
+
+  // The PrefixTrie is either the dstIps or non-destIps
+  // if dstIps, we want to check if the ACL is always true,
+  // never true, or sometimes true. Maybe it's good enough to
+  // just return if it can overlap.
+
+  public static boolean isRelevantFor(FibRow fibRow, PrefixTrie dstIps, PrefixTrie nonDstIps) {
+    return isRelevantFor(fibRow.getPrefix(), dstIps, nonDstIps);
+  }
+
+  public static boolean isRelevantFor(Prefix prefix, PrefixTrie dstIps, PrefixTrie nonDstIps) {
+    return dstIps.overlaps(prefix) && !nonDstIps.overlaps(prefix);
   }
 
   public static Map<Ip, Set<String>> computeIpOwners(

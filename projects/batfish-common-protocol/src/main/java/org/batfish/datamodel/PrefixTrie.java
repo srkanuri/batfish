@@ -37,6 +37,10 @@ public class PrefixTrie implements Serializable {
       long addressBits = address.asLong();
       return _root.getLongestPrefixMatch(address, addressBits, 0);
     }
+
+    public boolean overlaps(Prefix prefix) {
+      return _root.overlaps(prefix);
+    }
   }
 
   private class ByteTrieNode implements Serializable {
@@ -126,6 +130,23 @@ public class PrefixTrie implements Serializable {
         return longerMatch;
       }
     }
+
+    public boolean overlaps(Prefix prefix) {
+      return overlaps(prefix, prefix.getStartIp().asLong(), 0);
+    }
+
+    public boolean overlaps(Prefix prefix, long prefixStartIpBits, int index) {
+      if (_prefix != null && (_prefix.containsPrefix(prefix) || prefix.containsPrefix(_prefix))) {
+        return true;
+      }
+
+      boolean currentBit = Ip.getBitAtPosition(prefixStartIpBits, index);
+      if (currentBit) {
+        return _right != null && _right.overlaps(prefix, prefixStartIpBits, index + 1);
+      } else {
+        return _left != null && _left.overlaps(prefix, prefixStartIpBits, index + 1);
+      }
+    }
   }
 
   /** */
@@ -151,6 +172,15 @@ public class PrefixTrie implements Serializable {
 
   public boolean containsIp(Ip address) {
     return _trie.getLongestPrefixMatch(address) != null;
+  }
+
+  public boolean overlaps(Prefix prefix) {
+    return _trie.overlaps(prefix);
+  }
+
+  // TODO is this correct?
+  public boolean contains(IpWildcard ipWildcard) {
+    return containsIp(ipWildcard.getIp());
   }
 
   public boolean containsPathFromPrefix(Prefix prefix) {
