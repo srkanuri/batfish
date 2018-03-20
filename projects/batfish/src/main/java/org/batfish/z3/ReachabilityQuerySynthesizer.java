@@ -13,7 +13,6 @@ import org.batfish.z3.expr.BasicRuleStatement;
 import org.batfish.z3.expr.CurrentIsOriginalExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.RuleStatement;
-import org.batfish.z3.expr.SaneExpr;
 import org.batfish.z3.state.OriginateVrf;
 
 public abstract class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer {
