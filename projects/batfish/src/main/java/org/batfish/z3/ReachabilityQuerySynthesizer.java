@@ -6,6 +6,8 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.ForwardingAction;
 import org.batfish.datamodel.HeaderSpace;
+import org.batfish.datamodel.IpAccessListLine;
+import org.batfish.datamodel.IpAccessListLine.Builder;
 import org.batfish.z3.expr.AndExpr;
 import org.batfish.z3.expr.BasicRuleStatement;
 import org.batfish.z3.expr.CurrentIsOriginalExpr;
@@ -76,6 +78,10 @@ public abstract class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer 
 
   protected final void addOriginateRules(ImmutableList.Builder<RuleStatement> rules) {
     // create rules for injecting symbolic packets into ingress node(s)
+    IpAccessListLine.Builder headerSpaceBuilder = IpAccessListLine.builder();
+    headerSpaceBuilder.setDstIps(_headerSpace.getDstIps());
+    headerSpaceBuilder.setNotDstIps(_headerSpace.getNotDstIps());
+
     for (String ingressNode : _ingressNodeVrfs.keySet()) {
       for (String ingressVrf : _ingressNodeVrfs.get(ingressNode)) {
         rules.add(
@@ -83,8 +89,7 @@ public abstract class ReachabilityQuerySynthesizer extends BaseQuerySynthesizer 
                 new AndExpr(
                     ImmutableList.of(
                         CurrentIsOriginalExpr.INSTANCE,
-                        new HeaderSpaceMatchExpr(_headerSpace),
-                        SaneExpr.INSTANCE)),
+                        new HeaderSpaceMatchExpr(headerSpaceBuilder.build()))),
                 new OriginateVrf(ingressNode, ingressVrf)));
       }
     }

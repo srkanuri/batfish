@@ -9,9 +9,12 @@ import javax.annotation.Nonnull;
 import org.batfish.common.BatfishException;
 import org.batfish.datamodel.ForwardingAction;
 import org.batfish.datamodel.HeaderSpace;
+import org.batfish.z3.expr.AndExpr;
 import org.batfish.z3.expr.BasicRuleStatement;
+import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.QueryStatement;
 import org.batfish.z3.expr.RuleStatement;
+import org.batfish.z3.expr.SaneExpr;
 import org.batfish.z3.expr.StateExpr;
 import org.batfish.z3.state.Accept;
 import org.batfish.z3.state.Debug;
@@ -184,7 +187,13 @@ public class StandardReachabilityQuerySynthesizer extends ReachabilityQuerySynth
     List<StateExpr> finalActions = computeFinalActions();
     finalActions
         .stream()
-        .map(finalAction -> new BasicRuleStatement(ImmutableSet.of(finalAction), Query.INSTANCE))
+        .map(finalAction -> new BasicRuleStatement(
+            new AndExpr(
+                ImmutableList.of(
+                    SaneExpr.INSTANCE,
+                    new HeaderSpaceMatchExpr(_headerSpace))),
+            ImmutableSet.of(finalAction),
+            Query.INSTANCE))
         .forEach(rules::add);
     addOriginateRules(rules);
     return ReachabilityProgram.builder()
