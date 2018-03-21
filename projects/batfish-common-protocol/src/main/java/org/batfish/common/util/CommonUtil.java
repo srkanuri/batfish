@@ -154,7 +154,7 @@ public class CommonUtil {
 
   public static IpAccessList specializeAclFor(
       IpAccessList acl, PrefixTrie dstIpWhitelist, PrefixTrie dstIpBlacklist) {
-    if(dstIpWhitelist.getPrefixes().isEmpty()) {
+    if (dstIpWhitelist.getPrefixes().isEmpty()) {
       /*
        * default: allow everything
        * TODO see what we can do with dstIpBlacklist
@@ -178,26 +178,33 @@ public class CommonUtil {
       // punt: don't remove it
       return true;
     }
+    if (aclLine.getDstIps().isEmpty()) {
+      // acl doesn't constrain dstIp, so we have to assume it's relevant
+      return true;
+    }
     return aclLine
         .getDstIps()
         .stream()
         .anyMatch(
             ipWildcard -> {
               Prefix aclPrefix = ipWildcard.toPrefix();
-              return dstIpWhiteList
+              boolean matchesWhitelist =
+                  dstIpWhiteList
                       .getPrefixes()
                       .stream()
                       .anyMatch(
                           dstPrefix ->
                               dstPrefix.containsPrefix(aclPrefix)
-                                  || aclPrefix.containsPrefix(dstPrefix))
-                  && dstIpBlackList
+                                  || aclPrefix.containsPrefix(dstPrefix));
+              boolean doesntMatchBlacklist =
+                  dstIpBlackList
                       .getPrefixes()
                       .stream()
                       .noneMatch(
                           dstPrefix ->
                               dstPrefix.containsPrefix(aclPrefix)
                                   || aclPrefix.containsPrefix(dstPrefix));
+              return matchesWhitelist && doesntMatchBlacklist;
             });
   }
 

@@ -31,6 +31,7 @@ import java.util.SortedSet;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.Edge;
+import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
@@ -756,11 +757,7 @@ public class SynthesizerInputImplTest {
                 srcNode.getHostname(),
                 ImmutableMap.of(
                     SynthesizerInputImpl.DEFAULT_SOURCE_NAT_ACL.getName(),
-                    ImmutableList.of(
-                        new HeaderSpaceMatchExpr(
-                            IpAccessListLine.builder()
-                                .setSrcIps(ImmutableList.of(new IpWildcard("0.0.0.0/0")))
-                                .build()))))));
+                    ImmutableList.of(new HeaderSpaceMatchExpr(new HeaderSpace()))))));
 
     assertThat(
         inputWithDataPlane,

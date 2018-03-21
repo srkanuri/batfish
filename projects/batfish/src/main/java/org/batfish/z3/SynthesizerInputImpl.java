@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +73,10 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     private boolean _simplify;
 
+    private boolean _specializeAcls;
+
+    private boolean _specializeFibs;
+
     private Set<Type> _vectorizedParameters;
 
     private Builder() {
@@ -81,6 +86,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
       _disabledVrfs = ImmutableMap.of();
       _headerSpace = new HeaderSpace();
       _simplify = false;
+      _specializeAcls = false;
+      _specializeFibs = false;
       _vectorizedParameters = ImmutableSet.of();
     }
 
@@ -94,6 +101,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
           _disabledVrfs,
           _headerSpace,
           _simplify,
+          _specializeAcls,
+          _specializeFibs,
           _vectorizedParameters,
           _logger);
     }
@@ -140,6 +149,16 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     public Builder setSimplify(boolean simplify) {
       _simplify = simplify;
+      return this;
+    }
+
+    public Builder setSpecializeAcls(boolean specializeAcls) {
+      _specializeAcls = specializeAcls;
+      return this;
+    }
+
+    public Builder setSpecializeFibs(boolean specializeFibs) {
+      _specializeFibs = specializeFibs;
       return this;
     }
 
@@ -222,6 +241,10 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Map<String, Map<String, List<Entry<AclPermit, BooleanExpr>>>> _sourceNats;
 
+  private final boolean _specializeAcls;
+
+  private final boolean _specializeFibs;
+
   private final Map<String, Set<String>> _topologyInterfaces;
 
   private final Set<Type> _vectorizedParameters;
@@ -235,11 +258,15 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
       Map<String, Set<String>> disabledVrfs,
       HeaderSpace headerSpace,
       boolean simplify,
+      boolean specializeAcls,
+      boolean specializeFibs,
       Set<Type> vectorizedParameters,
       BatfishLogger logger) {
     if (configurations == null) {
       throw new BatfishException("Must supply configurations");
     }
+    _specializeAcls = specializeAcls;
+    _specializeFibs = specializeFibs;
     _logger = logger;
     _configurations = ImmutableMap.copyOf(configurations);
     _disabledAcls = ImmutableMap.copyOf(disabledAcls);
@@ -299,12 +326,14 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _aclActions = computeAclActions();
     _aclConditions = computeAclConditions();
 
-    if (_logger != null) {
+    if (_specializeFibs && _logger != null) {
       _logger.info(
           String.format(
               "SynthesizerInputImpl removed %d of %d fib rows", _removedFibRows, _totalFibRows));
       _logger.info(
           String.format("SynthesizerInputImpl old way removed %d fib rows", _oldRemovedFibRows));
+    }
+    if (_specializeAcls && _logger != null) {
       _logger.info(
           String.format(
               "SynthesizerInputImpl removed %d of %d acl lines", _removedAclLines, _origAclLines));
@@ -378,23 +407,31 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                                   ImmutableList.builder();
                               IpAccessList aclIn = i.getIncomingFilter();
                               if (aclIn != null) {
-                                IpAccessList newAclIn =
-                                    CommonUtil.specializeAclFor(
-                                        aclIn, _dstIpWhitelist, _dstIpBlacklist);
-                                _removedAclLines +=
-                                    aclIn.getLines().size() - newAclIn.getLines().size();
-                                _origAclLines += aclIn.getLines().size();
-                                interfaceAcls.add(new Pair<>(aclIn.getName(), newAclIn));
+                                if (_specializeAcls) {
+                                  IpAccessList newAclIn =
+                                      CommonUtil.specializeAclFor(
+                                          aclIn, _dstIpWhitelist, _dstIpBlacklist);
+                                  _removedAclLines +=
+                                      aclIn.getLines().size() - newAclIn.getLines().size();
+                                  _origAclLines += aclIn.getLines().size();
+                                  interfaceAcls.add(new Pair<>(aclIn.getName(), newAclIn));
+                                } else {
+                                  interfaceAcls.add(new Pair<>(aclIn.getName(), aclIn));
+                                }
                               }
                               IpAccessList aclOut = i.getOutgoingFilter();
                               if (aclOut != null) {
-                                IpAccessList newAclOut =
-                                    CommonUtil.specializeAclFor(
-                                        aclOut, _dstIpWhitelist, _dstIpBlacklist);
-                                _removedAclLines +=
-                                    aclOut.getLines().size() - newAclOut.getLines().size();
-                                _origAclLines += aclOut.getLines().size();
-                                interfaceAcls.add(new Pair<>(aclOut.getName(), newAclOut));
+                                if (_specializeAcls) {
+                                  IpAccessList newAclOut =
+                                      CommonUtil.specializeAclFor(
+                                          aclOut, _dstIpWhitelist, _dstIpBlacklist);
+                                  _removedAclLines +=
+                                      aclOut.getLines().size() - newAclOut.getLines().size();
+                                  _origAclLines += aclOut.getLines().size();
+                                  interfaceAcls.add(new Pair<>(aclOut.getName(), newAclOut));
+                                } else {
+                                  interfaceAcls.add(new Pair<>(aclOut.getName(), aclOut));
+                                }
                               }
                               i.getSourceNats()
                                   .forEach(
@@ -573,15 +610,20 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     Map<String, Map<NodeInterfacePair, ImmutableList.Builder<BooleanExpr>>> conditionsByInterface =
         new HashMap<>();
     SortedSet<FibRow> fibSet = _fibs.get(hostname).get(vrfName);
-    List<FibRow> oldFib =
-        fibSet
-            .stream()
-            .filter(fibRow -> CommonUtil.isRelevantFor(fibRow, _dstIpWhitelist, _dstIpBlacklist))
-            .collect(Collectors.toList());
-    List<FibRow> fib = CommonUtil.removeIrrelevantFibs(fibSet, _dstIpWhitelist, _dstIpBlacklist);
-    _removedFibRows += fibSet.size() - fib.size();
-    _oldRemovedFibRows += fibSet.size() - oldFib.size();
-    _totalFibRows += fibSet.size();
+    List<FibRow> fib;
+    if (_specializeFibs) {
+      List<FibRow> oldFib =
+          fibSet
+              .stream()
+              .filter(fibRow -> CommonUtil.isRelevantFor(fibRow, _dstIpWhitelist, _dstIpBlacklist))
+              .collect(Collectors.toList());
+      fib = CommonUtil.removeIrrelevantFibs(fibSet, _dstIpWhitelist, _dstIpBlacklist);
+      _removedFibRows += fibSet.size() - fib.size();
+      _oldRemovedFibRows += fibSet.size() - oldFib.size();
+      _totalFibRows += fibSet.size();
+    } else {
+      fib = new ArrayList<>(fibSet);
+    }
     for (int i = 0; i < fib.size(); i++) {
       FibRow currentRow = fib.get(i);
       String ifaceOutName = currentRow.getInterface();

@@ -4260,6 +4260,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 .setHeaderSpace(headerSpace)
                 .setLogger(_logger)
                 .setSimplify(_settings.getSimplify())
+                .setSpecializeAcls(true)
+                .setSpecializeFibs(true)
                 .build());
 
     List<String> warnings = s.getWarnings();

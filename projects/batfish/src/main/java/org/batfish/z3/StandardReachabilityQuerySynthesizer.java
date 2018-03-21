@@ -12,6 +12,7 @@ import org.batfish.datamodel.HeaderSpace;
 import org.batfish.z3.expr.AndExpr;
 import org.batfish.z3.expr.BasicRuleStatement;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
+import org.batfish.z3.expr.HeaderSpaceMatchExpr.MatchMode;
 import org.batfish.z3.expr.QueryStatement;
 import org.batfish.z3.expr.RuleStatement;
 import org.batfish.z3.expr.SaneExpr;
@@ -192,7 +193,8 @@ public class StandardReachabilityQuerySynthesizer extends ReachabilityQuerySynth
                 new BasicRuleStatement(
                     new AndExpr(
                         ImmutableList.of(
-                            SaneExpr.INSTANCE, new HeaderSpaceMatchExpr(_headerSpace))),
+                            SaneExpr.INSTANCE,
+                            new HeaderSpaceMatchExpr(_headerSpace, MatchMode.ORIGINAL))),
                     ImmutableSet.of(finalAction),
                     Query.INSTANCE))
         .forEach(rules::add);
