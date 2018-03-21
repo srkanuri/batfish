@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Hashing;
@@ -33,6 +34,7 @@ import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileTime;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -108,6 +110,44 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 public class CommonUtil {
+
+  public static List<FibRow> removeIrrelevantFibs(
+      SortedSet<FibRow> fibSet, PrefixTrie dstIpWhitelist, PrefixTrie dstIpBlacklist) {
+    // if a FibRow cannot be a longest-prefix match and is more general than any possible dstIP,
+    // then we can remove it.
+
+    // TODO: generalize to handle the blacklist too
+    if (!dstIpBlacklist.getPrefixes().isEmpty()) {
+      return new ArrayList<>(fibSet);
+    }
+
+    PrefixTrie fibTrie =
+        new PrefixTrie(
+            ImmutableSortedSet.copyOf(
+                fibSet.stream().map(FibRow::getPrefix).collect(Collectors.toList())));
+
+    Set<Prefix> longestPrefixMatches =
+        dstIpWhitelist
+            .getPrefixes()
+            .stream()
+            .map(Prefix::getStartIp)
+            .map(fibTrie::getLongestPrefixMatch)
+            .collect(Collectors.toSet());
+
+    return fibSet
+        .stream()
+        .filter(
+            fibRow ->
+                // is more specific than some dest Prefix
+                dstIpWhitelist
+                        .getPrefixes()
+                        .stream()
+                        .anyMatch(dstPrefix -> dstPrefix.containsPrefix(fibRow.getPrefix()))
+                    ||
+                    // is longest-prefix match of some dest prefix
+                    longestPrefixMatches.contains(fibRow.getPrefix()))
+        .collect(Collectors.toList());
+  }
 
   private static class TrustAllHostNameVerifier implements HostnameVerifier {
     @Override
@@ -238,7 +278,13 @@ public class CommonUtil {
   }
 
   public static boolean isRelevantFor(Prefix prefix, PrefixTrie dstIps, PrefixTrie nonDstIps) {
-    return dstIps.overlaps(prefix) && !nonDstIps.overlaps(prefix);
+    // TODO: handle nonDstIps
+    return dstIps
+        .getPrefixes()
+        .stream()
+        .anyMatch(
+            dstPrefix -> prefix.containsPrefix(dstPrefix) || dstPrefix.containsPrefix(prefix));
+    // return dstIps.overlaps(prefix) && !nonDstIps.overlaps(prefix);
   }
 
   public static Map<Ip, Set<String>> computeIpOwners(

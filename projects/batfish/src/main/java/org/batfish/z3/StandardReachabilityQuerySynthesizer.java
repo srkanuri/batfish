@@ -187,13 +187,14 @@ public class StandardReachabilityQuerySynthesizer extends ReachabilityQuerySynth
     List<StateExpr> finalActions = computeFinalActions();
     finalActions
         .stream()
-        .map(finalAction -> new BasicRuleStatement(
-            new AndExpr(
-                ImmutableList.of(
-                    SaneExpr.INSTANCE,
-                    new HeaderSpaceMatchExpr(_headerSpace))),
-            ImmutableSet.of(finalAction),
-            Query.INSTANCE))
+        .map(
+            finalAction ->
+                new BasicRuleStatement(
+                    new AndExpr(
+                        ImmutableList.of(
+                            SaneExpr.INSTANCE, new HeaderSpaceMatchExpr(_headerSpace))),
+                    ImmutableSet.of(finalAction),
+                    Query.INSTANCE))
         .forEach(rules::add);
     addOriginateRules(rules);
     return ReachabilityProgram.builder()

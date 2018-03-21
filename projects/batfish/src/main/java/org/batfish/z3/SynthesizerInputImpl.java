@@ -197,7 +197,11 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
   private final Map<String, Map<String, String>> _outgoingAcls;
 
   // Diagnostics: keep track of how many fib rows we remove
-  int _removedFibRows;
+  private int _removedFibRows;
+
+  private int _oldRemovedFibRows;
+
+  private int _totalFibRows;
 
   private final boolean _simplify;
 
@@ -279,7 +283,11 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _aclConditions = computeAclConditions();
 
     // TODO use a logger
-    System.out.println(String.format("SynthesizerInputImpl removed %d fib rows", _removedFibRows));
+    System.out.println(
+        String.format(
+            "SynthesizerInputImpl removed %d of %d fib rows", _removedFibRows, _totalFibRows));
+    System.out.println(
+        String.format("SynthesizerInputImpl old way removed %d fib rows", _oldRemovedFibRows));
   }
 
   private Map<String, Map<String, List<LineAction>>> computeAclActions() {
@@ -532,12 +540,15 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     Map<String, Map<NodeInterfacePair, ImmutableList.Builder<BooleanExpr>>> conditionsByInterface =
         new HashMap<>();
     SortedSet<FibRow> fibSet = _fibs.get(hostname).get(vrfName);
-    List<FibRow> fib =
+    List<FibRow> oldFib =
         fibSet
             .stream()
             .filter(fibRow -> CommonUtil.isRelevantFor(fibRow, _dstIpWhitelist, _dstIpBlacklist))
             .collect(Collectors.toList());
+    List<FibRow> fib = CommonUtil.removeIrrelevantFibs(fibSet, _dstIpWhitelist, _dstIpBlacklist);
     _removedFibRows += fibSet.size() - fib.size();
+    _oldRemovedFibRows += fibSet.size() - oldFib.size();
+    _totalFibRows += fibSet.size();
     for (int i = 0; i < fib.size(); i++) {
       FibRow currentRow = fib.get(i);
       String ifaceOutName = currentRow.getInterface();
