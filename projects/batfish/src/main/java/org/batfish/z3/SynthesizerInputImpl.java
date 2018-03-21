@@ -336,7 +336,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     if (_specializeAcls && _logger != null) {
       _logger.info(
           String.format(
-              "SynthesizerInputImpl removed %d of %d acl lines\n", _removedAclLines, _origAclLines));
+              "SynthesizerInputImpl removed %d of %d acl lines\n",
+              _removedAclLines, _origAclLines));
     }
   }
 
