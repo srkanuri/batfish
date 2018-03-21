@@ -118,8 +118,9 @@ public class CommonUtil {
     // if a FibRow cannot be a longest-prefix match and is more general than any possible dstIP,
     // then we can remove it.
 
+    // empty whitelist means accept anything
     // TODO: generalize to handle the blacklist too
-    if (!dstIpBlacklist.getPrefixes().isEmpty()) {
+    if (dstIpWhitelist.getPrefixes().isEmpty() || !dstIpBlacklist.getPrefixes().isEmpty()) {
       return new ArrayList<>(fibSet);
     }
 
@@ -153,6 +154,13 @@ public class CommonUtil {
 
   public static IpAccessList specializeAclFor(
       IpAccessList acl, PrefixTrie dstIpWhitelist, PrefixTrie dstIpBlacklist) {
+    if(dstIpWhitelist.getPrefixes().isEmpty()) {
+      /*
+       * default: allow everything
+       * TODO see what we can do with dstIpBlacklist
+       */
+      return acl;
+    }
     return new IpAccessList(
         acl.getName(),
         acl.getLines()
