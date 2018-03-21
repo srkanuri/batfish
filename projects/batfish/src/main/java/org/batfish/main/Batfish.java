@@ -4258,6 +4258,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 .setConfigurations(configurations)
                 .setDataPlane(dataPlane)
                 .setHeaderSpace(headerSpace)
+                .setLogger(_logger)
                 .setSimplify(_settings.getSimplify())
                 .build());
 

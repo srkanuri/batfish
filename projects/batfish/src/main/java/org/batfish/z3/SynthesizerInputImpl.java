@@ -15,8 +15,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
+import org.batfish.common.BatfishLogger;
 import org.batfish.common.Pair;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
@@ -67,9 +69,12 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     private HeaderSpace _headerSpace;
 
+    private BatfishLogger _logger;
+
     private boolean _simplify;
 
     private Set<Type> _vectorizedParameters;
+
 
     private Builder() {
       _disabledAcls = ImmutableMap.of();
@@ -91,7 +96,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
           _disabledVrfs,
           _headerSpace,
           _simplify,
-          _vectorizedParameters);
+          _vectorizedParameters,
+          _logger);
     }
 
     public Builder setConfigurations(Map<String, Configuration> configurations) {
@@ -126,6 +132,11 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
     public Builder setHeaderSpace(HeaderSpace headerSpace) {
       _headerSpace = headerSpace;
+      return this;
+    }
+
+    public Builder setLogger(BatfishLogger logger) {
+      _logger = logger;
       return this;
     }
 
@@ -194,6 +205,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Map<String, Set<Ip>> _ipsByHostname;
 
+  private final BatfishLogger _logger;
+
   private final Map<String, Map<String, String>> _outgoingAcls;
 
   // Diagnostics: keep track of how many fib rows we remove
@@ -203,6 +216,10 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private int _totalFibRows;
 
+  private int _removedAclLines;
+
+  private int _origAclLines;
+
   private final boolean _simplify;
 
   private final Map<String, Map<String, List<Entry<AclPermit, BooleanExpr>>>> _sourceNats;
@@ -211,19 +228,14 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Set<Type> _vectorizedParameters;
 
-  public SynthesizerInputImpl(
-      Map<String, Configuration> configurations,
-      DataPlane dataPlane,
-      Map<String, Set<String>> disabledAcls,
-      Map<String, Set<String>> disabledInterfaces,
-      Set<String> disabledNodes,
-      Map<String, Set<String>> disabledVrfs,
-      HeaderSpace headerSpace,
-      boolean simplify,
-      Set<Type> vectorizedParameters) {
+  public SynthesizerInputImpl(Map<String, Configuration> configurations, DataPlane dataPlane,
+      Map<String, Set<String>> disabledAcls, Map<String, Set<String>> disabledInterfaces,
+      Set<String> disabledNodes, Map<String, Set<String>> disabledVrfs, HeaderSpace headerSpace,
+      boolean simplify, Set<Type> vectorizedParameters, BatfishLogger logger) {
     if (configurations == null) {
       throw new BatfishException("Must supply configurations");
     }
+    _logger = logger;
     _configurations = ImmutableMap.copyOf(configurations);
     _disabledAcls = ImmutableMap.copyOf(disabledAcls);
     _disabledInterfaces = ImmutableMap.copyOf(disabledInterfaces);
@@ -282,12 +294,16 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _aclActions = computeAclActions();
     _aclConditions = computeAclConditions();
 
-    // TODO use a logger
-    System.out.println(
-        String.format(
-            "SynthesizerInputImpl removed %d of %d fib rows", _removedFibRows, _totalFibRows));
-    System.out.println(
-        String.format("SynthesizerInputImpl old way removed %d fib rows", _oldRemovedFibRows));
+    if(_logger != null) {
+      _logger.info(String.format("SynthesizerInputImpl removed %d of %d fib rows",
+          _removedFibRows,
+          _totalFibRows));
+      _logger.info(String.format("SynthesizerInputImpl old way removed %d fib rows",
+          _oldRemovedFibRows));
+      _logger.info(String.format("SynthesizerInputImpl removed %d of %d acl lines",
+          _removedAclLines,
+          _origAclLines));
+    }
   }
 
   private Map<String, Map<String, List<LineAction>>> computeAclActions() {
@@ -357,11 +373,17 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                                   ImmutableList.builder();
                               IpAccessList aclIn = i.getIncomingFilter();
                               if (aclIn != null) {
-                                interfaceAcls.add(new Pair<>(aclIn.getName(), aclIn));
+                                IpAccessList newAclIn = CommonUtil.specializeAclFor(aclIn,_dstIpWhitelist,_dstIpBlacklist);
+                                _removedAclLines += aclIn.getLines().size() - newAclIn.getLines().size();
+                                _origAclLines += aclIn.getLines().size();
+                                interfaceAcls.add(new Pair<>(aclIn.getName(), newAclIn));
                               }
                               IpAccessList aclOut = i.getOutgoingFilter();
                               if (aclOut != null) {
-                                interfaceAcls.add(new Pair<>(aclOut.getName(), aclOut));
+                                IpAccessList newAclOut = CommonUtil.specializeAclFor(aclOut,_dstIpWhitelist,_dstIpBlacklist);
+                                _removedAclLines += aclOut.getLines().size() - newAclOut.getLines().size();
+                                _origAclLines += aclOut.getLines().size();
+                                interfaceAcls.add(new Pair<>(aclOut.getName(), newAclOut));
                               }
                               i.getSourceNats()
                                   .forEach(
