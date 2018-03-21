@@ -15,7 +15,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
@@ -74,7 +73,6 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     private boolean _simplify;
 
     private Set<Type> _vectorizedParameters;
-
 
     private Builder() {
       _disabledAcls = ImmutableMap.of();
@@ -228,10 +226,17 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final Set<Type> _vectorizedParameters;
 
-  public SynthesizerInputImpl(Map<String, Configuration> configurations, DataPlane dataPlane,
-      Map<String, Set<String>> disabledAcls, Map<String, Set<String>> disabledInterfaces,
-      Set<String> disabledNodes, Map<String, Set<String>> disabledVrfs, HeaderSpace headerSpace,
-      boolean simplify, Set<Type> vectorizedParameters, BatfishLogger logger) {
+  public SynthesizerInputImpl(
+      Map<String, Configuration> configurations,
+      DataPlane dataPlane,
+      Map<String, Set<String>> disabledAcls,
+      Map<String, Set<String>> disabledInterfaces,
+      Set<String> disabledNodes,
+      Map<String, Set<String>> disabledVrfs,
+      HeaderSpace headerSpace,
+      boolean simplify,
+      Set<Type> vectorizedParameters,
+      BatfishLogger logger) {
     if (configurations == null) {
       throw new BatfishException("Must supply configurations");
     }
@@ -294,15 +299,15 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _aclActions = computeAclActions();
     _aclConditions = computeAclConditions();
 
-    if(_logger != null) {
-      _logger.info(String.format("SynthesizerInputImpl removed %d of %d fib rows",
-          _removedFibRows,
-          _totalFibRows));
-      _logger.info(String.format("SynthesizerInputImpl old way removed %d fib rows",
-          _oldRemovedFibRows));
-      _logger.info(String.format("SynthesizerInputImpl removed %d of %d acl lines",
-          _removedAclLines,
-          _origAclLines));
+    if (_logger != null) {
+      _logger.info(
+          String.format(
+              "SynthesizerInputImpl removed %d of %d fib rows", _removedFibRows, _totalFibRows));
+      _logger.info(
+          String.format("SynthesizerInputImpl old way removed %d fib rows", _oldRemovedFibRows));
+      _logger.info(
+          String.format(
+              "SynthesizerInputImpl removed %d of %d acl lines", _removedAclLines, _origAclLines));
     }
   }
 
@@ -373,15 +378,21 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                                   ImmutableList.builder();
                               IpAccessList aclIn = i.getIncomingFilter();
                               if (aclIn != null) {
-                                IpAccessList newAclIn = CommonUtil.specializeAclFor(aclIn,_dstIpWhitelist,_dstIpBlacklist);
-                                _removedAclLines += aclIn.getLines().size() - newAclIn.getLines().size();
+                                IpAccessList newAclIn =
+                                    CommonUtil.specializeAclFor(
+                                        aclIn, _dstIpWhitelist, _dstIpBlacklist);
+                                _removedAclLines +=
+                                    aclIn.getLines().size() - newAclIn.getLines().size();
                                 _origAclLines += aclIn.getLines().size();
                                 interfaceAcls.add(new Pair<>(aclIn.getName(), newAclIn));
                               }
                               IpAccessList aclOut = i.getOutgoingFilter();
                               if (aclOut != null) {
-                                IpAccessList newAclOut = CommonUtil.specializeAclFor(aclOut,_dstIpWhitelist,_dstIpBlacklist);
-                                _removedAclLines += aclOut.getLines().size() - newAclOut.getLines().size();
+                                IpAccessList newAclOut =
+                                    CommonUtil.specializeAclFor(
+                                        aclOut, _dstIpWhitelist, _dstIpBlacklist);
+                                _removedAclLines +=
+                                    aclOut.getLines().size() - newAclOut.getLines().size();
                                 _origAclLines += aclOut.getLines().size();
                                 interfaceAcls.add(new Pair<>(aclOut.getName(), newAclOut));
                               }
