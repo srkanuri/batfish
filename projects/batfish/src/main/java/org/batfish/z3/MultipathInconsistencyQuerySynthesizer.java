@@ -7,7 +7,10 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.ForwardingAction;
 import org.batfish.datamodel.HeaderSpace;
+import org.batfish.z3.expr.AndExpr;
 import org.batfish.z3.expr.BasicRuleStatement;
+import org.batfish.z3.expr.HeaderSpaceMatchExpr;
+import org.batfish.z3.expr.HeaderSpaceMatchExpr.MatchMode;
 import org.batfish.z3.expr.QueryStatement;
 import org.batfish.z3.expr.RuleStatement;
 import org.batfish.z3.expr.SaneExpr;
@@ -61,7 +64,11 @@ public class MultipathInconsistencyQuerySynthesizer extends ReachabilityQuerySyn
     addOriginateRules(rules);
     rules.add(
         new BasicRuleStatement(
-            SaneExpr.INSTANCE, ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE), Query.INSTANCE));
+            new AndExpr(
+                ImmutableList.of(
+                    SaneExpr.INSTANCE,
+                    new HeaderSpaceMatchExpr(_headerSpace, MatchMode.ORIGINAL))),
+            ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE), Query.INSTANCE));
     return ReachabilityProgram.builder()
         .setInput(input)
         .setQueries(ImmutableList.of(new QueryStatement(Query.INSTANCE)))

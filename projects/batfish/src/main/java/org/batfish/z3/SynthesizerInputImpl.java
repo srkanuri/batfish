@@ -329,14 +329,14 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     if (_specializeFibs && _logger != null) {
       _logger.info(
           String.format(
-              "SynthesizerInputImpl removed %d of %d fib rows", _removedFibRows, _totalFibRows));
+              "SynthesizerInputImpl removed %d of %d fib rows\n", _removedFibRows, _totalFibRows));
       _logger.info(
-          String.format("SynthesizerInputImpl old way removed %d fib rows", _oldRemovedFibRows));
+          String.format("SynthesizerInputImpl old way removed %d fib rows\n", _oldRemovedFibRows));
     }
     if (_specializeAcls && _logger != null) {
       _logger.info(
           String.format(
-              "SynthesizerInputImpl removed %d of %d acl lines", _removedAclLines, _origAclLines));
+              "SynthesizerInputImpl removed %d of %d acl lines\n", _removedAclLines, _origAclLines));
     }
   }
 
