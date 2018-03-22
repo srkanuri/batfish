@@ -16,7 +16,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
 import org.batfish.common.Pair;
@@ -229,8 +228,6 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
   // Diagnostics: keep track of how many fib rows we remove
   private int _removedFibRows;
 
-  private int _oldRemovedFibRows;
-
   private int _totalFibRows;
 
   private int _removedAclLines;
@@ -330,8 +327,6 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
       _logger.info(
           String.format(
               "SynthesizerInputImpl removed %d of %d fib rows\n", _removedFibRows, _totalFibRows));
-      _logger.info(
-          String.format("SynthesizerInputImpl old way removed %d fib rows\n", _oldRemovedFibRows));
     }
     if (_specializeAcls && _logger != null) {
       _logger.info(
@@ -613,14 +608,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     SortedSet<FibRow> fibSet = _fibs.get(hostname).get(vrfName);
     List<FibRow> fib;
     if (_specializeFibs) {
-      List<FibRow> oldFib =
-          fibSet
-              .stream()
-              .filter(fibRow -> CommonUtil.isRelevantFor(fibRow, _dstIpWhitelist, _dstIpBlacklist))
-              .collect(Collectors.toList());
       fib = CommonUtil.removeIrrelevantFibs(fibSet, _dstIpWhitelist, _dstIpBlacklist);
       _removedFibRows += fibSet.size() - fib.size();
-      _oldRemovedFibRows += fibSet.size() - oldFib.size();
       _totalFibRows += fibSet.size();
     } else {
       fib = new ArrayList<>(fibSet);

@@ -141,14 +141,14 @@ public class CommonUtil {
         .stream()
         .filter(
             fibRow ->
-                // is more specific than some dest Prefix
-                dstIpWhitelist
+                // is longest-prefix match of some dest prefix
+                longestPrefixMatches.contains(fibRow.getPrefix())
+                    ||
+                    // is more specific than some dest Prefix
+                    dstIpWhitelist
                         .getPrefixes()
                         .stream()
-                        .anyMatch(dstPrefix -> dstPrefix.containsPrefix(fibRow.getPrefix()))
-                    ||
-                    // is longest-prefix match of some dest prefix
-                    longestPrefixMatches.contains(fibRow.getPrefix()))
+                        .anyMatch(dstPrefix -> dstPrefix.containsPrefix(fibRow.getPrefix())))
         .collect(Collectors.toList());
   }
 
@@ -171,41 +171,32 @@ public class CommonUtil {
 
   public static boolean isRelevantFor(
       IpAccessListLine aclLine, PrefixTrie dstIpWhiteList, PrefixTrie dstIpBlackList) {
-    /*
-     * TODO: better way to handle aclLine.getNotDstIps()
-     */
-    if (!aclLine.getNotDstIps().isEmpty()) {
-      // punt: don't remove it
-      return true;
-    }
-    if (aclLine.getDstIps().isEmpty()) {
-      // acl doesn't constrain dstIp, so we have to assume it's relevant
-      return true;
-    }
-    return aclLine
-        .getDstIps()
-        .stream()
-        .anyMatch(
-            ipWildcard -> {
-              Prefix aclPrefix = ipWildcard.toPrefix();
-              boolean matchesWhitelist =
-                  dstIpWhiteList
-                      .getPrefixes()
-                      .stream()
-                      .anyMatch(
-                          dstPrefix ->
-                              dstPrefix.containsPrefix(aclPrefix)
-                                  || aclPrefix.containsPrefix(dstPrefix));
-              boolean doesntMatchBlacklist =
-                  dstIpBlackList
-                      .getPrefixes()
-                      .stream()
-                      .noneMatch(
-                          dstPrefix ->
-                              dstPrefix.containsPrefix(aclPrefix)
-                                  || aclPrefix.containsPrefix(dstPrefix));
-              return matchesWhitelist && doesntMatchBlacklist;
-            });
+    return !aclLine.getNotDstIps().isEmpty() // TODO: handle notDstIps better
+        || aclLine.getDstIps().isEmpty() // no dstIp constraint
+        || aclLine
+            .getDstIps()
+            .stream()
+            .anyMatch(
+                ipWildcard -> {
+                  Prefix aclPrefix = ipWildcard.toPrefix();
+                  boolean matchesWhitelist =
+                      dstIpWhiteList
+                          .getPrefixes()
+                          .stream()
+                          .anyMatch(
+                              dstPrefix ->
+                                  dstPrefix.containsPrefix(aclPrefix)
+                                      || aclPrefix.containsPrefix(dstPrefix));
+                  boolean doesntMatchBlacklist =
+                      dstIpBlackList
+                          .getPrefixes()
+                          .stream()
+                          .noneMatch(
+                              dstPrefix ->
+                                  dstPrefix.containsPrefix(aclPrefix)
+                                      || aclPrefix.containsPrefix(dstPrefix));
+                  return matchesWhitelist && doesntMatchBlacklist;
+                });
   }
 
   private static class TrustAllHostNameVerifier implements HostnameVerifier {
