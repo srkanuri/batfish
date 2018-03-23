@@ -3,13 +3,22 @@ package org.batfish.z3;
 import com.microsoft.z3.BitVecExpr;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.batfish.common.Pair;
 import org.batfish.config.Settings;
+import org.batfish.z3.expr.QueryStatement;
+import org.batfish.z3.expr.ReachabilityProgramOptimizer;
+import org.batfish.z3.expr.RuleStatement;
+import org.batfish.z3.state.OriginateVrf;
 
 public final class NodJob extends AbstractNodJob {
+
+  private final SortedSet<Pair<String, String>> _nodeVrfSet;
 
   private Synthesizer _dataPlaneSynthesizer;
 
@@ -24,6 +33,7 @@ public final class NodJob extends AbstractNodJob {
     super(settings, nodeVrfSet, tag);
     _dataPlaneSynthesizer = dataPlaneSynthesizer;
     _querySynthesizer = querySynthesizer;
+    _nodeVrfSet = nodeVrfSet;
   }
 
   @Override
@@ -41,6 +51,46 @@ public final class NodJob extends AbstractNodJob {
     ReachabilityProgram queryProgram =
         instrumentReachabilityProgram(
             _querySynthesizer.getReachabilityProgram(_dataPlaneSynthesizer.getInput()));
-    return new NodProgram(ctx, baseProgram, queryProgram);
+
+    List<RuleStatement> allRules = new ArrayList<>(baseProgram.getRules());
+    allRules.addAll(queryProgram.getRules());
+
+    List<QueryStatement> allQueries = new ArrayList<>(baseProgram.getQueries());
+    allQueries.addAll(queryProgram.getQueries());
+
+    ReachabilityProgramOptimizer optimizer =
+        new ReachabilityProgramOptimizer(
+            _nodeVrfSet
+                .stream()
+                .map(nodeVrf -> new OriginateVrf(nodeVrf.getFirst(), nodeVrf.getSecond()))
+                .collect(Collectors.toList()),
+            allRules,
+            allQueries);
+
+    ReachabilityProgram optimizedBaseProgram =
+        ReachabilityProgram.builder()
+            .setInput(baseProgram.getInput())
+            .setRules(
+                baseProgram
+                    .getRules()
+                    .stream()
+                    .filter(optimizer.getOptimizedRules()::contains)
+                    .collect(Collectors.toList()))
+            .setQueries(baseProgram.getQueries())
+            .build();
+
+    ReachabilityProgram optimizedQueryProgram =
+        ReachabilityProgram.builder()
+            .setInput(queryProgram.getInput())
+            .setRules(
+                queryProgram
+                    .getRules()
+                    .stream()
+                    .filter(optimizer.getOptimizedRules()::contains)
+                    .collect(Collectors.toList()))
+            .setQueries(queryProgram.getQueries())
+            .build();
+
+    return new NodProgram(ctx, optimizedBaseProgram, optimizedQueryProgram);
   }
 }

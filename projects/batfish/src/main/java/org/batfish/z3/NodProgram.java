@@ -6,6 +6,7 @@ import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.batfish.z3.expr.visitors.BoolExprTransformer;
@@ -60,6 +61,17 @@ public class NodProgram {
 
   public String toSmt2String() {
     StringBuilder sb = new StringBuilder();
+
+    String[] variablesAsNames = _context.getVariableNames().stream().toArray(String[]::new);
+
+    String[] variablesAsDebruijnIndices =
+        IntStream.range(0, variablesAsNames.length)
+            .mapToObj(index -> String.format("(:var %d)", index))
+            .toArray(String[]::new);
+
+    Consumer<String> write =
+        (s) -> sb.append(StringUtils.replaceEach(s, variablesAsDebruijnIndices, variablesAsNames));
+
     Streams.concat(
             Arrays.stream(BasicHeaderField.values()),
             Arrays.stream(TransformationHeaderField.values()))
@@ -67,7 +79,7 @@ public class NodProgram {
             hf -> {
               String var = hf.name();
               int size = hf.getSize();
-              sb.append(String.format("(declare-var %s (_ BitVec %d))\n", var, size));
+              write.accept(String.format("(declare-var %s (_ BitVec %d))\n", var, size));
             });
     _context
         .getRelationDeclarations()
@@ -79,19 +91,13 @@ public class NodProgram {
                     .getSExpr()
                     .replaceAll("declare-fun", "declare-rel")
                     .replaceAll(" Bool\\)", ")"))
-        .forEach(declaration -> sb.append(String.format("%s\n", declaration)));
-    _rules.forEach(r -> sb.append(String.format("(rule %s)\n", r.toString())));
+        .forEach(declaration -> write.accept(String.format("%s\n", declaration)));
+    _rules.forEach(r -> write.accept(String.format("(rule %s)\n", r.toString())));
 
     sb.append("\n");
     _queries.forEach(
-        query -> sb.append(String.format("(query %s)\n", query.getFuncDecl().getName())));
+        query -> write.accept(String.format("(query %s)\n", query.getFuncDecl().getName())));
 
-    String[] variablesAsNames = _context.getVariableNames().stream().toArray(String[]::new);
-
-    String[] variablesAsDebruijnIndices =
-        IntStream.range(0, variablesAsNames.length)
-            .mapToObj(index -> String.format("(:var %d)", index))
-            .toArray(String[]::new);
-    return StringUtils.replaceEach(sb.toString(), variablesAsDebruijnIndices, variablesAsNames);
+    return sb.toString();
   }
 }
