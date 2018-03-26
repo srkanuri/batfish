@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -20,18 +21,28 @@ import org.batfish.z3.state.OriginateVrf;
  */
 public class ReachabilityProgramOptimizer {
   private final List<StateExpr> _queryStates;
+  private boolean _useFindDerivableStates;
   private Map<StateExpr, Set<RuleStatement>> _derivingRules;
+  private Map<StateExpr, Set<RuleStatement>> _dependentRules;
   private Set<StateExpr> _states;
   private Set<RuleStatement> _rules;
   private List<OriginateVrf> _originateVrfs;
+  private boolean _removeIrrelevantRulesAndStates;
+  private boolean _removeUnreachableStates;
+  private boolean _removeUnusableRules;
 
   public ReachabilityProgramOptimizer(
       List<OriginateVrf> originateVrfs, List<RuleStatement> rules, List<QueryStatement> queries) {
     _rules = new HashSet<>(rules);
     _derivingRules = new HashMap<>();
+    _dependentRules = new HashMap<>();
     _states = new HashSet<>();
     _originateVrfs = originateVrfs;
     _queryStates = queries.stream().map(QueryStatement::getStateExpr).collect(Collectors.toList());
+    _useFindDerivableStates = true;
+    _removeIrrelevantRulesAndStates = false;
+    _removeUnreachableStates = false;
+    _removeUnusableRules = true;
 
     init();
     computeFixpoint();
@@ -45,6 +56,11 @@ public class ReachabilityProgramOptimizer {
           _derivingRules
               .computeIfAbsent(rule.getPostconditionState(), s -> new HashSet<>())
               .add(rule);
+          rule.getPreconditionStates()
+              .forEach(stateExpr ->
+                  _dependentRules
+                      .computeIfAbsent(stateExpr, s -> new HashSet<>())
+                      .add(rule));
           _states.add(rule.getPostconditionState());
           _states.addAll(rule.getPreconditionStates());
         });
@@ -53,6 +69,9 @@ public class ReachabilityProgramOptimizer {
   private void computeFixpoint() {
     int round = 0;
     boolean converged = false;
+
+    int origStates = _states.size();
+    int origRules = _rules.size();
 
     while (!converged) {
       round++;
@@ -67,6 +86,11 @@ public class ReachabilityProgramOptimizer {
           String.format("Round %d removed %d states and %d rules.", round, states, rules));
       converged = statesRemoved == 0 && rulesRemoved == 0;
     }
+
+    System.out.println(
+        String.format("Nod optimization removed %d states and %d rules.",
+            origStates - _states.size(),
+            origRules - _rules.size()));
   }
 
   public Set<RuleStatement> getOptimizedRules() {
@@ -86,9 +110,18 @@ public class ReachabilityProgramOptimizer {
   }
 
   private void optimize() {
-    removeRules(_rules.stream().filter(this::unusableRule).collect(Collectors.toList()));
-    removeStates(_states.stream().filter(this::unreachableState).collect(Collectors.toList()));
-    removeIrrelevantRulesAndStates();
+    if(_removeUnusableRules) {
+      removeRules(_rules.stream().filter(this::unusableRule).collect(Collectors.toList()));
+    }
+    if(_removeUnreachableStates) {
+      removeStates(_states.stream().filter(this::unreachableState).collect(Collectors.toList()));
+    }
+    if(_removeIrrelevantRulesAndStates) {
+      removeIrrelevantRulesAndStates();
+    }
+    if(_useFindDerivableStates) {
+      findDerivableStates();
+    }
   }
 
   private void removeStates(Collection<StateExpr> statesToRemove) {
@@ -133,5 +166,66 @@ public class ReachabilityProgramOptimizer {
 
     _rules = relevantRules;
     _states = relevantStates;
+  }
+
+  /* Find all states forward reachable from the graph roots (states without prestates) */
+  private void findDerivableStates() {
+    // initially, the derivable states are the roots
+    Set<StateExpr> derivableStates = new HashSet<>();
+
+    assert(derivableStates.containsAll(_originateVrfs));
+    // should also have some acl states, etc.
+
+    Set<StateExpr> newStates =
+        _derivingRules
+            .entrySet()
+            .stream()
+            .filter(stateAndDerivingRules ->
+                stateAndDerivingRules
+                    .getValue()
+                    .stream()
+                    .anyMatch(rule -> rule.getPreconditionStates().isEmpty()))
+            .map(Entry::getKey)
+            .collect(Collectors.toSet());
+    Set<RuleStatement> visitedRules = new HashSet<>();
+
+    // keep looking for new forward-reachable states until we're done
+    long startTime = System.currentTimeMillis();
+    int iterations = 0;
+    while(!newStates.isEmpty()) {
+      iterations++;
+      derivableStates.addAll(newStates);
+
+      HashSet<StateExpr> newNewStates = new HashSet<>();
+      newStates
+          .stream()
+          .filter(_dependentRules::containsKey)
+          .forEach(state ->
+              _dependentRules
+                  .get(state)
+                  .stream()
+                  .filter(rule -> !visitedRules.contains(rule)
+                      && derivableStates.containsAll(rule.getPreconditionStates()))
+                  .forEach(rule -> {
+                    StateExpr postState = rule.getPostconditionState();
+                    if(!derivableStates.contains(postState)) {
+                      newNewStates.add(postState);
+                    }
+                    visitedRules.add(rule);
+                  }));
+      newStates = newNewStates;
+      /*
+      _rules
+          .stream()
+          .filter(rule -> !visitedRules.contains(rule)
+              && derivableStates.containsAll(rule.getPreconditionStates()))
+              */
+    }
+      _states = derivableStates;
+      _rules = visitedRules;
+    long elapsed = System.currentTimeMillis() - startTime;
+    System.out.println(
+        String.format("findDerivableStates completed %d iterations in %d milliseconds",
+            iterations, elapsed));
   }
 }
