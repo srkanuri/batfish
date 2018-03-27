@@ -18,8 +18,6 @@ import org.batfish.z3.expr.RuleStatement;
 
 public final class NodJob extends AbstractNodJob {
 
-  private final SortedSet<Pair<String, String>> _nodeVrfSet;
-
   private Synthesizer _dataPlaneSynthesizer;
 
   private QuerySynthesizer _querySynthesizer;
@@ -33,7 +31,6 @@ public final class NodJob extends AbstractNodJob {
     super(settings, nodeVrfSet, tag);
     _dataPlaneSynthesizer = dataPlaneSynthesizer;
     _querySynthesizer = querySynthesizer;
-    _nodeVrfSet = nodeVrfSet;
   }
 
   @Override
