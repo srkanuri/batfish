@@ -6,6 +6,7 @@ import com.microsoft.z3.Context;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
@@ -58,14 +59,7 @@ public final class NodJob extends AbstractNodJob {
     List<QueryStatement> allQueries = new ArrayList<>(baseProgram.getQueries());
     allQueries.addAll(queryProgram.getQueries());
 
-    ReachabilityProgramOptimizer optimizer =
-        new ReachabilityProgramOptimizer(
-            _nodeVrfSet
-                .stream()
-                .map(nodeVrf -> new OriginateVrf(nodeVrf.getFirst(), nodeVrf.getSecond()))
-                .collect(Collectors.toList()),
-            allRules,
-            allQueries);
+    Set<RuleStatement> optimizedRules = ReachabilityProgramOptimizer.optimize(allRules, allQueries);
 
     ReachabilityProgram optimizedBaseProgram =
         ReachabilityProgram.builder()
@@ -74,7 +68,7 @@ public final class NodJob extends AbstractNodJob {
                 baseProgram
                     .getRules()
                     .stream()
-                    .filter(optimizer.getOptimizedRules()::contains)
+                    .filter(optimizedRules::contains)
                     .collect(Collectors.toList()))
             .setQueries(baseProgram.getQueries())
             .build();
@@ -86,7 +80,7 @@ public final class NodJob extends AbstractNodJob {
                 queryProgram
                     .getRules()
                     .stream()
-                    .filter(optimizer.getOptimizedRules()::contains)
+                    .filter(optimizedRules::contains)
                     .collect(Collectors.toList()))
             .setQueries(queryProgram.getQueries())
             .build();
