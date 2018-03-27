@@ -18,10 +18,10 @@ import java.util.stream.Collectors;
  */
 public class ReachabilityProgramOptimizer {
 
-  public static Set<RuleStatement> optimize(List<RuleStatement> rules, List<QueryStatement> queries) {
+  public static Set<RuleStatement> optimize(
+      List<RuleStatement> rules, List<QueryStatement> queries) {
     return new ReachabilityProgramOptimizer(rules, queries).getOptimizedRules();
   }
-
 
   private final List<StateExpr> _queryStates;
   private Map<StateExpr, Set<RuleStatement>> _derivingRules;
@@ -48,10 +48,9 @@ public class ReachabilityProgramOptimizer {
               .computeIfAbsent(rule.getPostconditionState(), s -> new HashSet<>())
               .add(rule);
           rule.getPreconditionStates()
-              .forEach(stateExpr ->
-                  _dependentRules
-                      .computeIfAbsent(stateExpr, s -> new HashSet<>())
-                      .add(rule));
+              .forEach(
+                  stateExpr ->
+                      _dependentRules.computeIfAbsent(stateExpr, s -> new HashSet<>()).add(rule));
         });
   }
 
@@ -72,14 +71,12 @@ public class ReachabilityProgramOptimizer {
       forwardReachability();
 
       int rulesRemoved = rules - _rules.size();
-      System.out.println(
-          String.format("Round %d removed %d rules.", round, rulesRemoved));
+      System.out.println(String.format("Round %d removed %d rules.", round, rulesRemoved));
       converged = rulesRemoved == 0;
     }
 
     System.out.println(
-        String.format("Nod optimization removed %d rules.",
-            origRules - _rules.size()));
+        String.format("Nod optimization removed %d rules.", origRules - _rules.size()));
   }
 
   public Set<RuleStatement> getOptimizedRules() {
@@ -121,18 +118,17 @@ public class ReachabilityProgramOptimizer {
 
     // start at axioms and the states they derive
     Set<RuleStatement> visitedRules =
-        _rules.stream()
+        _rules
+            .stream()
             .filter(rule -> rule.getPreconditionStates().isEmpty())
             .collect(Collectors.toSet());
     Set<StateExpr> newStates =
-        visitedRules.stream()
-            .map(RuleStatement::getPostconditionState)
-            .collect(Collectors.toSet());
+        visitedRules.stream().map(RuleStatement::getPostconditionState).collect(Collectors.toSet());
 
     // keep looking for new forward-reachable states until we're done
     long startTime = System.currentTimeMillis();
     int iterations = 0;
-    while(!newStates.isEmpty()) {
+    while (!newStates.isEmpty()) {
       iterations++;
       derivableStates.addAll(newStates);
 
@@ -140,25 +136,29 @@ public class ReachabilityProgramOptimizer {
       newStates
           .stream()
           .filter(_dependentRules::containsKey)
-          .forEach(state ->
-              _dependentRules
-                  .get(state)
-                  .stream()
-                  .filter(rule -> !visitedRules.contains(rule)
-                      && derivableStates.containsAll(rule.getPreconditionStates()))
-                  .forEach(rule -> {
-                    StateExpr postState = rule.getPostconditionState();
-                    if(!derivableStates.contains(postState)) {
-                      newNewStates.add(postState);
-                    }
-                    visitedRules.add(rule);
-                  }));
+          .forEach(
+              state ->
+                  _dependentRules
+                      .get(state)
+                      .stream()
+                      .filter(
+                          rule ->
+                              !visitedRules.contains(rule)
+                                  && derivableStates.containsAll(rule.getPreconditionStates()))
+                      .forEach(
+                          rule -> {
+                            StateExpr postState = rule.getPostconditionState();
+                            if (!derivableStates.contains(postState)) {
+                              newNewStates.add(postState);
+                            }
+                            visitedRules.add(rule);
+                          }));
       newStates = newNewStates;
     }
     _rules = visitedRules;
     long elapsed = System.currentTimeMillis() - startTime;
     System.out.println(
-        String.format("forwardReachability completed %d iterations in %d milliseconds",
-            iterations, elapsed));
+        String.format(
+            "forwardReachability completed %d iterations in %d milliseconds", iterations, elapsed));
   }
 }

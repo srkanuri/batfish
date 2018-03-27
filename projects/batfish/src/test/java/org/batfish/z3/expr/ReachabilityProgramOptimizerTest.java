@@ -1,9 +1,6 @@
 package org.batfish.z3.expr;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasItems;
@@ -42,8 +39,8 @@ public class ReachabilityProgramOptimizerTest {
   }
 
   private RuleStatement addRuleFor(StateExpr postState, StateExpr... preStates) {
-    RuleStatement rule = new BasicRuleStatement(Arrays.stream(preStates)
-        .collect(Collectors.toSet()), postState);
+    RuleStatement rule =
+        new BasicRuleStatement(Arrays.stream(preStates).collect(Collectors.toSet()), postState);
     _rules.add(rule);
     return rule;
   }
@@ -61,7 +58,7 @@ public class ReachabilityProgramOptimizerTest {
     RuleStatement rule = addRuleFor(queryState, initialState);
     Set<RuleStatement> rules = optimize();
     assertThat(rules, hasSize(2));
-    assertThat(rules, hasItems(axiom,rule));
+    assertThat(rules, hasItems(axiom, rule));
   }
 
   @Test
@@ -105,7 +102,7 @@ public class ReachabilityProgramOptimizerTest {
     assertThat(rules, not(hasItem(goalState3Rule)));
 
     // all other rules remain
-    assertThat(rules, hasItems(goalState1Rule,state1Axiom));
+    assertThat(rules, hasItems(goalState1Rule, state1Axiom));
   }
 
   /*

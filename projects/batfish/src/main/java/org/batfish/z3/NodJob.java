@@ -15,7 +15,6 @@ import org.batfish.config.Settings;
 import org.batfish.z3.expr.QueryStatement;
 import org.batfish.z3.expr.ReachabilityProgramOptimizer;
 import org.batfish.z3.expr.RuleStatement;
-import org.batfish.z3.state.OriginateVrf;
 
 public final class NodJob extends AbstractNodJob {
 
