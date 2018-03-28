@@ -60,7 +60,9 @@ public class ReachabilitySettings {
       return _notIngressNodes;
     }
 
-    public boolean getSpecialize() { return _specialize; }
+    public boolean getSpecialize() {
+      return _specialize;
+    }
 
     public NodesSpecifier getTransitNodes() {
       return _transitNodes;

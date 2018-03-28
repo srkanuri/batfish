@@ -4092,7 +4092,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     Synthesizer dataPlaneSynthesizer =
         synthesizeDataPlane(
-            configurations, dataPlane, reachabilitySettings.getHeaderSpace(), reachabilitySettings.getSpecialize()
+            configurations,
+            dataPlane,
+            reachabilitySettings.getHeaderSpace(),
+            reachabilitySettings.getSpecialize()
             // new HeaderSpace()
             );
 
@@ -4122,7 +4125,13 @@ public class Batfish extends PluginConsumer implements IBatfish {
                           .setNonTransitNodes(nonTransitNodes)
                           .build();
 
-                  return new NodJob(settings, dataPlaneSynthesizer, query, nodeVrfs, tag, reachabilitySettings.getSpecialize());
+                  return new NodJob(
+                      settings,
+                      dataPlaneSynthesizer,
+                      query,
+                      nodeVrfs,
+                      tag,
+                      reachabilitySettings.getSpecialize());
                 })
             .collect(Collectors.toList());
 
@@ -4247,7 +4256,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Nonnull
   public Synthesizer synthesizeDataPlane(
-      Map<String, Configuration> configurations, DataPlane dataPlane, HeaderSpace headerSpace, boolean specialize) {
+      Map<String, Configuration> configurations,
+      DataPlane dataPlane,
+      HeaderSpace headerSpace,
+      boolean specialize) {
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
 
