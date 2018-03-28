@@ -18,6 +18,8 @@ import org.batfish.z3.expr.RuleStatement;
 
 public final class NodJob extends AbstractNodJob {
 
+  private final boolean _optimize;
+
   private Synthesizer _dataPlaneSynthesizer;
 
   private QuerySynthesizer _querySynthesizer;
@@ -27,10 +29,12 @@ public final class NodJob extends AbstractNodJob {
       Synthesizer dataPlaneSynthesizer,
       QuerySynthesizer querySynthesizer,
       SortedSet<Pair<String, String>> nodeVrfSet,
-      String tag) {
+      String tag,
+      boolean optimize) {
     super(settings, nodeVrfSet, tag);
     _dataPlaneSynthesizer = dataPlaneSynthesizer;
     _querySynthesizer = querySynthesizer;
+    _optimize = optimize;
   }
 
   @Override
@@ -49,6 +53,16 @@ public final class NodJob extends AbstractNodJob {
         instrumentReachabilityProgram(
             _querySynthesizer.getReachabilityProgram(_dataPlaneSynthesizer.getInput()));
 
+    if(_optimize) {
+      return optimizedProgram(ctx, baseProgram, queryProgram);
+    } else {
+      return new NodProgram(ctx, baseProgram, queryProgram);
+    }
+  }
+
+  private NodProgram optimizedProgram(
+      Context ctx,
+      ReachabilityProgram baseProgram, ReachabilityProgram queryProgram) {
     List<RuleStatement> allRules = new ArrayList<>(baseProgram.getRules());
     allRules.addAll(queryProgram.getRules());
 

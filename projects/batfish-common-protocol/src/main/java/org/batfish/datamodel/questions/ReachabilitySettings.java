@@ -26,6 +26,8 @@ public class ReachabilitySettings {
 
     private NodesSpecifier _transitNodes;
 
+    private boolean _specialize;
+
     public ReachabilitySettings build() {
       return new ReachabilitySettings(this);
     }
@@ -57,6 +59,8 @@ public class ReachabilitySettings {
     public NodesSpecifier getNotIngressNodes() {
       return _notIngressNodes;
     }
+
+    public boolean getSpecialize() { return _specialize; }
 
     public NodesSpecifier getTransitNodes() {
       return _transitNodes;
@@ -90,6 +94,10 @@ public class ReachabilitySettings {
       _notIngressNodes = notIngressNodes;
     }
 
+    public void setSpecialize(boolean specialize) {
+      _specialize = specialize;
+    }
+
     public void setTransitNodes(NodesSpecifier transitNodes) {
       _transitNodes = transitNodes;
     }
@@ -115,6 +123,8 @@ public class ReachabilitySettings {
 
   private final NodesSpecifier _transitNodes;
 
+  private final boolean _specialize;
+
   private ReachabilitySettings(Builder builder) {
     _finalNodes = builder._finalNodes;
     _notFinalNodes = builder._notFinalNodes;
@@ -124,6 +134,7 @@ public class ReachabilitySettings {
     _maxChunkSize = builder._maxChunkSize;
     _transitNodes = builder._transitNodes;
     _nonTransitNodes = builder._nonTransitNodes;
+    _specialize = builder._specialize;
   }
 
   public Set<String> computeActiveFinalNodes(Map<String, Configuration> configurations)
@@ -188,6 +199,10 @@ public class ReachabilitySettings {
 
   public NodesSpecifier getTransitNodes() {
     return _transitNodes;
+  }
+
+  public boolean getSpecialize() {
+    return _specialize;
   }
 
   public void validateTransitNodes(Map<String, Configuration> configurations)

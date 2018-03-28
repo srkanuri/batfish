@@ -4092,7 +4092,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     Synthesizer dataPlaneSynthesizer =
         synthesizeDataPlane(
-            configurations, dataPlane, reachabilitySettings.getHeaderSpace()
+            configurations, dataPlane, reachabilitySettings.getHeaderSpace(), reachabilitySettings.getSpecialize()
             // new HeaderSpace()
             );
 
@@ -4122,7 +4122,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                           .setNonTransitNodes(nonTransitNodes)
                           .build();
 
-                  return new NodJob(settings, dataPlaneSynthesizer, query, nodeVrfs, tag);
+                  return new NodJob(settings, dataPlaneSynthesizer, query, nodeVrfs, tag, reachabilitySettings.getSpecialize());
                 })
             .collect(Collectors.toList());
 
@@ -4242,12 +4242,12 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   public Synthesizer synthesizeDataPlane(HeaderSpace headerSpace) {
-    return synthesizeDataPlane(loadConfigurations(), loadDataPlane(), headerSpace);
+    return synthesizeDataPlane(loadConfigurations(), loadDataPlane(), headerSpace, false);
   }
 
   @Nonnull
   public Synthesizer synthesizeDataPlane(
-      Map<String, Configuration> configurations, DataPlane dataPlane, HeaderSpace headerSpace) {
+      Map<String, Configuration> configurations, DataPlane dataPlane, HeaderSpace headerSpace, boolean specialize) {
     _logger.info("\n*** GENERATING Z3 LOGIC ***\n");
     _logger.resetTimer();
 
@@ -4260,8 +4260,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 .setHeaderSpace(headerSpace)
                 .setLogger(_logger)
                 .setSimplify(_settings.getSimplify())
-                .setSpecializeAcls(true)
-                .setSpecializeFibs(true)
+                .setSpecializeAcls(specialize)
+                .setSpecializeFibs(specialize)
                 .build());
 
     List<String> warnings = s.getWarnings();

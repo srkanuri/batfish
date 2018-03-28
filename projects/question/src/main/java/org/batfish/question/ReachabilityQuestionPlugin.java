@@ -130,6 +130,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private static final boolean DEFAULT_USE_COMPRESSION = false;
 
+    private static final boolean DEFAULT_SPECIALIZE = false;
+
     private static final String PROP_ACTIONS = "actions";
 
     private static final String PROP_DST_IPS = "dstIps";
@@ -202,6 +204,8 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
 
     private static final String PROP_USE_COMPRESSION = "useCompression";
 
+    private static final String PROP_SPECIALIZE = "specialize";
+
     private SortedSet<ForwardingAction> _actions;
 
     private ReachabilitySettings.Builder _reachabilitySettings;
@@ -223,6 +227,7 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
       _reachabilityType = ReachabilityType.STANDARD;
       setTransitNodes(DEFAULT_TRANSIT_NODES);
       _useCompression = DEFAULT_USE_COMPRESSION;
+      setSpecialize(DEFAULT_SPECIALIZE);
     }
 
     @JsonProperty(PROP_ACTIONS)
@@ -413,6 +418,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_USE_COMPRESSION)
     public boolean getUseCompression() {
       return _useCompression;
+    }
+
+    @JsonProperty(PROP_SPECIALIZE)
+    public boolean getSpecialize() {
+      return _reachabilitySettings.getSpecialize();
     }
 
     @Override
@@ -742,6 +752,11 @@ public class ReachabilityQuestionPlugin extends QuestionPlugin {
     @JsonProperty(PROP_USE_COMPRESSION)
     public void setUseCompression(boolean useCompression) {
       _useCompression = useCompression;
+    }
+
+    @JsonProperty(PROP_SPECIALIZE)
+    public void setSpecialize(boolean specialize) {
+      _reachabilitySettings.setSpecialize(specialize);
     }
   }
 
