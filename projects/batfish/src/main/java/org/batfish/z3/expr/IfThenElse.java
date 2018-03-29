@@ -18,24 +18,27 @@ public class IfThenElse extends BooleanExpr {
     _else = els;
   }
 
-  @Override public <R> R accept(GenericBooleanExprVisitor<R> visitor) {
+  @Override
+  public <R> R accept(GenericBooleanExprVisitor<R> visitor) {
     return visitor.visitIfThenElse(this);
   }
 
-  @Override public void accept(ExprVisitor visitor) {
+  @Override
+  public void accept(ExprVisitor visitor) {
     visitor.visitIfThenElse(this);
   }
 
-  @Override public boolean exprEquals(Expr e) {
-    if(this == e) {
+  @Override
+  public boolean exprEquals(Expr e) {
+    if (this == e) {
       return true;
     }
 
-    if(e == null) {
+    if (e == null) {
       return false;
     }
 
-    if(! (e instanceof IfThenElse)) {
+    if (!(e instanceof IfThenElse)) {
       return false;
     }
 
@@ -46,7 +49,8 @@ public class IfThenElse extends BooleanExpr {
         && Objects.equals(_else, other._else);
   }
 
-  @Override public int hashCode() {
+  @Override
+  public int hashCode() {
     return Objects.hash(_condition, _then, _else);
   }
 

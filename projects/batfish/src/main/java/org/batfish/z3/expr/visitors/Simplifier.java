@@ -333,17 +333,18 @@ public class Simplifier
     return trueExpr;
   }
 
-  @Override public BooleanExpr visitIfThenElse(IfThenElse ifThenElse) {
+  @Override
+  public BooleanExpr visitIfThenElse(IfThenElse ifThenElse) {
     BooleanExpr condition = ifThenElse.getCondition().accept(this);
 
-    if(condition.equals(TrueExpr.INSTANCE)) {
+    if (condition.equals(TrueExpr.INSTANCE)) {
       return ifThenElse.getThen().accept(this);
-    } else if(condition.equals(FalseExpr.INSTANCE)) {
+    } else if (condition.equals(FalseExpr.INSTANCE)) {
       return ifThenElse.getElse().accept(this);
     } else {
       BooleanExpr then = ifThenElse.getThen().accept(this);
       BooleanExpr els = ifThenElse.getElse().accept(this);
-      if(condition != ifThenElse.getCondition()
+      if (condition != ifThenElse.getCondition()
           || then != ifThenElse.getThen()
           || els != ifThenElse.getElse()) {
         return new IfThenElse(condition, then, els);

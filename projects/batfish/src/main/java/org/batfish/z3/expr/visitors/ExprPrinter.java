@@ -285,7 +285,8 @@ public class ExprPrinter implements ExprVisitor, VoidStatementVisitor {
     _sb.append(varIntExpr.getField().getName());
   }
 
-  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+  @Override
+  public void visitIfThenElse(IfThenElse ifThenElse) {
     printCollapsedComplexExpr(
         ImmutableList.of(
             new IdExpr("ite"),

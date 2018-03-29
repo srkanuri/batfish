@@ -18,7 +18,6 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.NotExpr;
-import org.batfish.z3.expr.OrExpr;
 import org.batfish.z3.expr.TrueExpr;
 
 /**
@@ -41,24 +40,20 @@ public class IpSpaceBooleanExprTransformer implements GenericIpSpaceVisitor<Bool
     return (BooleanExpr) o;
   }
 
-
   @Override
   public BooleanExpr visitAclIpSpace(AclIpSpace aclIpSpace) {
     // right fold
     BooleanExpr expr = FalseExpr.INSTANCE;
-    for(int i = aclIpSpace.getLines().size() -1; i >= 0; i--) {
+    for (int i = aclIpSpace.getLines().size() - 1; i >= 0; i--) {
       AclIpSpaceLine line = aclIpSpace.getLines().get(i);
       expr =
           new IfThenElse(
               line.getIpSpace().accept(this),
-              line.getAction() == LineAction.ACCEPT
-                  ? TrueExpr.INSTANCE
-                  : FalseExpr.INSTANCE,
+              line.getAction() == LineAction.ACCEPT ? TrueExpr.INSTANCE : FalseExpr.INSTANCE,
               expr);
     }
     return expr;
   }
-
 
   /*
     aclIpSpace

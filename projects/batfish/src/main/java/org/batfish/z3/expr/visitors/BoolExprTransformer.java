@@ -276,11 +276,13 @@ public class BoolExprTransformer
     return _nodContext.getContext().mkTrue();
   }
 
-  @Override public BoolExpr visitIfThenElse(IfThenElse ifThenElse) {
+  @Override
+  public BoolExpr visitIfThenElse(IfThenElse ifThenElse) {
     Context ctx = _nodContext.getContext();
-    return (BoolExpr) ctx.mkITE(
-        ifThenElse.getCondition().accept(this),
-        ifThenElse.getThen().accept(this),
-        ifThenElse.getElse().accept(this));
+    return (BoolExpr)
+        ctx.mkITE(
+            ifThenElse.getCondition().accept(this),
+            ifThenElse.getThen().accept(this),
+            ifThenElse.getElse().accept(this));
   }
 }

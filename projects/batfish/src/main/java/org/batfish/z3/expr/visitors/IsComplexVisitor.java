@@ -133,7 +133,8 @@ public class IsComplexVisitor implements ExprVisitor {
     _isComplex = false;
   }
 
-  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+  @Override
+  public void visitIfThenElse(IfThenElse ifThenElse) {
     _isComplex = true;
   }
 }

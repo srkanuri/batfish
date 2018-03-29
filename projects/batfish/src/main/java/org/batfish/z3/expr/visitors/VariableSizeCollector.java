@@ -190,7 +190,8 @@ public class VariableSizeCollector implements ExprVisitor, VoidStatementVisitor 
     _variableSizes.add(Maps.immutableEntry(field.getName(), field.getSize()));
   }
 
-  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+  @Override
+  public void visitIfThenElse(IfThenElse ifThenElse) {
     ifThenElse.getCondition().accept(this);
     ifThenElse.getThen().accept(this);
     ifThenElse.getElse().accept(this);
