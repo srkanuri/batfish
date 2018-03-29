@@ -6,6 +6,7 @@ import org.batfish.z3.expr.EqExpr;
 import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.NotExpr;
 import org.batfish.z3.expr.OrExpr;
@@ -43,4 +44,6 @@ public interface GenericBooleanExprVisitor<R> {
   R visitSaneExpr(SaneExpr saneExpr);
 
   R visitTrueExpr(TrueExpr trueExpr);
+
+  R visitIfThenElse(IfThenElse ifThenElse);
 }

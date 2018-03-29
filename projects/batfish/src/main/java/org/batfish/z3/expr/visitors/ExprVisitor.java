@@ -9,6 +9,7 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IdExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.ListExpr;
 import org.batfish.z3.expr.LitIntExpr;
@@ -61,4 +62,6 @@ public interface ExprVisitor {
   void visitTrueExpr(TrueExpr trueExpr);
 
   void visitVarIntExpr(VarIntExpr varIntExpr);
+
+  void visitIfThenElse(IfThenElse ifThenElse);
 }

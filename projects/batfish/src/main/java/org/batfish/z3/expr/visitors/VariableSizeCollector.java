@@ -21,6 +21,7 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IdExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.ListExpr;
 import org.batfish.z3.expr.LitIntExpr;
@@ -187,5 +188,11 @@ public class VariableSizeCollector implements ExprVisitor, VoidStatementVisitor 
   public void visitVarIntExpr(VarIntExpr varIntExpr) {
     Field field = varIntExpr.getField();
     _variableSizes.add(Maps.immutableEntry(field.getName(), field.getSize()));
+  }
+
+  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+    ifThenElse.getCondition().accept(this);
+    ifThenElse.getThen().accept(this);
+    ifThenElse.getElse().accept(this);
   }
 }

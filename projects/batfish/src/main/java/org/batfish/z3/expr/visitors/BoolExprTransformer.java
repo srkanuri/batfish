@@ -21,6 +21,7 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.GenericStatementVisitor;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.NotExpr;
 import org.batfish.z3.expr.OrExpr;
@@ -273,5 +274,13 @@ public class BoolExprTransformer
   @Override
   public BoolExpr visitTrueExpr(TrueExpr trueExpr) {
     return _nodContext.getContext().mkTrue();
+  }
+
+  @Override public BoolExpr visitIfThenElse(IfThenElse ifThenElse) {
+    Context ctx = _nodContext.getContext();
+    return (BoolExpr) ctx.mkITE(
+        ifThenElse.getCondition().accept(this),
+        ifThenElse.getThen().accept(this),
+        ifThenElse.getElse().accept(this));
   }
 }

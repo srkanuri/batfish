@@ -15,6 +15,7 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IdExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.ListExpr;
 import org.batfish.z3.expr.LitIntExpr;
@@ -282,5 +283,14 @@ public class ExprPrinter implements ExprVisitor, VoidStatementVisitor {
   @Override
   public void visitVarIntExpr(VarIntExpr varIntExpr) {
     _sb.append(varIntExpr.getField().getName());
+  }
+
+  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+    printCollapsedComplexExpr(
+        ImmutableList.of(
+            new IdExpr("ite"),
+            ifThenElse.getCondition(),
+            ifThenElse.getThen(),
+            ifThenElse.getElse()));
   }
 }

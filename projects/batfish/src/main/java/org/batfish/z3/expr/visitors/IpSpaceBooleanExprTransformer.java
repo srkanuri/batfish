@@ -3,6 +3,7 @@ package org.batfish.z3.expr.visitors;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.batfish.datamodel.AclIpSpace;
+import org.batfish.datamodel.AclIpSpaceLine;
 import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpWildcard;
@@ -15,6 +16,7 @@ import org.batfish.z3.expr.AndExpr;
 import org.batfish.z3.expr.BooleanExpr;
 import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.NotExpr;
 import org.batfish.z3.expr.OrExpr;
 import org.batfish.z3.expr.TrueExpr;
@@ -39,10 +41,26 @@ public class IpSpaceBooleanExprTransformer implements GenericIpSpaceVisitor<Bool
     return (BooleanExpr) o;
   }
 
+
   @Override
   public BooleanExpr visitAclIpSpace(AclIpSpace aclIpSpace) {
-    ImmutableList.Builder<BooleanExpr> lineSpaceMatchConditions = ImmutableList.builder();
-    ImmutableList.Builder<BooleanExpr> dontMatchPrevious = ImmutableList.builder();
+    // right fold
+    BooleanExpr expr = FalseExpr.INSTANCE;
+    for(int i = aclIpSpace.getLines().size() -1; i >= 0; i--) {
+      AclIpSpaceLine line = aclIpSpace.getLines().get(i);
+      expr =
+          new IfThenElse(
+              line.getIpSpace().accept(this),
+              line.getAction() == LineAction.ACCEPT
+                  ? TrueExpr.INSTANCE
+                  : FalseExpr.INSTANCE,
+              expr);
+    }
+    return expr;
+  }
+
+
+  /*
     aclIpSpace
         .getLines()
         .forEach(
@@ -60,6 +78,7 @@ public class IpSpaceBooleanExprTransformer implements GenericIpSpaceVisitor<Bool
             });
     return new OrExpr(lineSpaceMatchConditions.build());
   }
+  */
 
   @Override
   public BooleanExpr visitEmptyIpSpace(EmptyIpSpace emptyIpSpace) {

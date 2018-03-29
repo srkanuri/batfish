@@ -10,6 +10,7 @@ import org.batfish.z3.expr.FalseExpr;
 import org.batfish.z3.expr.HeaderSpaceMatchExpr;
 import org.batfish.z3.expr.IdExpr;
 import org.batfish.z3.expr.IfExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.ListExpr;
 import org.batfish.z3.expr.LitIntExpr;
@@ -130,5 +131,9 @@ public class IsComplexVisitor implements ExprVisitor {
   @Override
   public void visitVarIntExpr(VarIntExpr varIntExpr) {
     _isComplex = false;
+  }
+
+  @Override public void visitIfThenElse(IfThenElse ifThenElse) {
+    _isComplex = true;
   }
 }
