@@ -176,13 +176,13 @@ public abstract class Z3ContextJob<R extends BatfishJobResult<?, ?>> extends Bat
   }
 
   protected BoolExpr computeSmtConstraintsViaNod(NodProgram program, boolean negate) {
-    if(_saveNodProgram) {
+    if (_saveNodProgram) {
       try {
         File file = File.createTempFile("nodProgram", ".smt2", new File("/tmp"));
         try (FileWriter writer = new FileWriter(file)) {
           program.toSmt2(writer);
         }
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new BatfishException("Error saving nod program", e);
       }
     }

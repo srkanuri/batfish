@@ -5,8 +5,6 @@ import com.google.common.collect.Maps;
 import com.microsoft.z3.BitVecSort;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Arrays;
@@ -75,13 +73,14 @@ public class NodProgram {
   }
 
   public void toSmt2(Writer writer) {
-    toSmt2(str -> {
-      try {
-        writer.write(str);
-      } catch(IOException e) {
-        throw new BatfishException("exception writing smt2", e);
-      }
-    });
+    toSmt2(
+        str -> {
+          try {
+            writer.write(str);
+          } catch (IOException e) {
+            throw new BatfishException("exception writing smt2", e);
+          }
+        });
   }
 
   private void toSmt2(Consumer<String> stringConsumer) {
