@@ -104,17 +104,6 @@ public class NodProgram {
               stringConsumer.accept(String.format("(declare-var %s (_ BitVec %d))\n", var, size));
             });
 
-    Map<String, String> varSizes =
-        _context
-            .getVariableNames()
-            .stream()
-            .map(
-                var -> {
-                  int size = _context.getVariables().get(var).getSortSize();
-                  return Maps.immutableEntry(var, String.format("(_ BitVec %d) ", size));
-                })
-            .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-
     StringBuilder varSizesStringBuilder = new StringBuilder();
     _context
         .getBasicStateVariableSorts()
