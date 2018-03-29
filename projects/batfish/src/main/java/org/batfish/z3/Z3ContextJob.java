@@ -11,6 +11,9 @@ import com.microsoft.z3.Fixedpoint;
 import com.microsoft.z3.FuncDecl;
 import com.microsoft.z3.Params;
 import com.microsoft.z3.Status;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -148,8 +151,11 @@ public abstract class Z3ContextJob<R extends BatfishJobResult<?, ?>> extends Bat
     return flowBuilder.build();
   }
 
+  private static boolean _saveNodProgram;
+
   public Z3ContextJob(Settings settings) {
     super(settings);
+    _saveNodProgram = false;
   }
 
   protected Expr answerFixedPoint(Fixedpoint fix, NodProgram program) {
@@ -170,6 +176,17 @@ public abstract class Z3ContextJob<R extends BatfishJobResult<?, ?>> extends Bat
   }
 
   protected BoolExpr computeSmtConstraintsViaNod(NodProgram program, boolean negate) {
+    if(_saveNodProgram) {
+      try {
+        File file = File.createTempFile("nodProgram", ".smt2", new File("/tmp"));
+        try (FileWriter writer = new FileWriter(file)) {
+          program.toSmt2(writer);
+        }
+      } catch(IOException e) {
+        throw new BatfishException("Error saving nod program", e);
+      }
+    }
+
     Fixedpoint fix = mkFixedpoint(program, true);
     Expr answer = answerFixedPoint(fix, program);
     return getSolverInput(answer, program, negate);
