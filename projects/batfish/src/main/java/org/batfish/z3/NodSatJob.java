@@ -16,6 +16,8 @@ public class NodSatJob<KeyT> extends Z3ContextJob<NodSatResult<KeyT>> {
 
   private final Synthesizer _synthesizer;
 
+  private static boolean OPTIMIZE = false;
+
   public NodSatJob(Settings settings, Synthesizer synthesizer, SatQuerySynthesizer<KeyT> query) {
     super(settings);
     _synthesizer = synthesizer;
@@ -29,7 +31,15 @@ public class NodSatJob<KeyT> extends Z3ContextJob<NodSatResult<KeyT>> {
     try (Context ctx = new Context()) {
       ReachabilityProgram baseProgram = _query.synthesizeBaseProgram(_synthesizer);
       ReachabilityProgram queryProgram = _query.getReachabilityProgram(_synthesizer.getInput());
-      NodProgram program = new NodProgram(ctx, baseProgram, queryProgram);
+
+      NodProgram program =
+          OPTIMIZE
+              ? NodJob.optimizedProgram(ctx, baseProgram, queryProgram)
+              : new NodProgram(ctx, baseProgram, queryProgram);
+
+      synchronized (NodSatJob.class) {
+        System.out.println(program.toSmt2String());
+      }
       Fixedpoint fix = mkFixedpoint(program, false);
       for (int queryNum = 0; queryNum < program.getQueries().size(); queryNum++) {
         BoolExpr query = program.getQueries().get(queryNum);

@@ -82,7 +82,7 @@ public final class NodJob extends AbstractNodJob {
     }
   }
 
-  private NodProgram optimizedProgram(
+  public static NodProgram optimizedProgram(
       Context ctx, ReachabilityProgram baseProgram, ReachabilityProgram queryProgram) {
     List<RuleStatement> allRules = new ArrayList<>(baseProgram.getRules());
     allRules.addAll(queryProgram.getRules());
