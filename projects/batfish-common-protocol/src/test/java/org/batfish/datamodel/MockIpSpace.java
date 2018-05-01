@@ -1,5 +1,6 @@
 package org.batfish.datamodel;
 
+import com.google.common.collect.ImmutableList.Builder;
 import java.util.Map;
 import java.util.Objects;
 import org.batfish.datamodel.visitors.GenericIpSpaceVisitor;
@@ -33,7 +34,7 @@ public class MockIpSpace extends IpSpace {
   }
 
   @Override
-  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces) {
+  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces, Builder<AccessListActionRecord> actionRecords, String aclIpSpaceName) {
     throw new UnsupportedOperationException(
         "no implementation for generated method"); // TODO Auto-generated method stub
   }

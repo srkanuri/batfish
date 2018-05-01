@@ -61,7 +61,7 @@ public class IpSpaceSpecializer implements GenericIpSpaceVisitor<IpSpace> {
   }
 
   public IpSpace specialize(Ip ip) {
-    if (_ipSpace.containsIp(ip, ImmutableMap.of())) {
+    if (_ipSpace.containsIp(ip, ImmutableMap.of(), null, null)) {
       return ip.toIpSpace();
     } else {
       return EmptyIpSpace.INSTANCE;

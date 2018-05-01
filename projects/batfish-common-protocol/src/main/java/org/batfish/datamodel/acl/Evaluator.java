@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.Map;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.IpAccessList;
-import org.batfish.datamodel.IpAccessListActionRecord;
+import org.batfish.datamodel.AccessListActionRecord;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.LineAction;
 
@@ -25,14 +25,14 @@ public class Evaluator implements GenericAclLineMatchExprVisitor<Boolean> {
 
   private final String _srcInterface;
   private final Map<String, IpSpace> _namedIpSpaces;
-  private final ImmutableList.Builder<IpAccessListActionRecord> _actionRecords;
+  private final ImmutableList.Builder<AccessListActionRecord> _actionRecords;
 
   public Evaluator(
       Flow flow,
       String srcInterface,
       Map<String, IpAccessList> availableAcls,
       Map<String, IpSpace> namedIpSpaces,
-      ImmutableList.Builder<IpAccessListActionRecord> actionRecords) {
+      ImmutableList.Builder<AccessListActionRecord> actionRecords) {
     _srcInterface = srcInterface;
     _flow = flow;
     _availableAcls = availableAcls;
@@ -52,7 +52,7 @@ public class Evaluator implements GenericAclLineMatchExprVisitor<Boolean> {
 
   @Override
   public Boolean visitMatchHeaderSpace(MatchHeaderSpace matchHeaderSpace) {
-    return matchHeaderSpace.getHeaderspace().matches(_flow, _namedIpSpaces);
+    return matchHeaderSpace.getHeaderspace().matches(_flow, _namedIpSpaces, _actionRecords);
   }
 
   @Override

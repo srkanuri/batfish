@@ -7,12 +7,12 @@ public class FilterResult {
 
   private final LineAction _action;
 
-  private final List<IpAccessListActionRecord> _actionRecords;
+  private final List<AccessListActionRecord> _actionRecords;
 
   private final Integer _matchLine;
 
   public FilterResult(
-      Integer matchLine, LineAction action, Iterable<IpAccessListActionRecord> actionRecords) {
+      Integer matchLine, LineAction action, Iterable<AccessListActionRecord> actionRecords) {
     _action = action;
     _actionRecords = ImmutableList.copyOf(actionRecords);
     _matchLine = matchLine;
@@ -22,7 +22,7 @@ public class FilterResult {
     return _action;
   }
 
-  public List<IpAccessListActionRecord> getActionRecords() {
+  public List<AccessListActionRecord> getActionRecords() {
     return _actionRecords;
   }
 

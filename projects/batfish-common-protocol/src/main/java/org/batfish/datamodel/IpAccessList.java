@@ -117,18 +117,22 @@ public class IpAccessList extends ComparableStructure<String> {
       String srcInterface,
       Map<String, IpAccessList> availableAcls,
       Map<String, IpSpace> namedIpSpaces,
-      ImmutableList.Builder<IpAccessListActionRecord> actionRecords) {
+      ImmutableList.Builder<AccessListActionRecord> actionRecords) {
     Evaluator evaluator =
         new Evaluator(flow, srcInterface, availableAcls, namedIpSpaces, actionRecords);
     for (int i = 0; i < _lines.size(); i++) {
       IpAccessListLine line = _lines.get(i);
       if (line.getMatchCondition().accept(evaluator)) {
         actionRecords.add(
-            new IpAccessListActionRecord(_key, line.getAction(), null, line.getName()));
+            new AccessListActionRecord(
+                _key,
+                line.getAction(),
+                null,
+                line.getName() != null ? line.getName() : line.toString()));
         return new FilterResult(i, line.getAction(), actionRecords.build());
       }
     }
-    actionRecords.add(new IpAccessListActionRecord(_key, LineAction.REJECT, true, null));
+    actionRecords.add(new AccessListActionRecord(_key, LineAction.REJECT, true, null));
     return new FilterResult(null, LineAction.REJECT, actionRecords.build());
   }
 

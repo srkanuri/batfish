@@ -113,7 +113,7 @@ public final class IpWildcardSetIpSpace extends IpSpace {
   }
 
   @Override
-  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces) {
+  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces, com.google.common.collect.ImmutableList.Builder<AccessListActionRecord> actionRecords, String aclIpSpaceName) {
     return _blacklist.stream().noneMatch(w -> w.containsIp(ip))
         && _whitelist.stream().anyMatch(w -> w.containsIp(ip));
   }

@@ -3,8 +3,9 @@ package org.batfish.datamodel;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
+import java.util.Objects;
 
-public class IpAccessListActionRecord implements Serializable {
+public class AccessListActionRecord implements Serializable {
 
   private static final String PROP_ACL_NAME = "aclName";
 
@@ -25,12 +26,12 @@ public class IpAccessListActionRecord implements Serializable {
   private final String _lineDescription;
 
   @JsonCreator
-  public IpAccessListActionRecord(
+  public AccessListActionRecord(
       @JsonProperty(PROP_ACL_NAME) String aclName,
       @JsonProperty(PROP_ACTION) LineAction action,
       @JsonProperty(PROP_DEFAULT_DENY) Boolean defaultDeny,
       @JsonProperty(PROP_LINE_DESCRIPTION) String lineDescription) {
-    _aclName = aclName;
+    _aclName = Objects.requireNonNull(aclName);
     _action = action;
     _defaultDeny = defaultDeny;
     _lineDescription = lineDescription;

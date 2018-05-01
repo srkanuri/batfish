@@ -3,6 +3,7 @@ package org.batfish.datamodel;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList.Builder;
 import java.util.Map;
 import org.batfish.datamodel.visitors.GenericIpSpaceVisitor;
 
@@ -39,7 +40,7 @@ public class IpWildcardIpSpace extends IpSpace {
   }
 
   @Override
-  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces) {
+  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces, Builder<AccessListActionRecord> actionRecords, String aclIpSpaceName) {
     return _ipWildcard.containsIp(ip);
   }
 

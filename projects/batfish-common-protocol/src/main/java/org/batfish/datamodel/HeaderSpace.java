@@ -953,17 +953,21 @@ public class HeaderSpace implements Serializable, Comparable<HeaderSpace> {
         _tcpFlags);
   }
 
-  public boolean matches(Flow flow, Map<String, IpSpace> namedIpSpaces) {
+  public boolean matches(
+      Flow flow,
+      Map<String, IpSpace> namedIpSpaces,
+      ImmutableList.Builder<AccessListActionRecord> actionRecords) {
     if (!_dscps.isEmpty() && !_dscps.contains(flow.getDscp())) {
       return false;
     }
     if (!_notDscps.isEmpty() && _notDscps.contains(flow.getDscp())) {
       return false;
     }
-    if (_dstIps != null && !_dstIps.containsIp(flow.getDstIp(), namedIpSpaces)) {
+    if (_dstIps != null && !_dstIps.containsIp(flow.getDstIp(), namedIpSpaces, actionRecords, null)) {
       return false;
     }
-    if (_notDstIps != null && _notDstIps.containsIp(flow.getDstIp(), namedIpSpaces)) {
+    if (_notDstIps != null
+        && _notDstIps.containsIp(flow.getDstIp(), namedIpSpaces, actionRecords, null)) {
       return false;
     }
     if (!_dstPorts.isEmpty() && !rangesContain(_dstPorts, flow.getDstPort())) {
@@ -1037,8 +1041,8 @@ public class HeaderSpace implements Serializable, Comparable<HeaderSpace> {
       return false;
     }
     if (_srcOrDstIps != null
-        && !(_srcOrDstIps.containsIp(flow.getSrcIp(), namedIpSpaces)
-            || _srcOrDstIps.containsIp(flow.getDstIp(), namedIpSpaces))) {
+        && !(_srcOrDstIps.containsIp(flow.getSrcIp(), namedIpSpaces, actionRecords, null)
+            || _srcOrDstIps.containsIp(flow.getDstIp(), namedIpSpaces, actionRecords, null))) {
       return false;
     }
     if (!_srcOrDstPorts.isEmpty()
@@ -1064,10 +1068,11 @@ public class HeaderSpace implements Serializable, Comparable<HeaderSpace> {
         return false;
       }
     }
-    if (_srcIps != null && !_srcIps.containsIp(flow.getSrcIp(), namedIpSpaces)) {
+    if (_srcIps != null && !_srcIps.containsIp(flow.getSrcIp(), namedIpSpaces, actionRecords, null)) {
       return false;
     }
-    if (_notSrcIps != null && _notSrcIps.containsIp(flow.getSrcIp(), namedIpSpaces)) {
+    if (_notSrcIps != null
+        && _notSrcIps.containsIp(flow.getSrcIp(), namedIpSpaces, actionRecords, null)) {
       return false;
     }
     if (!_srcPorts.isEmpty() && !rangesContain(_srcPorts, flow.getSrcPort())) {

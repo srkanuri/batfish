@@ -1,5 +1,6 @@
 package org.batfish.datamodel;
 
+import com.google.common.collect.ImmutableList.Builder;
 import java.util.Map;
 import org.batfish.datamodel.visitors.GenericIpSpaceVisitor;
 
@@ -28,7 +29,7 @@ public class EmptyIpSpace extends IpSpace {
   }
 
   @Override
-  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces) {
+  public boolean containsIp(Ip ip, Map<String, IpSpace> namedIpSpaces, Builder<AccessListActionRecord> actionRecords, String aclIpSpaceName) {
     return false;
   }
 

@@ -28,7 +28,7 @@ public class IpSpaceMatchersImpl {
 
     @Override
     protected boolean matchesSafely(IpSpace item, Description mismatchDescription) {
-      boolean matches = item.containsIp(_ip, _namedIpSpaces);
+      boolean matches = item.containsIp(_ip, _namedIpSpaces, null, null);
       if (!matches) {
         mismatchDescription.appendText(String.format("was %s", item));
       }

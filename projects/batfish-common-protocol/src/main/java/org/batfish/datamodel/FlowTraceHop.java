@@ -32,11 +32,11 @@ public final class FlowTraceHop implements Serializable {
 
   @Nullable private String _filterIn;
 
-  private List<IpAccessListActionRecord> _filterInActions;
+  private List<AccessListActionRecord> _filterInActions;
 
   @Nullable private String _filterOut;
 
-  private List<IpAccessListActionRecord> _filterOutActions;
+  private List<AccessListActionRecord> _filterOutActions;
 
   private final SortedSet<String> _routes;
 
@@ -81,7 +81,7 @@ public final class FlowTraceHop implements Serializable {
   }
 
   @JsonProperty(PROP_FILTER_IN_ACTIONS)
-  public List<IpAccessListActionRecord> getFilterInActions() {
+  public List<AccessListActionRecord> getFilterInActions() {
     return _filterInActions;
   }
 
@@ -91,7 +91,7 @@ public final class FlowTraceHop implements Serializable {
   }
 
   @JsonProperty(PROP_FILTER_OUT_ACTIONS)
-  public List<IpAccessListActionRecord> getFilterOutActions() {
+  public List<AccessListActionRecord> getFilterOutActions() {
     return _filterOutActions;
   }
 
@@ -123,7 +123,7 @@ public final class FlowTraceHop implements Serializable {
   }
 
   @JsonProperty(PROP_FILTER_IN_ACTIONS)
-  public void setFilterInActions(Iterable<IpAccessListActionRecord> filterInActions) {
+  public void setFilterInActions(Iterable<AccessListActionRecord> filterInActions) {
     _filterInActions = ImmutableList.copyOf(filterInActions);
   }
 
@@ -133,7 +133,7 @@ public final class FlowTraceHop implements Serializable {
   }
 
   @JsonProperty(PROP_FILTER_OUT_ACTIONS)
-  public void setFilterOutActions(Iterable<IpAccessListActionRecord> filterOutActions) {
+  public void setFilterOutActions(Iterable<AccessListActionRecord> filterOutActions) {
     _filterOutActions = ImmutableList.copyOf(filterOutActions);
   }
 }

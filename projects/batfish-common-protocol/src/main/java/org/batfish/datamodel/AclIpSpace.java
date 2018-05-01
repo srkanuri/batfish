@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Spliterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -32,7 +33,7 @@ public class AclIpSpace extends IpSpace {
     }
 
     public AclIpSpace build() {
-      return new AclIpSpace(_lines.build());
+      return new AclIpSpace(_name, _lines.build());
     }
 
     public Builder setLines(List<AclIpSpaceLine> lines) {
@@ -63,6 +64,13 @@ public class AclIpSpace extends IpSpace {
 
     private Builder thenRejecting(Stream<IpSpace> ipSpaces) {
       ipSpaces.map(AclIpSpaceLine::reject).forEach(_lines::add);
+      return this;
+    }
+
+    private String _name;
+
+    private Builder setName(String name) {
+      _name = name;
       return this;
     }
   }
@@ -163,22 +171,49 @@ public class AclIpSpace extends IpSpace {
   private final List<AclIpSpaceLine> _lines;
 
   @JsonCreator
-  private AclIpSpace(@JsonProperty(PROP_LINES) List<AclIpSpaceLine> lines) {
+  private AclIpSpace(
+      @JsonProperty(PROP_NAME) String name, @JsonProperty(PROP_LINES) List<AclIpSpaceLine> lines) {
+    _name = name;
     _lines = lines;
   }
+
+  private final String _name;
+
+  private static final String PROP_NAME = "name";
 
   @Override
   public <R> R accept(GenericIpSpaceVisitor<R> ipSpaceVisitor) {
     return ipSpaceVisitor.visitAclIpSpace(this);
   }
 
-  private LineAction action(Ip ip, Map<String, IpSpace> namedIpSpaces) {
-    return _lines
-        .stream()
-        .filter(line -> line.getIpSpace().containsIp(ip, namedIpSpaces))
-        .map(AclIpSpaceLine::getAction)
-        .findFirst()
-        .orElse(LineAction.REJECT);
+  private LineAction action(
+      Ip ip,
+      Map<String, IpSpace> namedIpSpaces,
+      ImmutableList.Builder<AccessListActionRecord> actionRecords,
+      String name) {
+    Optional<AclIpSpaceLine> matchingLine =
+        _lines
+            .stream()
+            .filter(
+                line ->
+                    line.getIpSpace()
+                        .containsIp(
+                            ip,
+                            namedIpSpaces,
+                            actionRecords,
+                            name != null ? name : line.getIpSpace().toString()))
+            .findFirst();
+    matchingLine.ifPresent(line -> {});
+
+    if (matchingLine.isPresent()) {
+      AclIpSpaceLine line = matchingLine.get();
+      LineAction action = line.getAction();
+      actionRecords.add(new AccessListActionRecord(name, action, null, line.toString()));
+      return action;
+    } else {
+      actionRecords.add(new AccessListActionRecord(name, LineAction.REJECT, true, null));
+      return LineAction.REJECT;
+    }
   }
 
   @Override
@@ -202,8 +237,8 @@ public class AclIpSpace extends IpSpace {
   }
 
   @Override
-  public boolean containsIp(@Nonnull Ip ip, @Nonnull Map<String, IpSpace> namedIpSpaces) {
-    return action(ip, namedIpSpaces) == LineAction.ACCEPT;
+  public boolean containsIp(@Nonnull Ip ip, @Nonnull Map<String, IpSpace> namedIpSpaces, com.google.common.collect.ImmutableList.Builder<AccessListActionRecord> actionRecords, String aclIpSpaceName) {
+    return action(ip, namedIpSpaces, actionRecords, aclIpSpaceName) == LineAction.ACCEPT;
   }
 
   @Override

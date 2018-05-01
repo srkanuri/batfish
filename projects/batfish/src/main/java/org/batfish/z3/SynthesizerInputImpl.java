@@ -633,7 +633,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     ipOwners.forEach(
         (ip, owners) -> {
           for (String owner : owners) {
-            if (_specializationIpSpace.containsIp(ip, _namedIpSpaces.get(owner))) {
+            if (_specializationIpSpace.containsIp(ip, _namedIpSpaces.get(owner), null, null)) {
               map.get(owner).add(ip);
             }
           }
