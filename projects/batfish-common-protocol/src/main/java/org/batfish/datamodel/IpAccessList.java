@@ -109,14 +109,27 @@ public class IpAccessList extends ComparableStructure<String> {
       String srcInterface,
       Map<String, IpAccessList> availableAcls,
       Map<String, IpSpace> namedIpSpaces) {
-    Evaluator evaluator = new Evaluator(flow, srcInterface, availableAcls, namedIpSpaces);
+    return filter(flow, srcInterface, availableAcls, namedIpSpaces, ImmutableList.builder());
+  }
+
+  public FilterResult filter(
+      Flow flow,
+      String srcInterface,
+      Map<String, IpAccessList> availableAcls,
+      Map<String, IpSpace> namedIpSpaces,
+      ImmutableList.Builder<IpAccessListActionRecord> actionRecords) {
+    Evaluator evaluator =
+        new Evaluator(flow, srcInterface, availableAcls, namedIpSpaces, actionRecords);
     for (int i = 0; i < _lines.size(); i++) {
       IpAccessListLine line = _lines.get(i);
       if (line.getMatchCondition().accept(evaluator)) {
-        return new FilterResult(i, line.getAction());
+        actionRecords.add(
+            new IpAccessListActionRecord(_key, line.getAction(), null, line.getName()));
+        return new FilterResult(i, line.getAction(), actionRecords.build());
       }
     }
-    return new FilterResult(null, LineAction.REJECT);
+    actionRecords.add(new IpAccessListActionRecord(_key, LineAction.REJECT, true, null));
+    return new FilterResult(null, LineAction.REJECT, actionRecords.build());
   }
 
   @JsonProperty(PROP_LINES)

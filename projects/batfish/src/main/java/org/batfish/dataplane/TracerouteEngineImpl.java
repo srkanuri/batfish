@@ -162,11 +162,7 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
       Set<Edge> newVisitedEdges = new LinkedHashSet<>(visitedEdges);
       FlowTraceHop newHop =
           new FlowTraceHop(
-              edge,
-              routesForThisNextHopInterface,
-              null,
-              null,
-              hopFlow(originalFlow, transformedFlow));
+              edge, routesForThisNextHopInterface, hopFlow(originalFlow, transformedFlow));
       newVisitedEdges.add(edge);
       newHops.add(newHop);
       /*
@@ -429,11 +425,7 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
                         Configuration.NODE_NONE_NAME, Interface.NULL_INTERFACE_NAME));
             FlowTraceHop newHop =
                 new FlowTraceHop(
-                    newEdge,
-                    routesForThisNextHopInterface,
-                    null,
-                    null,
-                    hopFlow(originalFlow, transformedFlow));
+                    newEdge, routesForThisNextHopInterface, hopFlow(originalFlow, transformedFlow));
             newHops.add(newHop);
             FlowTrace nullRouteTrace =
                 new FlowTrace(
@@ -489,17 +481,15 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
                * Should only get here for delta environment where
                * non-flow-sink interface from base has no edges in delta
                */
-              Edge neighborUnreachbleEdge =
+              Edge neighborUnreachableEdge =
                   new Edge(
                       nextHopInterface,
                       new NodeInterfacePair(
                           Configuration.NODE_NONE_NAME, Interface.NULL_INTERFACE_NAME));
               FlowTraceHop neighborUnreachableHop =
                   new FlowTraceHop(
-                      neighborUnreachbleEdge,
+                      neighborUnreachableEdge,
                       routesForThisNextHopInterface,
-                      null,
-                      null,
                       hopFlow(originalFlow, transformedFlow));
               List<FlowTraceHop> newHops = new ArrayList<>(hopsSoFar);
               newHops.add(neighborUnreachableHop);
@@ -550,10 +540,10 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
       IpAccessList filter,
       FlowDisposition disposition) {
     boolean out = disposition == FlowDisposition.DENIED_OUT;
-    FilterResult outResult =
+    FilterResult filterResult =
         filter.filter(transformedFlow, srcInterface, aclDefinitions, namedIpSpaces);
-    String outFilterName = filter.getName();
-    Integer matchLine = outResult.getMatchLine();
+    String filterName = filter.getName();
+    Integer matchLine = filterResult.getMatchLine();
     String lineDesc;
     if (matchLine != null) {
       lineDesc = filter.getLines().get(matchLine).getName();
@@ -563,9 +553,10 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
     } else {
       lineDesc = "no-match";
     }
-    boolean denied = outResult.getAction() == LineAction.REJECT;
+    boolean denied = filterResult.getAction() == LineAction.REJECT;
+    FlowTraceHop hopToAnnotate = newHops.get(newHops.size() - 1);
     if (denied) {
-      String notes = disposition + "{" + outFilterName + "}{" + lineDesc + "}";
+      String notes = disposition + "{" + filterName + "}{" + lineDesc + "}";
       if (out) {
         FlowTraceHop lastHop = newHops.get(newHops.size() - 1);
         newHops.remove(newHops.size() - 1);
@@ -574,25 +565,21 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
             new Edge(
                 lastEdge.getFirst(),
                 new NodeInterfacePair(Configuration.NODE_NONE_NAME, Interface.NULL_INTERFACE_NAME));
-        FlowTraceHop deniedOutHop =
+        hopToAnnotate =
             new FlowTraceHop(
-                deniedOutEdge,
-                lastHop.getRoutes(),
-                null,
-                null,
-                hopFlow(originalFlow, transformedFlow));
-        newHops.add(deniedOutHop);
+                deniedOutEdge, lastHop.getRoutes(), hopFlow(originalFlow, transformedFlow));
+        newHops.add(hopToAnnotate);
       }
       FlowTrace trace = new FlowTrace(disposition, newHops, notes);
       flowTraces.add(trace);
+    }
+    String filterNotes = "{" + filterName + "}{" + lineDesc + "}";
+    if (out) {
+      hopToAnnotate.setFilterOut(filterNotes);
+      hopToAnnotate.setFilterOutActions(filterResult.getActionRecords());
     } else {
-      FlowTraceHop hop = newHops.get(newHops.size() - 1);
-      String filterNotes = "{" + outFilterName + "}{" + lineDesc + "}";
-      if (out) {
-        hop.setFilterOut(filterNotes);
-      } else {
-        hop.setFilterIn(filterNotes);
-      }
+      hopToAnnotate.setFilterIn(filterNotes);
+      hopToAnnotate.setFilterInActions(filterResult.getActionRecords());
     }
     return denied;
   }
@@ -617,8 +604,7 @@ public class TracerouteEngineImpl implements ITracerouteEngine {
             srcInterface,
             new NodeInterfacePair(Configuration.NODE_NONE_NAME, Interface.NULL_INTERFACE_NAME));
     FlowTraceHop neighborUnreachableHop =
-        new FlowTraceHop(
-            neighborUnreachbleEdge, routes, null, null, hopFlow(originalFlow, transformedFlow));
+        new FlowTraceHop(neighborUnreachbleEdge, routes, hopFlow(originalFlow, transformedFlow));
     List<FlowTraceHop> newHops = new ArrayList<>(completedHops);
     newHops.add(neighborUnreachableHop);
     FlowTrace trace =

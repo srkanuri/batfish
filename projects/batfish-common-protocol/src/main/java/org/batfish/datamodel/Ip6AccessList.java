@@ -3,6 +3,7 @@ package org.batfish.datamodel;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.collect.ImmutableList;
 import com.kjetland.jackson.jsonSchema.annotations.JsonSchemaDescription;
 import java.util.List;
 import org.batfish.common.util.ComparableStructure;
@@ -61,10 +62,10 @@ public class Ip6AccessList extends ComparableStructure<String> {
     for (int i = 0; i < _lines.size(); i++) {
       Ip6AccessListLine line = _lines.get(i);
       if (line.matches(flow)) {
-        return new FilterResult(i, line.getAction());
+        return new FilterResult(i, line.getAction(), ImmutableList.of());
       }
     }
-    return new FilterResult(null, LineAction.REJECT);
+    return new FilterResult(null, LineAction.REJECT, ImmutableList.of());
   }
 
   @JsonProperty(PROP_LINES)

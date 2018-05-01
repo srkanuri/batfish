@@ -1,21 +1,32 @@
 package org.batfish.datamodel;
 
-import org.batfish.common.Pair;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
 
-public class FilterResult extends Pair<Integer, LineAction> {
+public class FilterResult {
 
-  /** */
-  private static final long serialVersionUID = 1L;
+  private final LineAction _action;
 
-  public FilterResult(Integer t1, LineAction t2) {
-    super(t1, t2);
+  private final List<IpAccessListActionRecord> _actionRecords;
+
+  private final Integer _matchLine;
+
+  public FilterResult(
+      Integer matchLine, LineAction action, Iterable<IpAccessListActionRecord> actionRecords) {
+    _action = action;
+    _actionRecords = ImmutableList.copyOf(actionRecords);
+    _matchLine = matchLine;
   }
 
   public LineAction getAction() {
-    return _second;
+    return _action;
+  }
+
+  public List<IpAccessListActionRecord> getActionRecords() {
+    return _actionRecords;
   }
 
   public Integer getMatchLine() {
-    return _first;
+    return _matchLine;
   }
 }
