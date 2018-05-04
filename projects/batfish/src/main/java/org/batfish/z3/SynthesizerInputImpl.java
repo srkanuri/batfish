@@ -39,11 +39,14 @@ import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.z3.expr.BooleanExpr;
+import org.batfish.z3.expr.FalseExpr;
+import org.batfish.z3.expr.IfThenElse;
 import org.batfish.z3.expr.IntExpr;
 import org.batfish.z3.expr.IpSpaceMatchExpr;
 import org.batfish.z3.expr.LitIntExpr;
 import org.batfish.z3.expr.RangeMatchExpr;
 import org.batfish.z3.expr.TransformedVarIntExpr;
+import org.batfish.z3.expr.TrueExpr;
 import org.batfish.z3.expr.visitors.IpSpaceBooleanExprTransformer;
 import org.batfish.z3.state.AclPermit;
 import org.batfish.z3.state.StateParameter.Type;
@@ -183,6 +186,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final @Nonnull Map<String, Map<String, List<BooleanExpr>>> _aclConditions;
 
+  private final @Nonnull Map<String, Map<String, BooleanExpr>> _aclPermitExprs;
+
   private final @Nonnull Map<
           String, Map<String, Map<String, Map<String, Map<String, BooleanExpr>>>>>
       _arpTrueEdge;
@@ -198,6 +203,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
   private final @Nonnull Map<String, Set<String>> _disabledVrfs;
 
   private final @Nonnull Set<Edge> _edges;
+
+  private boolean _enableAclStates;
 
   private final @Nonnull Map<String, Map<String, IpAccessList>> _enabledAcls;
 
@@ -334,6 +341,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     _nonTransitNodes = ImmutableSortedSet.copyOf(nonTransitNodes);
     _transitNodes = ImmutableSortedSet.copyOf(transitNodes);
     _aclConditions = computeAclConditions();
+    _aclPermitExprs = computeAclPermitExprs();
   }
 
   private Set<String> computeNodesWithSrcInterfaceConstraints() {
@@ -438,6 +446,31 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                       .map(aclLineMatchExprToBooleanExpr::toBooleanExpr)
                       .collect(ImmutableList.toImmutableList()));
         });
+  }
+
+  private BooleanExpr computeAclPermitExpr(String hostname, String aclName) {
+    List<LineAction> actions = _aclActions.get(hostname).get(aclName);
+    List<BooleanExpr> conditions = _aclConditions.get(hostname).get(aclName);
+
+    BooleanExpr expr = FalseExpr.INSTANCE;
+    for (int i = actions.size() - 1; i >= 0; i--) {
+      BooleanExpr condition = conditions.get(i);
+      BooleanExpr actionExpr =
+          actions.get(i) == LineAction.ACCEPT ? TrueExpr.INSTANCE : FalseExpr.INSTANCE;
+      expr = new IfThenElse(condition, actionExpr, expr);
+    }
+    return expr;
+  }
+
+  private Map<String, Map<String, BooleanExpr>> computeAclPermitExprs() {
+    return toImmutableMap(
+        _enabledAcls,
+        Entry::getKey, /* node name */
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey, /* acl Name */
+                aclEntry -> computeAclPermitExpr(nodeEntry.getKey(), aclEntry.getKey())));
   }
 
   private Map<String, Map<String, Map<String, Map<String, Map<String, BooleanExpr>>>>>
@@ -784,6 +817,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     return _aclConditions;
   }
 
+  @Override
   public Map<String, Map<String, Map<String, Map<String, Map<String, BooleanExpr>>>>>
       getArpTrueEdge() {
     return _arpTrueEdge;
@@ -829,6 +863,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     return _namedIpSpaces;
   }
 
+  @Override
   public Map<String, Map<String, Map<String, BooleanExpr>>> getNeighborUnreachable() {
     return _neighborUnreachable;
   }
@@ -891,6 +926,16 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
   @Override
   public Map<String, Map<String, IntExpr>> getSourceInterfaceFieldValues() {
     return _sourceInterfaceFieldValues;
+  }
+
+  @Override
+  public boolean getEnableAclStates() {
+    return _enableAclStates;
+  }
+
+  @Override
+  public Map<String, Map<String, BooleanExpr>> getAclPermitExprs() {
+    return _aclPermitExprs;
   }
 
   @Override

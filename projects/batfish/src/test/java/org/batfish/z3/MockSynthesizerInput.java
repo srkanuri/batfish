@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import org.batfish.common.BatfishException;
 import org.batfish.datamodel.Edge;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
@@ -426,6 +427,16 @@ public class MockSynthesizerInput implements SynthesizerInput {
   @Override
   public Map<String, Map<String, IntExpr>> getSourceInterfaceFieldValues() {
     return _sourceInterfaceFieldValues;
+  }
+
+  @Override
+  public boolean getEnableAclStates() {
+    throw new BatfishException("TODO");
+  }
+
+  @Override
+  public Map<String, Map<String, BooleanExpr>> getAclPermitExprs() {
+    throw new BatfishException("TODO");
   }
 
   @Override

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.IpWildcardSetIpSpace;
@@ -477,12 +478,21 @@ public class DefaultTransitionGenerator implements StateVisitor {
                   .map(
                       ifaceName -> {
                         String inAcl = incomingAcls.get(ifaceName);
+
+                        BooleanExpr precondition =
+                            _input.getEnableAclStates()
+                                ? TrueExpr.INSTANCE
+                                : _input.getAclPermitExprs().get(hostname).get(inAcl);
+
+                        Set<StateExpr> preStates =
+                            _input.getEnableAclStates()
+                                ? ImmutableSet.of(
+                                    new AclDeny(hostname, inAcl),
+                                    new PreInInterface(hostname, ifaceName))
+                                : ImmutableSet.of(new PreInInterface(hostname, ifaceName));
+
                         return new BasicRuleStatement(
-                            TrueExpr.INSTANCE,
-                            ImmutableSet.of(
-                                new AclDeny(hostname, inAcl),
-                                new PreInInterface(hostname, ifaceName)),
-                            new NodeDropAclIn(hostname));
+                            precondition, preStates, new NodeDropAclIn(hostname));
                       });
             })
         .forEach(_rules::add);
@@ -501,13 +511,20 @@ public class DefaultTransitionGenerator implements StateVisitor {
               String outAcl = _input.getOutgoingAcls().get(node1).get(iface1);
               // There has to be an ACL -- no ACL is an implicit Permit.
               if (outAcl != null) {
-                Set<StateExpr> postTransformationPreStates =
-                    ImmutableSet.of(
-                        new AclDeny(node1, outAcl),
-                        new PreOutEdgePostNat(node1, iface1, node2, iface2));
+                ImmutableList.Builder<BooleanExpr> preconditions = ImmutableList.builder();
+                ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
+                preStates.add(new PreOutEdgePostNat(node1, iface1, node2, iface2));
+
+                if (_input.getEnableAclStates()) {
+                  preStates.add(new AclDeny(node1, outAcl));
+                } else {
+                  preconditions.add(_input.getAclPermitExprs().get(node1).get(outAcl));
+                }
                 _rules.add(
                     new BasicRuleStatement(
-                        TrueExpr.INSTANCE, postTransformationPreStates, new NodeDropAclOut(node1)));
+                        new AndExpr(preconditions.build()),
+                        preStates.build(),
+                        new NodeDropAclOut(node1)));
               }
             });
   }
@@ -554,7 +571,11 @@ public class DefaultTransitionGenerator implements StateVisitor {
                     (vrf, neighborUnreachableByOutInterface) ->
                         neighborUnreachableByOutInterface.forEach(
                             (outIface, dstIpConstraint) -> {
+                              ImmutableList.Builder<BooleanExpr> preConditions =
+                                  ImmutableList.builder();
                               ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
+
+                              preConditions.add(dstIpConstraint);
                               preStates.add(new PostInVrf(hostname, vrf), new PreOut(hostname));
 
                               // add outAcl if one exists
@@ -564,12 +585,17 @@ public class DefaultTransitionGenerator implements StateVisitor {
                                       .getOrDefault(hostname, ImmutableMap.of())
                                       .get(outIface);
                               if (outAcl != null) {
-                                preStates.add(new AclPermit(hostname, outAcl));
+                                if (_input.getEnableAclStates()) {
+                                  preStates.add(new AclPermit(hostname, outAcl));
+                                } else {
+                                  preConditions.add(
+                                      _input.getAclPermitExprs().get(hostname).get(outAcl));
+                                }
                               }
 
                               _rules.add(
                                   new BasicRuleStatement(
-                                      dstIpConstraint,
+                                      new AndExpr(preConditions.build()),
                                       preStates.build(),
                                       new NodeInterfaceNeighborUnreachable(hostname, outIface)));
                             })));
@@ -703,16 +729,21 @@ public class DefaultTransitionGenerator implements StateVisitor {
                   .map(
                       ifaceName -> {
                         String inAcl = incomingAcls.get(ifaceName);
-                        Set<StateExpr> preconditionStates;
-                        StateExpr preIn = new PreInInterface(hostname, ifaceName);
+                        ImmutableList.Builder<BooleanExpr> preConditions = ImmutableList.builder();
+                        ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
+                        preStates.add(new PreInInterface(hostname, ifaceName));
+
                         if (inAcl != null) {
-                          preconditionStates =
-                              ImmutableSet.of(new AclPermit(hostname, inAcl), preIn);
-                        } else {
-                          preconditionStates = ImmutableSet.of(preIn);
+                          if (_input.getEnableAclStates()) {
+                            preStates.add(new AclPermit(hostname, inAcl));
+                          } else {
+                            preConditions.add(_input.getAclPermitExprs().get(hostname).get(inAcl));
+                          }
                         }
                         return new BasicRuleStatement(
-                            preconditionStates, new PostInInterface(hostname, ifaceName));
+                            new AndExpr(preConditions.build()),
+                            preStates.build(),
+                            new PostInInterface(hostname, ifaceName));
                       });
             })
         .forEach(_rules::add);
@@ -795,17 +826,23 @@ public class DefaultTransitionGenerator implements StateVisitor {
               String node2 = edge.getNode2();
               String iface2 = edge.getInt2();
               String outAcl = _input.getOutgoingAcls().get(node1).get(iface1);
-              Set<StateExpr> aclStates =
-                  outAcl == null
-                      ? ImmutableSet.of(new PreOutEdgePostNat(node1, iface1, node2, iface2))
-                      : ImmutableSet.of(
-                          new AclPermit(node1, outAcl),
-                          new PreOutEdgePostNat(node1, iface1, node2, iface2));
-              ImmutableList.Builder<BooleanExpr> preconditionsBuilder = ImmutableList.builder();
+
+              ImmutableList.Builder<BooleanExpr> preconditions = ImmutableList.builder();
+              ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
+
+              preStates.add(new PreOutEdgePostNat(node1, iface1, node2, iface2));
+
+              if (outAcl != null) {
+                if (_input.getEnableAclStates()) {
+                  preStates.add(new AclPermit(node1, outAcl));
+                } else {
+                  preconditions.add(_input.getAclPermitExprs().get(node1).get(outAcl));
+                }
+              }
 
               /* If we set the source interface field, reset it now */
               if (_input.getNodesWithSrcInterfaceConstraints().contains(node1)) {
-                preconditionsBuilder.add(
+                preconditions.add(
                     new EqExpr(
                         new TransformedVarIntExpr(_input.getSourceInterfaceField()),
                         new LitIntExpr(
@@ -814,22 +851,16 @@ public class DefaultTransitionGenerator implements StateVisitor {
 
               /* If node1 is a transit node, set its flag */
               if (_input.getTransitNodes().contains(node1)) {
-                preconditionsBuilder.add(
+                preconditions.add(
                     new EqExpr(
                         new TransformedVarIntExpr(
                             DefaultTransitionGenerator.TRANSITED_TRANSIT_NODES_FIELD),
                         TRANSITED));
               }
 
-              List<BooleanExpr> preconditions = preconditionsBuilder.build();
-
               return new BasicRuleStatement(
-                  preconditions.isEmpty()
-                      ? TrueExpr.INSTANCE
-                      : preconditions.size() == 1
-                          ? preconditions.get(0)
-                          : new AndExpr(preconditions),
-                  aclStates,
+                  new AndExpr(preconditions.build()),
+                  preStates.build(),
                   new PostOutEdge(node1, iface1, node2, iface2));
             })
         .forEach(_rules::add);
@@ -944,33 +975,53 @@ public class DefaultTransitionGenerator implements StateVisitor {
     List<Entry<AclPermit, BooleanExpr>> sourceNats = _input.getSourceNats().get(node1).get(iface1);
 
     for (int natNumber = 0; natNumber < sourceNats.size(); natNumber++) {
+      ImmutableList.Builder<BooleanExpr> preconditions = ImmutableList.builder();
       ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
 
       preStates.add(new PreOutEdge(node1, iface1, node2, iface2));
 
-      // does not match any previous source NAT.
-      sourceNats
-          .subList(0, natNumber)
-          .stream()
-          .map(Entry::getKey)
-          .map(aclPermit -> new AclDeny(aclPermit.getHostname(), aclPermit.getAcl()))
-          .forEach(preStates::add);
+      // should match the current source NAT.
+      AclPermit currentAclPermit = sourceNats.get(natNumber).getKey();
 
-      // does match the current source NAT.
-      AclPermit aclPermit = sourceNats.get(natNumber).getKey();
-      if (aclPermit != null) {
-        preStates.add(sourceNats.get(natNumber).getKey());
+      // should not match any previous source NAT.
+      Stream<AclPermit> prevAclPermits =
+          sourceNats.subList(0, natNumber).stream().map(Entry::getKey);
+      if (_input.getEnableAclStates()) {
+        prevAclPermits
+            .map(aclPermit -> new AclDeny(aclPermit.getHostname(), aclPermit.getAcl()))
+            .forEach(preStates::add);
+        if (currentAclPermit != null) {
+          preStates.add(currentAclPermit);
+        }
+      } else {
+        prevAclPermits
+            .map(
+                aclPermit ->
+                    new NotExpr(
+                        _input
+                            .getAclPermitExprs()
+                            .get(aclPermit.getHostname())
+                            .get(aclPermit.getAcl())))
+            .forEach(preconditions::add);
+        preconditions.add(
+            currentAclPermit == null
+                ? TrueExpr.INSTANCE
+                : _input
+                    .getAclPermitExprs()
+                    .get(currentAclPermit.getHostname())
+                    .get(currentAclPermit.getAcl()));
       }
 
       BooleanExpr transformationExpr = sourceNats.get(natNumber).getValue();
+      preconditions.add(transformationExpr);
 
       _rules.add(
           new BasicRuleStatement(
-              transformationExpr,
+              new AndExpr(preconditions.build()),
               preStates.build(),
               new PreOutEdgePostNat(node1, iface1, node2, iface2)));
 
-      if (aclPermit == null) {
+      if (currentAclPermit == null) {
         // null means accept everything, so no need to consider subsequent NATs.
         break;
       }
@@ -985,18 +1036,35 @@ public class DefaultTransitionGenerator implements StateVisitor {
             .getOrDefault(node1, ImmutableMap.of())
             .getOrDefault(iface1, ImmutableList.of());
 
+    ImmutableList.Builder<BooleanExpr> preconditions = ImmutableList.builder();
     ImmutableSet.Builder<StateExpr> preStates = ImmutableSet.builder();
     preStates.add(new PreOutEdge(node1, iface1, node2, iface2));
 
-    sourceNats
-        .stream()
-        .map(Entry::getKey)
-        .map(aclPermit -> new AclDeny(aclPermit.getHostname(), aclPermit.getAcl()))
-        .forEach(preStates::add);
+    if (_input.getEnableAclStates()) {
+      sourceNats
+          .stream()
+          .map(Entry::getKey)
+          .map(aclPermit -> new AclDeny(aclPermit.getHostname(), aclPermit.getAcl()))
+          .forEach(preStates::add);
+    } else {
+      sourceNats
+          .stream()
+          .map(Entry::getKey)
+          .map(
+              aclPermit ->
+                  new NotExpr(
+                      _input
+                          .getAclPermitExprs()
+                          .get(aclPermit.getHostname())
+                          .get(aclPermit.getAcl())))
+          .forEach(preconditions::add);
+    }
 
     _rules.add(
         new BasicRuleStatement(
-            preStates.build(), new PreOutEdgePostNat(node1, iface1, node2, iface2)));
+            new AndExpr(preconditions.build()),
+            preStates.build(),
+            new PreOutEdgePostNat(node1, iface1, node2, iface2)));
   }
 
   private void visitPreOutEdgePostNat_generateTopologyEdgeRules() {
