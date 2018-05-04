@@ -115,7 +115,13 @@ public interface SynthesizerInput {
   /** Mapping: hostname -> interface -> constraint on transformed source interface field */
   Map<String, Map<String, IntExpr>> getSourceInterfaceFieldValues();
 
-  boolean getEnableAclStates();
+  public enum AclEncoding {
+    NO_STATES,
+    SINGLE_STATE,
+    MULTIPLE_STATES
+  }
+
+  AclEncoding getAclEncoding();
 
   Map<String, Map<String, BooleanExpr>> getAclPermitExprs();
 }

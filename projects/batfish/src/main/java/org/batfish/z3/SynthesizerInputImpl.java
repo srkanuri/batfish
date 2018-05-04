@@ -204,7 +204,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
 
   private final @Nonnull Set<Edge> _edges;
 
-  private boolean _enableAclStates;
+  private AclEncoding _aclEncoding;
 
   private final @Nonnull Map<String, Map<String, IpAccessList>> _enabledAcls;
 
@@ -929,8 +929,8 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
   }
 
   @Override
-  public boolean getEnableAclStates() {
-    return _enableAclStates;
+  public AclEncoding getAclEncoding() {
+    return _aclEncoding;
   }
 
   @Override

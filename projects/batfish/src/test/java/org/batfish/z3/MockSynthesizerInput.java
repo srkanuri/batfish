@@ -430,7 +430,7 @@ public class MockSynthesizerInput implements SynthesizerInput {
   }
 
   @Override
-  public boolean getEnableAclStates() {
+  public AclEncoding getAclEncoding() {
     throw new BatfishException("TODO");
   }
 
