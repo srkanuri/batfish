@@ -275,6 +275,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
     if (configurations == null) {
       throw new BatfishException("Must supply configurations");
     }
+    _aclEncoding = AclEncoding.MULTIPLE_STATES;
     _namedIpSpaces =
         toImmutableMap(configurations, Entry::getKey, entry -> entry.getValue().getIpSpaces());
     _specializationIpSpace =
