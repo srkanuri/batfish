@@ -416,6 +416,9 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
 
   @Override
   public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
     if (!(o instanceof BDDRoute)) {
       return false;
     }
@@ -425,6 +428,7 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
   }
 
   private static boolean equalsImpl(BDDRoute r1, BDDRoute r2) {
+    // TODO why not include prefix, prefixLength, or protocolHistory?
     return Objects.equals(r1._metric, r2._metric)
         && Objects.equals(r1._ospfMetric, r2._ospfMetric)
         && Objects.equals(r1._localPref, r2._localPref)
