@@ -142,7 +142,6 @@ public class BDDPacket {
   /*
    * Create a BDDRecord from another. Because BDDs are immutable,
    * there is no need for a deep copy.
-   */
   private BDDPacket(BDDPacket other) {
     _srcIp = new BDDInteger(other._srcIp);
     _dstIp = new BDDInteger(other._dstIp);
@@ -161,6 +160,8 @@ public class BDDPacket {
     _tcpUrg = other._tcpUrg;
   }
 
+   */
+
   /*
    * Helper function that builds a map from BDD variable index
    * to some more meaningful name. Helpful for debugging.
@@ -177,10 +178,10 @@ public class BDDPacket {
 
   /*
    * Convenience method for the copy constructor
-   */
   public BDDPacket copy() {
     return new BDDPacket(this);
   }
+   */
 
   /*
    * Converts a BDD to the graphviz DOT format for debugging.
@@ -400,7 +401,7 @@ public class BDDPacket {
     BDD[] vals = new BDD[len];
     pairing.reset();
     for (int i = 0; i < len; i++) {
-      int var = _dstIp.getBitvec()[i].var(); // dstIpIndex + i;
+      int var = _dstIp.getBitvec().get(i).var(); // dstIpIndex + i;
       BDD subst = Ip.getBitAtPosition(bits, i) ? factory.one() : factory.zero();
       vars[i] = var;
       vals[i] = subst;

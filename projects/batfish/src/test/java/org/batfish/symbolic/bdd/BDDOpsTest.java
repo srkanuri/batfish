@@ -2,6 +2,7 @@ package org.batfish.symbolic.bdd;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
 
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
@@ -73,5 +74,53 @@ public class BDDOpsTest {
     _factory.setVarNum(1);
     BDD var = _factory.ithVar(0);
     assertThat(_bddOps.or(var, _factory.zero()), equalTo(var));
+  }
+
+  @Test
+  public void testMutation_andWith() {
+    _factory.setVarNum(2);
+    BDD var = _factory.ithVar(0);
+    var.andWith(_factory.ithVar(1));
+    assertThat(var, not(equalTo(_factory.ithVar(0))));
+  }
+
+  @Test
+  public void testMutation_orWith() {
+    _factory.setVarNum(2);
+    BDD var = _factory.ithVar(0);
+    var.orWith(_factory.ithVar(1));
+    assertThat(var, not(equalTo(_factory.ithVar(0))));
+  }
+
+  @Test
+  public void testPersistence_ite() {
+    _factory.setVarNum(3);
+    BDD var = _factory.ithVar(0);
+    var.ite(_factory.ithVar(1), _factory.ithVar(2));
+    assertThat(var, equalTo(_factory.ithVar(0)));
+  }
+
+  @Test
+  public void testPersistence_and() {
+    _factory.setVarNum(2);
+    BDD var = _factory.ithVar(0);
+    var.and(_factory.ithVar(1));
+    assertThat(var, equalTo(_factory.ithVar(0)));
+  }
+
+  @Test
+  public void testPersistence_or() {
+    _factory.setVarNum(2);
+    BDD var = _factory.ithVar(0);
+    var.or(_factory.ithVar(1));
+    assertThat(var, equalTo(_factory.ithVar(0)));
+  }
+
+  @Test
+  public void testPersistence_not() {
+    _factory.setVarNum(1);
+    BDD var = _factory.ithVar(0);
+    var.not();
+    assertThat(var, equalTo(_factory.ithVar(0)));
   }
 }

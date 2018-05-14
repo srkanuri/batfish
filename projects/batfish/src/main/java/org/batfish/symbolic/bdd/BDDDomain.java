@@ -1,5 +1,6 @@
 package org.batfish.symbolic.bdd;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Objects;
 import net.sf.javabdd.BDD;
@@ -11,26 +12,30 @@ import net.sf.javabdd.BDDFactory;
  */
 public class BDDDomain<T> {
 
-  private BDDFactory _factory;
+  private final List<T> _values;
 
-  private List<T> _values;
+  private final BDDInteger _integer;
 
-  private BDDInteger _integer;
+  public BDDDomain(List<T> values, BDDInteger integer) {
+    _values = ImmutableList.copyOf(values);
+    _integer = integer;
+  }
 
   public BDDDomain(BDDFactory factory, List<T> values, int index) {
     int bits = numBits(values);
-    _factory = factory;
     _values = values;
-    _integer = BDDInteger.makeFromIndex(_factory, bits, index, false);
+    _integer = BDDInteger.makeFromIndex(factory, bits, index, false);
   }
 
-  public BDDDomain(BDDDomain<T> other) {
-    _factory = other._factory;
-    _values = other._values;
-    _integer = new BDDInteger(other._integer);
+  public BDDDomain(BDDFactory factory, List<T> values, T value) {
+    this(factory, values, values.indexOf(value));
   }
 
-  private int numBits(List<T> values) {
+  public List<T> getValues() {
+    return _values;
+  }
+
+  static <T> int numBits(List<T> values) {
     int size = values.size();
     double log = Math.log((double) size);
     double base = Math.log((double) 2);
@@ -46,18 +51,22 @@ public class BDDDomain<T> {
     return _integer.value(idx);
   }
 
+  /*
   public void setValue(T value) {
     int idx = _values.indexOf(value);
     _integer.setValue(idx);
   }
+  */
 
   public BDDInteger getInteger() {
     return _integer;
   }
 
+  /*
   public void setInteger(BDDInteger i) {
     _integer = i;
   }
+  */
 
   @Override
   public boolean equals(Object o) {

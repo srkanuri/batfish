@@ -1,5 +1,6 @@
 package org.batfish.symbolic.bdd;
 
+import java.util.List;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import org.batfish.common.BatfishException;
@@ -20,7 +21,7 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
   private final BDDFactory _factory;
 
-  private final BDD[] _bitBDDs;
+  private final List<BDD> _bitBDDs;
 
   public IpSpaceToBDD(BDDFactory factory, BDDInteger var) {
     _factory = factory;
@@ -46,9 +47,9 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
     for (int i = 0; i < length; i++) {
       boolean bitValue = Ip.getBitAtPosition(b, i);
       if (bitValue) {
-        acc = acc.and(_bitBDDs[i]);
+        acc = acc.and(_bitBDDs.get(i));
       } else {
-        acc = acc.and(_bitBDDs[i].not());
+        acc = acc.and(_bitBDDs.get(i).not());
       }
     }
     return acc;
@@ -74,9 +75,9 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
       if (significant) {
         boolean bitValue = Ip.getBitAtPosition(ip, i);
         if (bitValue) {
-          acc = acc.and(_bitBDDs[i]);
+          acc = acc.and(_bitBDDs.get(i));
         } else {
-          acc = acc.and(_bitBDDs[i].not());
+          acc = acc.and(_bitBDDs.get(i).not());
         }
       }
     }

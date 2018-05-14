@@ -1,10 +1,15 @@
 package org.batfish.symbolic.bdd;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Streams;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
@@ -14,6 +19,7 @@ import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.BDDPairing;
 import net.sf.javabdd.JFactory;
 import org.batfish.common.BatfishException;
+import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Prefix;
 import org.batfish.symbolic.CommunityVar;
@@ -29,13 +35,20 @@ import org.batfish.symbolic.Protocol;
  */
 public class BDDRoute implements IDeepCopy<BDDRoute> {
 
-  static BDDFactory factory;
+  static final BDDFactory factory;
 
-  private static List<Protocol> allProtos;
+  static final List<Protocol> ALL_PROTOS;
 
-  private static List<OspfType> allMetricTypes;
+  private static final List<OspfType> allMetricTypes;
 
-  private static BDDPairing pairing;
+  private static final BDDPairing pairing;
+
+  static final int METRIC_LENGTH = 32;
+  static final int MED_LENGTH = 32;
+  static final int ADMIN_DIST_LENGTH = 32;
+  static final int LOCAL_PREF_LENGTH = 32;
+  static final int PREFIX_LENGTH_LENGTH = 5;
+  static final int PREFIX_LENGTH = 32;
 
   private int _hcode = 0;
 
@@ -46,11 +59,7 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     allMetricTypes.add(OspfType.E1);
     allMetricTypes.add(OspfType.E2);
 
-    allProtos = new ArrayList<>();
-    allProtos.add(Protocol.CONNECTED);
-    allProtos.add(Protocol.STATIC);
-    allProtos.add(Protocol.OSPF);
-    allProtos.add(Protocol.BGP);
+    ALL_PROTOS = ImmutableList.of(Protocol.CONNECTED, Protocol.STATIC, Protocol.OSPF, Protocol.BGP);
 
     factory = JFactory.init(100000, 10000);
     // factory.disableReorder();
@@ -70,19 +79,129 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     pairing = factory.makePair();
   }
 
-  private BDDInteger _adminDist;
+  private BDDRoute(Builder builder) {
+    _adminDist = builder._adminDist;
+    _bitNames = ImmutableMap.copyOf(builder._bitNames);
+    _communities = ImmutableSortedMap.copyOf(builder._communities);
+    _localPref = builder._localPref;
+    _med = builder._med;
+    _metric = builder._metric;
+    _ospfMetric = builder._ospfMetric;
+    _prefix = builder._prefix;
+    _prefixLength = builder._prefixLength;
+    _protocolHistory = builder._protocolHistory;
+  }
 
-  private Map<Integer, String> _bitNames;
+  @Override
+  public BDDRoute deepCopy() {
+    // immutable, so no need for deep copies anymore
+    return this;
+  }
 
-  private SortedMap<CommunityVar, BDD> _communities;
+  public static class Builder {
 
-  private BDDInteger _localPref;
+    private BDDInteger _adminDist;
 
-  private BDDInteger _med;
+    private Map<Integer, String> _bitNames;
 
-  private BDDInteger _metric;
+    private SortedMap<CommunityVar, BDD> _communities;
 
-  private BDDDomain<OspfType> _ospfMetric;
+    private BDDInteger _localPref;
+
+    private BDDInteger _med;
+
+    private BDDInteger _metric;
+
+    private BDDDomain<OspfType> _ospfMetric;
+
+    private BDDInteger _prefix;
+
+    private BDDInteger _prefixLength;
+
+    private BDDDomain<Protocol> _protocolHistory;
+
+    BDDRoute build() {
+      return new BDDRoute(this);
+    }
+
+    public Builder setAdminDist(BDDInteger adminDist) {
+      _adminDist = adminDist;
+      return this;
+    }
+
+    public Builder setBitNames(Map<Integer, String> bitNames) {
+      _bitNames = bitNames;
+      return this;
+    }
+
+    public Builder setCommunities(SortedMap<CommunityVar, BDD> communities) {
+      _communities = ImmutableSortedMap.copyOf(communities);
+      return this;
+    }
+
+    public Builder updateCommunities(SortedMap<CommunityVar, BDD> communities) {
+      _communities =
+          Streams.concat(
+                  _communities
+                      .entrySet()
+                      .stream()
+                      .filter(entry -> !communities.containsKey(entry.getKey())),
+                  communities.entrySet().stream())
+              .collect(
+                  ImmutableSortedMap.toImmutableSortedMap(
+                      Comparator.naturalOrder(), Entry::getKey, Entry::getValue));
+      return this;
+    }
+
+    public Builder setLocalPref(BDDInteger localPref) {
+      _localPref = localPref;
+      return this;
+    }
+
+    public Builder setMed(BDDInteger med) {
+      _med = med;
+      return this;
+    }
+
+    public Builder setMetric(BDDInteger metric) {
+      _metric = metric;
+      return this;
+    }
+
+    public Builder setOspfMetric(BDDDomain<OspfType> ospfMetric) {
+      _ospfMetric = ospfMetric;
+      return this;
+    }
+
+    public Builder setPrefix(BDDInteger prefix) {
+      _prefix = prefix;
+      return this;
+    }
+
+    public Builder setPrefixLength(BDDInteger prefixLength) {
+      _prefixLength = prefixLength;
+      return this;
+    }
+
+    public Builder setProtocolHistory(BDDDomain<Protocol> protocolHistory) {
+      _protocolHistory = protocolHistory;
+      return this;
+    }
+  }
+
+  private final BDDInteger _adminDist;
+
+  private final Map<Integer, String> _bitNames;
+
+  private final SortedMap<CommunityVar, BDD> _communities;
+
+  private final BDDInteger _localPref;
+
+  private final BDDInteger _med;
+
+  private final BDDInteger _metric;
+
+  private final BDDDomain<OspfType> _ospfMetric;
 
   private final BDDInteger _prefix;
 
@@ -94,90 +213,108 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
    * Creates a collection of BDD variables representing the
    * various attributes of a control plane advertisement.
    */
-  public BDDRoute(Set<CommunityVar> comms) {
+  public static Builder builder(Set<CommunityVar> comms) {
     int numVars = factory.varNum();
     int numNeeded = 32 * 5 + 5 + comms.size() + 4;
     if (numVars < numNeeded) {
       factory.setVarNum(numNeeded);
     }
-    _bitNames = new HashMap<>();
+    ImmutableMap.Builder<Integer, String> bitNamesBuilder = ImmutableMap.builder();
+    Builder routeBuilder = builder();
 
     int idx = 0;
-    _protocolHistory = new BDDDomain<>(factory, allProtos, idx);
-    int len = _protocolHistory.getInteger().getBitvec().length;
-    addBitNames("proto", len, idx, false);
+    BDDDomain<Protocol> protocolHistory = new BDDDomain<>(factory, ALL_PROTOS, idx);
+    int len = protocolHistory.getInteger().getBitvec().size();
+    routeBuilder.setProtocolHistory(protocolHistory);
+    addBitNames(bitNamesBuilder, "proto", len, idx, false);
     idx += len;
+
     // Initialize integer values
-    _metric = BDDInteger.makeFromIndex(factory, 32, idx, false);
-    addBitNames("metric", 32, idx, false);
-    idx += 32;
-    _med = BDDInteger.makeFromIndex(factory, 32, idx, false);
-    addBitNames("med", 32, idx, false);
-    idx += 32;
-    _adminDist = BDDInteger.makeFromIndex(factory, 32, idx, false);
-    addBitNames("ad", 32, idx, false);
-    idx += 32;
-    _localPref = BDDInteger.makeFromIndex(factory, 32, idx, false);
-    addBitNames("lp", 32, idx, false);
-    idx += 32;
-    _prefixLength = BDDInteger.makeFromIndex(factory, 5, idx, true);
-    addBitNames("pfxLen", 5, idx, true);
-    idx += 5;
-    _prefix = BDDInteger.makeFromIndex(factory, 32, idx, true);
-    addBitNames("pfx", 32, idx, true);
-    idx += 32;
+    routeBuilder.setMetric(BDDInteger.makeFromIndex(factory, METRIC_LENGTH, idx, false));
+    addBitNames(bitNamesBuilder, "metric", METRIC_LENGTH, idx, false);
+    idx += METRIC_LENGTH;
+
+    routeBuilder.setMed(BDDInteger.makeFromIndex(factory, MED_LENGTH, idx, false));
+    addBitNames(bitNamesBuilder, "med", MED_LENGTH, idx, false);
+    idx += MED_LENGTH;
+
+    routeBuilder.setAdminDist(BDDInteger.makeFromIndex(factory, ADMIN_DIST_LENGTH, idx, false));
+    addBitNames(bitNamesBuilder, "ad", ADMIN_DIST_LENGTH, idx, false);
+    idx += ADMIN_DIST_LENGTH;
+
+    routeBuilder.setLocalPref(BDDInteger.makeFromIndex(factory, LOCAL_PREF_LENGTH, idx, false));
+    addBitNames(bitNamesBuilder, "lp", LOCAL_PREF_LENGTH, idx, false);
+    idx += LOCAL_PREF_LENGTH;
+
+    routeBuilder.setPrefixLength(
+        BDDInteger.makeFromIndex(factory, PREFIX_LENGTH_LENGTH, idx, true));
+    addBitNames(bitNamesBuilder, "pfxLen", PREFIX_LENGTH_LENGTH, idx, true);
+    idx += PREFIX_LENGTH_LENGTH;
+
+    routeBuilder.setPrefix(BDDInteger.makeFromIndex(factory, PREFIX_LENGTH, idx, true));
+    addBitNames(bitNamesBuilder, "pfx", PREFIX_LENGTH, idx, true);
+    idx += PREFIX_LENGTH;
+
     // Initialize communities
-    _communities = new TreeMap<>();
+    TreeMap<CommunityVar, BDD> communities = new TreeMap<>();
     for (CommunityVar comm : comms) {
       if (comm.getType() != Type.REGEX) {
-        _communities.put(comm, factory.ithVar(idx));
-        _bitNames.put(idx, comm.getValue());
+        communities.put(comm, factory.ithVar(idx));
+        bitNamesBuilder.put(idx, comm.getValue());
         idx++;
       }
     }
+    routeBuilder.setCommunities(communities);
+
     // Initialize OSPF type
-    _ospfMetric = new BDDDomain<>(factory, allMetricTypes, idx);
-    len = _ospfMetric.getInteger().getBitvec().length;
-    addBitNames("ospfMetric", len, idx, false);
+    BDDDomain<OspfType> ospfMetric = new BDDDomain<>(factory, allMetricTypes, idx);
+    len = ospfMetric.getInteger().getBitvec().size();
+    routeBuilder.setOspfMetric(ospfMetric);
+
+    addBitNames(bitNamesBuilder, "ospfMetric", len, idx, false);
+    routeBuilder.setBitNames(bitNamesBuilder.build());
+    return routeBuilder;
+  }
+
+  private static Builder builder() {
+    return new Builder();
   }
 
   /*
    * Create a BDDRecord from another. Because BDDs are immutable,
    * there is no need for a deep copy.
    */
-  public BDDRoute(BDDRoute other) {
-    _communities = new TreeMap<>(other._communities);
-    _prefixLength = new BDDInteger(other._prefixLength);
-    _prefix = new BDDInteger(other._prefix);
-    _metric = new BDDInteger(other._metric);
-    _adminDist = new BDDInteger(other._adminDist);
-    _med = new BDDInteger(other._med);
-    _localPref = new BDDInteger(other._localPref);
-    _protocolHistory = new BDDDomain<>(other._protocolHistory);
-    _ospfMetric = new BDDDomain<>(other._ospfMetric);
-    _bitNames = other._bitNames;
+  public Builder toBuilder() {
+    return new Builder()
+        .setAdminDist(_adminDist)
+        .setBitNames(_bitNames)
+        .setCommunities(_communities)
+        .setLocalPref(_localPref)
+        .setMed(_med)
+        .setMetric(_metric)
+        .setOspfMetric(_ospfMetric)
+        .setPrefix(_prefix)
+        .setPrefixLength(_prefixLength)
+        .setProtocolHistory(_protocolHistory);
   }
 
   /*
    * Helper function that builds a map from BDD variable index
    * to some more meaningful name. Helpful for debugging.
    */
-  private void addBitNames(String s, int length, int index, boolean reverse) {
+  private static void addBitNames(
+      ImmutableMap.Builder<Integer, String> bitNamesBuilder,
+      String s,
+      int length,
+      int index,
+      boolean reverse) {
     for (int i = index; i < index + length; i++) {
       if (reverse) {
-        _bitNames.put(i, s + (length - 1 - (i - index)));
+        bitNamesBuilder.put(i, s + (length - 1 - (i - index)));
       } else {
-        _bitNames.put(i, s + (i - index + 1));
+        bitNamesBuilder.put(i, s + (i - index + 1));
       }
     }
-  }
-
-  /*
-   * Convenience method for the copy constructor
-   */
-  @Override
-  public BDDRoute deepCopy() {
-    return new BDDRoute(this);
   }
 
   /*
@@ -231,48 +368,24 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     return _adminDist;
   }
 
-  public void setAdminDist(BDDInteger adminDist) {
-    this._adminDist = adminDist;
-  }
-
-  public Map<CommunityVar, BDD> getCommunities() {
+  public SortedMap<CommunityVar, BDD> getCommunities() {
     return _communities;
-  }
-
-  public void setCommunities(SortedMap<CommunityVar, BDD> communities) {
-    this._communities = communities;
   }
 
   public BDDInteger getLocalPref() {
     return _localPref;
   }
 
-  public void setLocalPref(BDDInteger localPref) {
-    this._localPref = localPref;
-  }
-
   public BDDInteger getMed() {
     return _med;
-  }
-
-  public void setMed(BDDInteger med) {
-    this._med = med;
   }
 
   public BDDInteger getMetric() {
     return _metric;
   }
 
-  public void setMetric(BDDInteger metric) {
-    this._metric = metric;
-  }
-
   public BDDDomain<OspfType> getOspfMetric() {
     return _ospfMetric;
-  }
-
-  public void setOspfMetric(BDDDomain<OspfType> ospfMetric) {
-    this._ospfMetric = ospfMetric;
   }
 
   public BDDInteger getPrefix() {
@@ -308,45 +421,59 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     }
     BDDRoute other = (BDDRoute) o;
 
-    return Objects.equals(_metric, other._metric)
-        && Objects.equals(_ospfMetric, other._ospfMetric)
-        && Objects.equals(_localPref, other._localPref)
-        && Objects.equals(_communities, other._communities)
-        && Objects.equals(_med, other._med)
-        && Objects.equals(_adminDist, other._adminDist);
+    return MemoEquals.memoEquals(this, other, BDDRoute::equalsImpl);
+  }
+
+  private static boolean equalsImpl(BDDRoute r1, BDDRoute r2) {
+    return Objects.equals(r1._metric, r2._metric)
+        && Objects.equals(r1._ospfMetric, r2._ospfMetric)
+        && Objects.equals(r1._localPref, r2._localPref)
+        && Objects.equals(r1._communities, r2._communities)
+        && Objects.equals(r1._med, r2._med)
+        && Objects.equals(r1._adminDist, r2._adminDist);
   }
 
   /*
    * Take the point-wise disjunction of two BDDRecords
    */
-  public void orWith(BDDRoute other) {
-    BDD[] metric = getMetric().getBitvec();
-    BDD[] adminDist = getAdminDist().getBitvec();
-    BDD[] med = getMed().getBitvec();
-    BDD[] localPref = getLocalPref().getBitvec();
-    BDD[] ospfMet = getOspfMetric().getInteger().getBitvec();
-
-    BDD[] metric2 = other.getMetric().getBitvec();
-    BDD[] adminDist2 = other.getAdminDist().getBitvec();
-    BDD[] med2 = other.getMed().getBitvec();
-    BDD[] localPref2 = other.getLocalPref().getBitvec();
-    BDD[] ospfMet2 = other.getOspfMetric().getInteger().getBitvec();
+  public BDDRoute or(BDDRoute other) {
+    BDD[] adminDist = new BDD[32];
+    BDD[] localPref = new BDD[32];
+    BDD[] med = new BDD[32];
+    BDD[] metric = new BDD[32];
+    BDD[] ospfMet = new BDD[getOspfMetric().getInteger().getBitvec().size()];
 
     for (int i = 0; i < 32; i++) {
-      metric[i].orWith(metric2[i]);
-      adminDist[i].orWith(adminDist2[i]);
-      med[i].orWith(med2[i]);
-      localPref[i].orWith(localPref2[i]);
+      adminDist[i] = _adminDist.getBitvec().get(i).or(other._adminDist.getBitvec().get(i));
+      localPref[i] = _localPref.getBitvec().get(i).or(other._localPref.getBitvec().get(i));
+      med[i] = _med.getBitvec().get(i).or(other._med.getBitvec().get(i));
+      metric[i] = _metric.getBitvec().get(i).or(other._metric.getBitvec().get(i));
     }
     for (int i = 0; i < ospfMet.length; i++) {
-      ospfMet[i].orWith(ospfMet2[i]);
+      ospfMet[i] =
+          _ospfMetric
+              .getInteger()
+              .getBitvec()
+              .get(i)
+              .or(other._ospfMetric.getInteger().getBitvec().get(i));
     }
-    getCommunities()
-        .forEach(
-            (cvar, bdd1) -> {
-              BDD bdd2 = other.getCommunities().get(cvar);
-              bdd1.orWith(bdd2);
-            });
+
+    return toBuilder()
+        .setAdminDist(new BDDInteger(_adminDist.getFactory(), adminDist))
+        .setCommunities(
+            CommonUtil.toImmutableSortedMap(
+                _communities,
+                Entry::getKey,
+                entry -> entry.getValue().or(other.getCommunities().get(entry.getKey()))))
+        .setBitNames(_bitNames)
+        .setLocalPref(new BDDInteger(_localPref.getFactory(), localPref))
+        .setMed(new BDDInteger(_med.getFactory(), med))
+        .setMetric(new BDDInteger(_metric.getFactory(), metric))
+        .setOspfMetric(
+            new BDDDomain<>(
+                _ospfMetric.getValues(),
+                new BDDInteger(_ospfMetric.getInteger().getFactory(), ospfMet)))
+        .build();
   }
 
   public BDDRoute restrict(Prefix pfx) {
@@ -358,30 +485,41 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     // JavaBDD will start to memory leak
     pairing.reset();
     for (int i = 0; i < len; i++) {
-      int var = _prefix.getBitvec()[i].var(); // prefixIndex + i;
+      int var = _prefix.getBitvec().get(i).var(); // prefixIndex + i;
       BDD subst = Ip.getBitAtPosition(bits, i) ? factory.one() : factory.zero();
       vars[i] = var;
       vals[i] = subst;
     }
     pairing.set(vars, vals);
 
-    BDDRoute rec = new BDDRoute(this);
-    BDD[] metric = rec.getMetric().getBitvec();
-    BDD[] adminDist = rec.getAdminDist().getBitvec();
-    BDD[] med = rec.getMed().getBitvec();
-    BDD[] localPref = rec.getLocalPref().getBitvec();
-    BDD[] ospfMet = rec.getOspfMetric().getInteger().getBitvec();
+    BDD[] adminDist = new BDD[32];
+    BDD[] localPref = new BDD[32];
+    BDD[] med = new BDD[32];
+    BDD[] metric = new BDD[32];
+    BDD[] ospfMet = new BDD[_ospfMetric.getInteger().getBitvec().size()];
+
     for (int i = 0; i < 32; i++) {
-      metric[i] = metric[i].veccompose(pairing);
-      adminDist[i] = adminDist[i].veccompose(pairing);
-      med[i] = med[i].veccompose(pairing);
-      localPref[i] = localPref[i].veccompose(pairing);
+      adminDist[i] = _adminDist.getBitvec().get(i).veccompose(pairing);
+      localPref[i] = _localPref.getBitvec().get(i).veccompose(pairing);
+      med[i] = _med.getBitvec().get(i).veccompose(pairing);
+      metric[i] = _metric.getBitvec().get(i).veccompose(pairing);
     }
     for (int i = 0; i < ospfMet.length; i++) {
-      ospfMet[i] = ospfMet[i].veccompose(pairing);
+      ospfMet[i] = _ospfMetric.getInteger().getBitvec().get(i).veccompose(pairing);
     }
-    rec.getCommunities().replaceAll((k, v) -> v.veccompose(pairing));
-    return rec;
+    return toBuilder()
+        .setAdminDist(new BDDInteger(_adminDist.getFactory(), adminDist))
+        .setCommunities(
+            CommonUtil.toImmutableSortedMap(
+                _communities, Entry::getKey, entry -> entry.getValue().veccompose(pairing)))
+        .setLocalPref(new BDDInteger(_localPref.getFactory(), localPref))
+        .setMed(new BDDInteger(_med.getFactory(), med))
+        .setMetric(new BDDInteger(_metric.getFactory(), metric))
+        .setOspfMetric(
+            new BDDDomain<>(
+                _ospfMetric.getValues(),
+                new BDDInteger(_ospfMetric.getInteger().getFactory(), ospfMet)))
+        .build();
   }
 
   public BDDRoute restrict(List<Prefix> prefixes) {
@@ -392,7 +530,7 @@ public class BDDRoute implements IDeepCopy<BDDRoute> {
     for (int i = 1; i < prefixes.size(); i++) {
       Prefix p = prefixes.get(i);
       BDDRoute x = restrict(p);
-      r.orWith(x);
+      r = r.or(x);
     }
     return r;
   }

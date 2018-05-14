@@ -1,11 +1,16 @@
 package org.batfish.symbolic.bdd;
 
+import com.google.common.collect.ImmutableSortedMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
@@ -76,6 +81,7 @@ import org.batfish.symbolic.OspfType;
 import org.batfish.symbolic.Protocol;
 import org.batfish.symbolic.TransferParam;
 import org.batfish.symbolic.TransferResult;
+import org.batfish.symbolic.bdd.BDDRoute.Builder;
 import org.batfish.symbolic.collections.Table2;
 import org.batfish.symbolic.utils.PrefixUtils;
 
@@ -124,6 +130,28 @@ class TransferBDD {
         acc = acc.and(bits[i]);
       } else {
         acc = acc.and(bits[i].not());
+      }
+    }
+    return acc;
+  }
+
+  /*
+   * Check if the first length bits match the BDDInteger
+   * representing the advertisement prefix.
+   *
+   * Note: We assume the prefix is never modified, so it will
+   * be a bitvector containing only the underlying variables:
+   * [var(0), ..., var(n)]
+   */
+  public static BDD firstBitsEqual(List<BDD> bits, Prefix p, int length) {
+    long b = p.getStartIp().asLong();
+    BDD acc = factory.one();
+    for (int i = 0; i < length; i++) {
+      boolean res = Ip.getBitAtPosition(b, i);
+      if (res) {
+        acc = acc.and(bits.get(i));
+      } else {
+        acc = acc.and(bits.get(i).not());
       }
     }
     return acc;
@@ -544,24 +572,28 @@ class TransferBDD {
         BDDInteger newValue = applyLongExprModification(p.indent(), p.getData().getMetric(), ie);
         BDDInteger med = ite(updateMed, p.getData().getMed(), newValue);
         BDDInteger met = ite(updateMet, p.getData().getMetric(), newValue);
-        p.getData().setMetric(met);
-        p.getData().setMetric(med);
+        p.setData(p.getData().toBuilder().setMed(med).setMetric(met).build());
+
+        // DEBUGGING: recreating bug.
+        // p.setData(p.getData().toBuilder().setMetric(met).setMetric(med).build());
 
       } else if (stmt instanceof SetOspfMetricType) {
         p.debug("SetOspfMetricType");
         SetOspfMetricType somt = (SetOspfMetricType) stmt;
         OspfMetricType mt = somt.getMetricType();
         BDDDomain<OspfType> current = result.getReturnValue().getFirst().getOspfMetric();
-        BDDDomain<OspfType> newValue = new BDDDomain<>(current);
+        BDDDomain<OspfType> newValue;
         if (mt == OspfMetricType.E1) {
           p.indent().debug("Value: E1");
-          newValue.setValue(OspfType.E1);
+          newValue =
+              new BDDDomain<>(current.getInteger().getFactory(), current.getValues(), OspfType.E1);
         } else {
           p.indent().debug("Value: E2");
-          newValue.setValue(OspfType.E1);
+          newValue =
+              new BDDDomain<>(current.getInteger().getFactory(), current.getValues(), OspfType.E2);
         }
         newValue = ite(result.getReturnAssignedValue(), p.getData().getOspfMetric(), newValue);
-        p.getData().setOspfMetric(newValue);
+        p.setData(p.getData().toBuilder().setOspfMetric(newValue).build());
 
       } else if (stmt instanceof SetLocalPreference) {
         p.debug("SetLocalPreference");
@@ -569,35 +601,39 @@ class TransferBDD {
         IntExpr ie = slp.getLocalPreference();
         BDDInteger newValue = applyIntExprModification(p.indent(), p.getData().getLocalPref(), ie);
         newValue = ite(result.getReturnAssignedValue(), p.getData().getLocalPref(), newValue);
-        p.getData().setLocalPref(newValue);
+        p.setData(p.getData().toBuilder().setLocalPref(newValue).build());
 
       } else if (stmt instanceof AddCommunity) {
         p.debug("AddCommunity");
         AddCommunity ac = (AddCommunity) stmt;
         Set<CommunityVar> comms = _graph.findAllCommunities(_conf, ac.getExpr());
+        SortedMap<CommunityVar, BDD> communities = new TreeMap<>(p.getData().getCommunities());
         for (CommunityVar cvar : comms) {
           if (!_policyQuotient.getCommsAssignedButNotMatched().contains(cvar)) {
             p.indent().debug("Value: " + cvar);
-            BDD comm = p.getData().getCommunities().get(cvar);
+            BDD comm = communities.get(cvar);
             BDD newValue = ite(result.getReturnAssignedValue(), comm, factory.one());
             p.indent().debug("New Value: " + newValue);
-            p.getData().getCommunities().put(cvar, newValue);
+            communities.put(cvar, newValue);
           }
         }
+        p.setData(p.getData().toBuilder().setCommunities(communities).build());
 
       } else if (stmt instanceof SetCommunity) {
         p.debug("SetCommunity");
         SetCommunity sc = (SetCommunity) stmt;
         Set<CommunityVar> comms = _graph.findAllCommunities(_conf, sc.getExpr());
+        SortedMap<CommunityVar, BDD> communities = new TreeMap<>(p.getData().getCommunities());
         for (CommunityVar cvar : comms) {
           if (!_policyQuotient.getCommsAssignedButNotMatched().contains(cvar)) {
             p.indent().debug("Value: " + cvar);
-            BDD comm = p.getData().getCommunities().get(cvar);
+            BDD comm = communities.get(cvar);
             BDD newValue = ite(result.getReturnAssignedValue(), comm, factory.one());
             p.indent().debug("New Value: " + newValue);
-            p.getData().getCommunities().put(cvar, newValue);
+            communities.put(cvar, newValue);
           }
         }
+        p.setData(p.getData().toBuilder().setCommunities(communities).build());
 
       } else if (stmt instanceof DeleteCommunity) {
         p.debug("DeleteCommunity");
@@ -613,14 +649,28 @@ class TransferBDD {
           }
         }
         // Delete the comms
-        for (CommunityVar cvar : toDelete) {
-          if (!_policyQuotient.getCommsAssignedButNotMatched().contains(cvar)) {
-            p.indent().debug("Value: " + cvar.getValue() + ", " + cvar.getType());
-            BDD comm = p.getData().getCommunities().get(cvar);
-            BDD newValue = ite(result.getReturnAssignedValue(), comm, factory.zero());
-            p.indent().debug("New Value: " + newValue);
-            p.getData().getCommunities().put(cvar, newValue);
-          }
+        if (!toDelete.isEmpty()) {
+          BDDRoute oldRoute = p.getData();
+          Builder routeBuilder = oldRoute.toBuilder();
+          BDD returnAssignedValue = result.getReturnAssignedValue();
+          final TransferParam<BDDRoute> finalP = p;
+          routeBuilder.updateCommunities(
+              toDelete
+                  .stream()
+                  .filter(cvar -> !_policyQuotient.getCommsAssignedButNotMatched().contains(cvar))
+                  .collect(
+                      ImmutableSortedMap.<CommunityVar, CommunityVar, BDD>toImmutableSortedMap(
+                          Comparator.naturalOrder(),
+                          Function.identity(),
+                          cvar -> {
+                            finalP
+                                .indent()
+                                .debug("Value: " + cvar.getValue() + ", " + cvar.getType());
+                            BDD comm = oldRoute.getCommunities().get(cvar);
+                            BDD newValue = ite(returnAssignedValue, comm, factory.zero());
+                            finalP.indent().debug("New Value: " + newValue);
+                            return newValue;
+                          })));
         }
 
       } else if (stmt instanceof RetainCommunity) {
@@ -635,7 +685,7 @@ class TransferBDD {
         BDDInteger met = p.getData().getMetric();
         BDDInteger newValue = met.add(BDDInteger.makeFromValue(met.getFactory(), 32, prependCost));
         newValue = ite(result.getReturnAssignedValue(), p.getData().getMetric(), newValue);
-        p.getData().setMetric(newValue);
+        p.setData(p.getData().toBuilder().setMetric(newValue).build());
 
       } else if (stmt instanceof SetOrigin) {
         p.debug("SetOrigin");
@@ -733,14 +783,12 @@ class TransferBDD {
    * Map ite over BDDDomain type
    */
   private <T> BDDDomain<T> ite(BDD b, BDDDomain<T> x, BDDDomain<T> y) {
-    BDDDomain<T> result = new BDDDomain<>(x);
     BDDInteger i = ite(b, x.getInteger(), y.getInteger());
-    result.setInteger(i);
-    return result;
+    return new BDDDomain<>(x.getValues(), i);
   }
 
   private BDDRoute ite(BDD guard, BDDRoute r1, BDDRoute r2) {
-    BDDRoute ret = new BDDRoute(_comms);
+    BDDRoute.Builder ret = BDDRoute.builder(_comms);
 
     BDDInteger x;
     BDDInteger y;
@@ -756,32 +804,40 @@ class TransferBDD {
 
     x = r1.getAdminDist();
     y = r2.getAdminDist();
-    ret.getAdminDist().setValue(ite(guard, x, y));
+    ret.setAdminDist(ite(guard, x, y));
 
     x = r1.getLocalPref();
     y = r2.getLocalPref();
-    ret.getLocalPref().setValue(ite(guard, x, y));
+    ret.setLocalPref(ite(guard, x, y));
 
     x = r1.getMetric();
     y = r2.getMetric();
-    ret.getMetric().setValue(ite(guard, x, y));
+    ret.setMetric(ite(guard, x, y));
 
     x = r1.getMed();
     y = r2.getMed();
-    ret.getMed().setValue(ite(guard, x, y));
+    ret.setMed(ite(guard, x, y));
 
-    r1.getCommunities()
-        .forEach(
-            (c, var1) -> {
-              BDD var2 = r2.getCommunities().get(c);
-              ret.getCommunities().put(c, ite(guard, var1, var2));
-            });
+    ret.setCommunities(
+        r1.getCommunities()
+            .entrySet()
+            .stream()
+            .collect(
+                ImmutableSortedMap.toImmutableSortedMap(
+                    Comparator.naturalOrder(),
+                    Entry::getKey,
+                    entry -> {
+                      CommunityVar c = entry.getKey();
+                      BDD var1 = entry.getValue();
+                      BDD var2 = r2.getCommunities().get(c);
+                      return ite(guard, var1, var2);
+                    })));
 
     // BDDInteger i =
     //    ite(guard, r1.getProtocolHistory().getInteger(), r2.getProtocolHistory().getInteger());
     // ret.getProtocolHistory().setInteger(i);
 
-    return ret;
+    return ret.build();
   }
 
   /*
@@ -936,29 +992,40 @@ class TransferBDD {
    * outputs if the route is filtered / dropped in the policy
    */
   private BDDRoute zeroedRecord() {
-    BDDRoute rec = new BDDRoute(_comms);
-    rec.getMetric().setValue(0);
-    rec.getLocalPref().setValue(0);
-    rec.getAdminDist().setValue(0);
-    rec.getPrefixLength().setValue(0);
-    rec.getMed().setValue(0);
-    rec.getPrefix().setValue(0);
-    for (CommunityVar comm : _comms) {
-      rec.getCommunities().put(comm, factory.zero());
-    }
-    rec.getProtocolHistory().getInteger().setValue(0);
-    return rec;
+    BDDRoute.Builder builder = BDDRoute.builder(_comms);
+    builder.setMetric(BDDInteger.makeFromValue(factory, BDDRoute.METRIC_LENGTH, 0));
+    builder.setLocalPref(BDDInteger.makeFromValue(factory, BDDRoute.LOCAL_PREF_LENGTH, 0));
+    builder.setAdminDist(BDDInteger.makeFromValue(factory, BDDRoute.ADMIN_DIST_LENGTH, 0));
+    builder.setPrefixLength(BDDInteger.makeFromValue(factory, BDDRoute.PREFIX_LENGTH_LENGTH, 0));
+    builder.setMed(BDDInteger.makeFromValue(factory, BDDRoute.MED_LENGTH, 0));
+    builder.setPrefix(BDDInteger.makeFromValue(factory, BDDRoute.PREFIX_LENGTH, 0));
+    builder.setCommunities(
+        _comms
+            .stream()
+            .collect(
+                ImmutableSortedMap.<CommunityVar, CommunityVar, BDD>toImmutableSortedMap(
+                    Comparator.naturalOrder(), Function.identity(), comm -> factory.zero())));
+
+    // TODO: refactor. This is too tightly coupled to BDDRoute.builder.
+    builder.setProtocolHistory(
+        new BDDDomain<>(
+            BDDRoute.ALL_PROTOS,
+            BDDInteger.makeFromValue(factory, BDDDomain.numBits(BDDRoute.ALL_PROTOS), 0)));
+
+    return builder.build();
   }
 
   /*
    * Communities assumed to not be attached
    */
-  private void addCommunityAssumptions(BDDRoute route) {
-    for (CommunityVar comm : _comms) {
-      if (_policyQuotient.getCommsUsedOnlyLocally().contains(comm)) {
-        route.getCommunities().put(comm, factory.zero());
-      }
-    }
+  private void addCommunityAssumptions(Builder route) {
+    route.updateCommunities(
+        _comms
+            .stream()
+            .filter(_policyQuotient.getCommsUsedOnlyLocally()::contains)
+            .collect(
+                ImmutableSortedMap.<CommunityVar, CommunityVar, BDD>toImmutableSortedMap(
+                    Comparator.naturalOrder(), Function.identity(), comm -> factory.zero())));
   }
 
   /*
@@ -969,9 +1036,9 @@ class TransferBDD {
     _ignoredNetworks = ignoredNetworks;
     _commDeps = _graph.getCommunityDependencies();
     _comms = _graph.getAllCommunities();
-    BDDRoute o = new BDDRoute(_comms);
+    BDDRoute.Builder o = BDDRoute.builder(_comms);
     addCommunityAssumptions(o);
-    TransferParam<BDDRoute> p = new TransferParam<>(o, false);
+    TransferParam<BDDRoute> p = new TransferParam<>(o.build(), false);
     TransferResult<TransferReturn, BDD> result = compute(_statements, p);
     // BDDRoute route = result.getReturnValue().getFirst();
     // System.out.println("DOT: \n" + route.dot(route.getLocalPref().getBitvec()[31]));

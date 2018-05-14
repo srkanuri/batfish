@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.equalTo;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Streams;
-import java.util.Arrays;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
@@ -41,7 +40,9 @@ public class IpSpaceToBDDTest {
         bdd,
         equalTo(
             _bddOps.and(
-                Arrays.stream(_ipAddrBdd.getBitvec())
+                _ipAddrBdd
+                    .getBitvec()
+                    .stream()
                     .map(BDD::not)
                     .collect(ImmutableList.toImmutableList()))));
   }
@@ -57,7 +58,7 @@ public class IpSpaceToBDDTest {
   public void testPrefixIpSpace() {
     IpSpace ipSpace = Prefix.parse("255.0.0.0/8").toIpSpace();
     BDD bdd = ipSpace.accept(_ipSpaceToBdd);
-    assertThat(bdd, equalTo(_bddOps.and(Arrays.asList(_ipAddrBdd.getBitvec()).subList(0, 8))));
+    assertThat(bdd, equalTo(_bddOps.and(_ipAddrBdd.getBitvec().subList(0, 8))));
   }
 
   @Test
@@ -97,7 +98,8 @@ public class IpSpaceToBDDTest {
         _bddOps.or(bdd1, bdd2),
         equalTo(
             _bddOps.and(
-                Arrays.asList(_ipAddrBdd.getBitvec())
+                _ipAddrBdd
+                    .getBitvec()
                     .subList(0, 7)
                     .stream()
                     .map(BDD::not)
@@ -113,8 +115,8 @@ public class IpSpaceToBDDTest {
         equalTo(
             _bddOps.and(
                 Streams.concat(
-                        Arrays.asList(_ipAddrBdd.getBitvec()).subList(0, 8).stream(),
-                        Arrays.asList(_ipAddrBdd.getBitvec()).subList(16, 24).stream())
+                        _ipAddrBdd.getBitvec().subList(0, 8).stream(),
+                        _ipAddrBdd.getBitvec().subList(16, 24).stream())
                     .collect(ImmutableList.toImmutableList()))));
   }
 
