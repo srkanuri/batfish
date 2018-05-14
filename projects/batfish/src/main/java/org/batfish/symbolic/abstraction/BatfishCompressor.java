@@ -3,7 +3,6 @@ package org.batfish.symbolic.abstraction;
 import static org.batfish.common.util.CommonUtil.asPositiveIpWildcards;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -79,15 +78,10 @@ public class BatfishCompressor {
       if (!to.containsKey(graphEdge)) {
         to.put(graphEdge, filter);
       } else {
-        // both maps have filters for this edge -- merge them together.
-        TreeSet<Prefix> mergedPrefixes =
-            new TreeSet<>(
-                Sets.union(
-                    to.get(graphEdge)._prefixTrie.getPrefixes(), filter._prefixTrie.getPrefixes()));
+        PrefixTrie prefixTrie = to.get(graphEdge)._prefixTrie.union(filter._prefixTrie);
         EquivalenceClassFilter mergedFilter =
             new EquivalenceClassFilter(
-                new PrefixTrie(mergedPrefixes),
-                to.get(graphEdge)._isForDefaultSlice || filter._isForDefaultSlice);
+                prefixTrie, to.get(graphEdge)._isForDefaultSlice || filter._isForDefaultSlice);
         to.put(graphEdge, mergedFilter);
       }
     }

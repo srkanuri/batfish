@@ -5,7 +5,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.collect.ImmutableSortedSet;
 import java.io.Serializable;
 import java.util.Collections;
+import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 
 public class PrefixTrie implements Serializable {
@@ -19,6 +21,10 @@ public class PrefixTrie implements Serializable {
 
     public ByteTrie() {
       _root = new ByteTrieNode();
+    }
+
+    private ByteTrie(ByteTrieNode root) {
+      _root = root;
     }
 
     public void addPrefix(Prefix prefix) {
@@ -37,6 +43,16 @@ public class PrefixTrie implements Serializable {
       long addressBits = address.asLong();
       return _root.getLongestPrefixMatch(address, addressBits, 0);
     }
+
+    public void addAllFrom(ByteTrie trie) {
+      _root.addAllFrom(trie._root);
+    }
+
+    public SortedSet<Prefix> getPrefixes() {
+      TreeSet<Prefix> prefixes = new TreeSet<>();
+      _root.collectPrefixes(prefixes);
+      return prefixes;
+    }
   }
 
   private class ByteTrieNode implements Serializable {
@@ -46,9 +62,40 @@ public class PrefixTrie implements Serializable {
 
     private ByteTrieNode _left;
 
+    /*
+     * TODO why store this? There's only one choice of prefix at each node, so we just need a bit
+     * to indicate whether it's present.
+     */
     private Prefix _prefix;
 
     private ByteTrieNode _right;
+
+    public void addAllFrom(ByteTrieNode other) {
+      if (other == null) {
+        return;
+      }
+
+      if (_prefix == null) {
+        _prefix = other._prefix;
+      } else {
+        // there's only 1 choice of prefix at each node, so make sure they agree
+        assert other._prefix == null || _prefix.equals(other._prefix);
+      }
+
+      if (other._left != null) {
+        if (_left == null) {
+          _left = new ByteTrieNode();
+        }
+        _left.addAllFrom(other._left);
+      }
+
+      if (other._right != null) {
+        if (_right == null) {
+          _right = new ByteTrieNode();
+        }
+        _right.addAllFrom(other._right);
+      }
+    }
 
     public void addPrefix(Prefix prefix, long bits, int prefixLength, int depth) {
       if (prefixLength == depth) {
@@ -126,6 +173,18 @@ public class PrefixTrie implements Serializable {
         return longerMatch;
       }
     }
+
+    public void collectPrefixes(Set<Prefix> prefixes) {
+      if (_prefix != null) {
+        prefixes.add(_prefix);
+      }
+      if (_left != null) {
+        _left.collectPrefixes(prefixes);
+      }
+      if (_right != null) {
+        _right.collectPrefixes(prefixes);
+      }
+    }
   }
 
   /** */
@@ -163,6 +222,17 @@ public class PrefixTrie implements Serializable {
 
   @JsonValue
   public SortedSet<Prefix> getPrefixes() {
+    if (_prefixes == null) {
+      _prefixes = _trie.getPrefixes();
+    }
     return _prefixes;
+  }
+
+  public PrefixTrie union(PrefixTrie other) {
+    PrefixTrie result = new PrefixTrie();
+    result._trie.addAllFrom(_trie);
+    result._trie.addAllFrom(other._trie);
+    result._prefixes = null;
+    return result;
   }
 }
