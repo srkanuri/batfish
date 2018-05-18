@@ -17,21 +17,17 @@ import org.junit.Test;
 
 public class AtomicPredicatesTests {
   private AtomicPredicates _atomicPredicates;
-  private BDDFactory _factory;
-  private BDDOps _bddOps;
-  private BDDInteger _ipAddrBdd;
   private IpSpaceToBDD _ipSpaceToBdd;
 
   @Before
   public void init() {
-    _factory = JFactory.init(10000, 1000);
-    _factory.disableReorder();
-    _factory.setCacheRatio(64);
-    _factory.setVarNum(32); // reserve 32 1-bit variables
-    _bddOps = new BDDOps(_factory);
-    _ipAddrBdd = BDDInteger.makeFromIndex(_factory, 32, 0, true);
-    _ipSpaceToBdd = new IpSpaceToBDD(_factory, _ipAddrBdd);
-    _atomicPredicates = new AtomicPredicates(_factory);
+    BDDFactory factory = JFactory.init(10000, 1000);
+    factory.disableReorder();
+    factory.setCacheRatio(64);
+    factory.setVarNum(32); // reserve 32 1-bit variables
+    BDDInteger ipAddrBdd = BDDInteger.makeFromIndex(factory, 32, 0, true);
+    _ipSpaceToBdd = new IpSpaceToBDD(factory, ipAddrBdd);
+    _atomicPredicates = new AtomicPredicates(factory);
   }
 
   private Collection<BDD> toBDD(IpSpace... ipSpaces) {
