@@ -1,9 +1,12 @@
 package org.batfish.symbolic.bdd;
 
+import com.google.common.collect.Lists;
+import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import org.batfish.common.BatfishException;
 import org.batfish.datamodel.AclIpSpace;
+import org.batfish.datamodel.AclIpSpaceLine;
 import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpIpSpace;
@@ -11,6 +14,7 @@ import org.batfish.datamodel.IpSpaceReference;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.IpWildcardIpSpace;
 import org.batfish.datamodel.IpWildcardSetIpSpace;
+import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.PrefixIpSpace;
 import org.batfish.datamodel.UniverseIpSpace;
@@ -18,13 +22,16 @@ import org.batfish.datamodel.visitors.GenericIpSpaceVisitor;
 
 public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
-  private final BDDFactory _factory;
+  private final BDDOps _bddOps;
 
   private final BDD[] _bitBDDs;
 
+  private final BDDFactory _factory;
+
   public IpSpaceToBDD(BDDFactory factory, BDDInteger var) {
-    _factory = factory;
+    _bddOps = new BDDOps(factory);
     _bitBDDs = var.getBitvec();
+    _factory = factory;
   }
 
   @Override
@@ -85,12 +92,22 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
   @Override
   public BDD visitAclIpSpace(AclIpSpace aclIpSpace) {
-    throw new BatfishException("AclIpSpace is unsupported");
+    BDD bdd = _factory.zero();
+    for (AclIpSpaceLine aclIpSpaceLine : Lists.reverse(aclIpSpace.getLines())) {
+      bdd =
+          visit(aclIpSpaceLine.getIpSpace())
+              .ite(
+                  aclIpSpaceLine.getAction() == LineAction.ACCEPT
+                      ? _factory.one()
+                      : _factory.zero(),
+                  bdd);
+    }
+    return bdd;
   }
 
   @Override
   public BDD visitEmptyIpSpace(EmptyIpSpace emptyIpSpace) {
-    throw new BatfishException("EmptyIpSpace is unsupported");
+    return _factory.zero();
   }
 
   @Override
@@ -110,7 +127,23 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
   @Override
   public BDD visitIpWildcardSetIpSpace(IpWildcardSetIpSpace ipWildcardSetIpSpace) {
-    throw new BatfishException("IpWildcardSetIpSpace is unsupported");
+    BDD whitelist =
+        _bddOps.or(
+            ipWildcardSetIpSpace
+                .getWhitelist()
+                .stream()
+                .map(this::toBDD)
+                .collect(Collectors.toList()));
+
+    BDD blacklist =
+        _bddOps.or(
+            ipWildcardSetIpSpace
+                .getBlacklist()
+                .stream()
+                .map(this::toBDD)
+                .collect(Collectors.toList()));
+
+    return whitelist.and(blacklist.not());
   }
 
   @Override
