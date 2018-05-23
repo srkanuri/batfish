@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableMap;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
+import org.batfish.datamodel.AclIpSpace;
 import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
@@ -62,5 +63,18 @@ public class BDDIpSpaceSpecializerTest {
         specializer(Prefix.parse("255.0.0.0/8").toIpSpace()).visit(ipSpace), equalTo(ipSpace));
     assertThat(
         specializer(new Ip("1.2.3.4").toIpSpace()).visit(ipSpace), equalTo(EmptyIpSpace.INSTANCE));
+  }
+
+  @Test
+  public void testAclIpSpace() {
+    IpSpace ipSpace1 = new Ip("1.1.1.1").toIpSpace();
+    IpSpace ipSpace2 = new Ip("2.2.2.2").toIpSpace();
+    IpSpace ipSpace =
+        AclIpSpace.builder()
+            .thenPermitting(ipSpace1, ipSpace2)
+            .thenRejecting(ipSpace1, ipSpace2)
+            .build();
+    assertThat(specializer(ipSpace).visit(ipSpace), equalTo(UniverseIpSpace.INSTANCE));
+
   }
 }

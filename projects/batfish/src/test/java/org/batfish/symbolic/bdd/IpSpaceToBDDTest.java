@@ -2,6 +2,8 @@ package org.batfish.symbolic.bdd;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Streams;
@@ -9,6 +11,7 @@ import java.util.Arrays;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
+import org.batfish.datamodel.AclIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.IpWildcard;
@@ -126,5 +129,30 @@ public class IpSpaceToBDDTest {
     BDD bdd1 = ipWildcardIpSpace.accept(_ipSpaceToBdd);
     BDD bdd2 = prefixIpSpace.accept(_ipSpaceToBdd);
     assertThat(bdd1, equalTo(bdd2));
+  }
+
+  @Test
+  public void testAclIpSpace() {
+    IpSpace ipSpace1 = new Ip("1.1.1.1").toIpSpace();
+    IpSpace ipSpace2 = new Ip("2.2.2.2").toIpSpace();
+    IpSpace aclIpSpace =
+        AclIpSpace.builder()
+            .thenPermitting(ipSpace1, ipSpace2)
+            .thenRejecting(ipSpace1, ipSpace2)
+            .build();
+
+    BDD bdd1 = ipSpace1.accept(_ipSpaceToBdd);
+    BDD bdd2 = ipSpace2.accept(_ipSpaceToBdd);
+    BDD aclBDD = aclIpSpace.accept(_ipSpaceToBdd);
+
+    assertFalse(aclBDD.and(bdd1).isZero());
+    assertFalse(aclBDD.and(bdd2).isZero());
+
+    assertTrue(aclBDD.not().and(bdd1).isZero());
+    assertTrue(aclBDD.not().and(bdd2).isZero());
+
+    IpSpace negIpSpace = aclIpSpace.complement();
+    BDD negAclBDD = negIpSpace.accept(_ipSpaceToBdd);
+    assertThat(negAclBDD, equalTo(aclBDD.not()));
   }
 }

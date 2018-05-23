@@ -65,7 +65,11 @@ public class BDDIpSpaceSpecializer implements GenericIpSpaceVisitor<IpSpace> {
   }
 
   private AclIpSpaceLine specialize(AclIpSpaceLine line) {
-    return line.toBuilder().setIpSpace(line.getIpSpace().accept(this)).build();
+    IpSpace specializedIpSpace = line.getIpSpace().accept(this);
+    return AclIpSpaceLine.builder()
+        .setAction(line.getAction())
+        .setIpSpace(specializedIpSpace)
+        .build();
   }
 
   private SortedSet<IpWildcard> specialize(SortedSet<IpWildcard> wildcards) {
