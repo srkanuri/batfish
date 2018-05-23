@@ -44,20 +44,25 @@ import static org.batfish.representation.cisco.CiscoStructureType.ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureType.SECURITY_ZONE;
 import static org.batfish.representation.cisco.CiscoStructureType.SERVICE_CLASS;
 import static org.batfish.representation.cisco.CiscoStructureType.SERVICE_OBJECT_GROUP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_AGGREGATE_ATTRIBUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_DEFAULT_ORIGINATE_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_FILTER6_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_FILTER_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_PREFIX6_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_PREFIX_LIST;
+import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_ROUTE6_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INBOUND_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INHERITED_PEER;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INHERITED_PEER_POLICY;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_INHERITED_SESSION;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_NEIGHBOR_REMOTE_AS_ROUTE_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_NETWORK6_ORIGINATION_ROUTE_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_NETWORK_ORIGINATION_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_FILTER6_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_FILTER_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_PREFIX6_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_PREFIX_LIST;
+import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_ROUTE6_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_OUTBOUND_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_REDISTRIBUTE_CONNECTED_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.BGP_REDISTRIBUTE_EIGRP_MAP;
@@ -93,19 +98,28 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_IGM
 import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_IP_INBAND_ACCESS_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_IP_VERIFY_ACCESS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_PIM_NEIGHBOR_FILTER;
+import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_POLICY_ROUTING_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.INTERFACE_ZONE_MEMBER;
 import static org.batfish.representation.cisco.CiscoStructureUsage.IPSEC_PROFILE_TRANSFORM_SET;
 import static org.batfish.representation.cisco.CiscoStructureUsage.IP_NAT_DESTINATION_ACCESS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.IP_NAT_SOURCE_ACCESS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.IP_NAT_SOURCE_POOL;
+import static org.batfish.representation.cisco.CiscoStructureUsage.ISAKMP_POLICY_SELF_REF;
 import static org.batfish.representation.cisco.CiscoStructureUsage.ISAKMP_PROFILE_KEYRING;
+import static org.batfish.representation.cisco.CiscoStructureUsage.ISAKMP_PROFILE_SELF_REF;
 import static org.batfish.representation.cisco.CiscoStructureUsage.LINE_ACCESS_CLASS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.LINE_ACCESS_CLASS_LIST6;
 import static org.batfish.representation.cisco.CiscoStructureUsage.MANAGEMENT_SSH_ACCESS_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.MANAGEMENT_TELNET_ACCESS_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.MSDP_PEER_SA_LIST;
+import static org.batfish.representation.cisco.CiscoStructureUsage.NETWORK_OBJECT_GROUP_GROUP_OBJECT;
+import static org.batfish.representation.cisco.CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT;
 import static org.batfish.representation.cisco.CiscoStructureUsage.NTP_ACCESS_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_AREA_FILTER_LIST;
+import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_DEFAULT_ORIGINATE_ROUTE_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_BGP_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_CONNECTED_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_STATIC_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.PIM_ACCEPT_REGISTER_ACL;
 import static org.batfish.representation.cisco.CiscoStructureUsage.PIM_ACCEPT_REGISTER_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.PIM_ACCEPT_RP_ACL;
@@ -182,6 +196,8 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Ip6;
 import org.batfish.datamodel.Ip6Wildcard;
 import org.batfish.datamodel.IpProtocol;
+import org.batfish.datamodel.IpSpace;
+import org.batfish.datamodel.IpSpaceReference;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.IpsecAuthenticationAlgorithm;
 import org.batfish.datamodel.IpsecProposal;
@@ -282,6 +298,8 @@ import org.batfish.grammar.cisco.CiscoParser.Aaa_accounting_defaultContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_accounting_default_groupContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_accounting_default_localContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_authenticationContext;
+import org.batfish.grammar.cisco.CiscoParser.Aaa_authentication_asaContext;
+import org.batfish.grammar.cisco.CiscoParser.Aaa_authentication_list_methodContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_authentication_loginContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_authentication_login_listContext;
 import org.batfish.grammar.cisco.CiscoParser.Aaa_authentication_login_privilege_modeContext;
@@ -392,6 +410,7 @@ import org.batfish.grammar.cisco.CiscoParser.Else_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Elseif_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Empty_neighbor_block_address_familyContext;
 import org.batfish.grammar.cisco.CiscoParser.Enable_secretContext;
+import org.batfish.grammar.cisco.CiscoParser.Eos_bandwidth_specifierContext;
 import org.batfish.grammar.cisco.CiscoParser.Extended_access_list_additional_featureContext;
 import org.batfish.grammar.cisco.CiscoParser.Extended_access_list_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Extended_access_list_tailContext;
@@ -404,6 +423,7 @@ import org.batfish.grammar.cisco.CiscoParser.Flan_unitContext;
 import org.batfish.grammar.cisco.CiscoParser.Hash_commentContext;
 import org.batfish.grammar.cisco.CiscoParser.If_autostateContext;
 import org.batfish.grammar.cisco.CiscoParser.If_bandwidthContext;
+import org.batfish.grammar.cisco.CiscoParser.If_channel_groupContext;
 import org.batfish.grammar.cisco.CiscoParser.If_descriptionContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_access_groupContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_addressContext;
@@ -431,6 +451,8 @@ import org.batfish.grammar.cisco.CiscoParser.If_mtuContext;
 import org.batfish.grammar.cisco.CiscoParser.If_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.If_shutdownContext;
 import org.batfish.grammar.cisco.CiscoParser.If_spanning_treeContext;
+import org.batfish.grammar.cisco.CiscoParser.If_speed_eosContext;
+import org.batfish.grammar.cisco.CiscoParser.If_speed_iosContext;
 import org.batfish.grammar.cisco.CiscoParser.If_st_portfastContext;
 import org.batfish.grammar.cisco.CiscoParser.If_switchportContext;
 import org.batfish.grammar.cisco.CiscoParser.If_switchport_accessContext;
@@ -535,8 +557,10 @@ import org.batfish.grammar.cisco.CiscoParser.Null_as_path_regexContext;
 import org.batfish.grammar.cisco.CiscoParser.Og_networkContext;
 import org.batfish.grammar.cisco.CiscoParser.Og_protocolContext;
 import org.batfish.grammar.cisco.CiscoParser.Og_serviceContext;
+import org.batfish.grammar.cisco.CiscoParser.Ogn_group_objectContext;
 import org.batfish.grammar.cisco.CiscoParser.Ogn_host_ipContext;
 import org.batfish.grammar.cisco.CiscoParser.Ogn_ip_with_maskContext;
+import org.batfish.grammar.cisco.CiscoParser.Ogn_network_objectContext;
 import org.batfish.grammar.cisco.CiscoParser.Ogp_protocol_objectContext;
 import org.batfish.grammar.cisco.CiscoParser.Ogs_icmpContext;
 import org.batfish.grammar.cisco.CiscoParser.Ogs_tcpContext;
@@ -1384,6 +1408,29 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void enterAaa_authentication_asa(Aaa_authentication_asaContext ctx) {
+    if (_configuration.getCf().getAaa().getAuthentication().getLogin() == null) {
+      _configuration.getCf().getAaa().getAuthentication().setLogin(new AaaAuthenticationLogin());
+    }
+    ArrayList<String> methods = new ArrayList<>();
+    if (ctx.aaa_authentication_asa_console().group != null) {
+      methods.add(ctx.aaa_authentication_asa_console().group.getText());
+    }
+    if (ctx.aaa_authentication_asa_console().LOCAL_ASA() != null) {
+      methods.add(ctx.aaa_authentication_asa_console().LOCAL_ASA().getText());
+    }
+    if (!methods.isEmpty()) {
+      AaaAuthenticationLogin login = _configuration.getCf().getAaa().getAuthentication().getLogin();
+      String name = ctx.linetype.getText();
+
+      // not allowed to specify multiple login lists for a given linetype so use computeIfAbsent
+      // rather than put so we only accept the first login list
+      _currentAaaAuthenticationLoginList =
+          login.getLists().computeIfAbsent(name, k -> new AaaAuthenticationLoginList(methods));
+    }
+  }
+
+  @Override
   public void enterAaa_authentication_login_list(Aaa_authentication_login_listContext ctx) {
     AaaAuthenticationLogin login = _configuration.getCf().getAaa().getAuthentication().getLogin();
     String name;
@@ -1394,8 +1441,13 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     } else {
       throw new BatfishException("Unsupported mode");
     }
+    List<String> methods =
+        ctx.aaa_authentication_list_method()
+            .stream()
+            .map(Aaa_authentication_list_methodContext::getText)
+            .collect(ImmutableList.toImmutableList());
     _currentAaaAuthenticationLoginList =
-        login.getLists().computeIfAbsent(name, k -> new AaaAuthenticationLoginList());
+        login.getLists().computeIfAbsent(name, k -> new AaaAuthenticationLoginList(methods));
   }
 
   @Override
@@ -1512,9 +1564,15 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (_currentIsakmpPolicy != null) {
       throw new BatfishException("IsakmpPolicy should be null!");
     }
-    _currentIsakmpPolicy = new IsakmpPolicy(ctx.name.getText(), ctx.getStart().getLine());
+    /* Pad priority number with zeros, so string sorting sorts in numerical order too */
+    String priority = String.format("%03d", toInteger(ctx.priority));
+    _currentIsakmpPolicy = new IsakmpPolicy(priority, ctx.getStart().getLine());
     _currentIsakmpPolicy.getProposal().setAuthenticationAlgorithm(IkeAuthenticationAlgorithm.SHA1);
-    defineStructure(ISAKMP_POLICY, ctx.name.getText(), ctx);
+    defineStructure(ISAKMP_POLICY, priority, ctx);
+    /* Isakmp policies are checked in order not explicitly referenced, so add a self-reference
+    here */
+    _configuration.referenceStructure(
+        ISAKMP_POLICY, priority, ISAKMP_POLICY_SELF_REF, ctx.priority.getLine());
   }
 
   @Override
@@ -1524,6 +1582,10 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     }
     _currentIsakmpProfile = new IsakmpProfile(ctx.name.getText(), ctx.getStart().getLine());
     defineStructure(ISAKMP_PROFILE, ctx.name.getText(), ctx);
+    /* Isakmp profiles are checked against for matches not explicitly referenced, so add a
+    self-reference here */
+    _configuration.referenceStructure(
+        ISAKMP_PROFILE, ctx.name.getText(), ISAKMP_PROFILE_SELF_REF, ctx.name.start.getLine());
   }
 
   @Override
@@ -2152,15 +2214,51 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void exitOgn_group_object(Ogn_group_objectContext ctx) {
+    String name = ctx.name.getText();
+    _currentNetworkObjectGroup.getLines().add(new IpSpaceReference(name));
+    _configuration.referenceStructure(
+        NETWORK_OBJECT_GROUP, name, NETWORK_OBJECT_GROUP_GROUP_OBJECT, ctx.name.start.getLine());
+  }
+
+  @Override
   public void exitOgn_host_ip(Ogn_host_ipContext ctx) {
-    _currentNetworkObjectGroup.getLines().add(new IpWildcard(toIp(ctx.ip)));
+    _currentNetworkObjectGroup.getLines().add(new IpWildcard(toIp(ctx.ip)).toIpSpace());
   }
 
   @Override
   public void exitOgn_ip_with_mask(Ogn_ip_with_maskContext ctx) {
     Ip ip = toIp(ctx.ip);
     Ip mask = toIp(ctx.mask);
-    _currentNetworkObjectGroup.getLines().add(new IpWildcard(new Prefix(ip, mask)));
+    _currentNetworkObjectGroup.getLines().add(new IpWildcard(new Prefix(ip, mask)).toIpSpace());
+  }
+
+  @Override
+  public void exitOgn_network_object(Ogn_network_objectContext ctx) {
+    IpSpace ipSpace = null;
+    if (ctx.prefix != null) {
+      ipSpace = new IpWildcard(ctx.prefix.getText()).toIpSpace();
+    } else if (ctx.wildcard_address != null && ctx.wildcard_mask != null) {
+      // Mask needs to be inverted since zeros are don't-cares in this context
+      ipSpace =
+          new IpWildcard(toIp(ctx.wildcard_address), toIp(ctx.wildcard_mask).inverted())
+              .toIpSpace();
+    } else if (ctx.address != null) {
+      ipSpace = new IpWildcard(ctx.address.getText()).toIpSpace();
+    } else if (ctx.name != null) {
+      String name = ctx.name.getText();
+      ipSpace = new IpSpaceReference(name);
+      _configuration.referenceStructure(
+          NETWORK_OBJECT_GROUP,
+          name,
+          NETWORK_OBJECT_GROUP_NETWORK_OBJECT,
+          ctx.name.start.getLine());
+    }
+    if (ipSpace == null) {
+      _w.redFlag("Unimplemented object-group network line: " + getFullText(ctx));
+    } else {
+      _currentNetworkObjectGroup.getLines().add(ipSpace);
+    }
   }
 
   @Override
@@ -3466,9 +3564,9 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         net.setSummaryOnly(summaryOnly);
         if (ctx.mapname != null) {
           String mapName = ctx.mapname.getText();
-          int mapLine = ctx.mapname.getStart().getLine();
           net.setAttributeMap(mapName);
-          net.setAttributeMapLine(mapLine);
+          _configuration.referenceStructure(
+              ROUTE_MAP, mapName, BGP_AGGREGATE_ATTRIBUTE_MAP, ctx.mapname.getStart().getLine());
         }
         proc.getAggregateNetworks().put(prefix, net);
       } else if (ctx.ipv6_prefix != null) {
@@ -3479,9 +3577,9 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         net.setSummaryOnly(summaryOnly);
         if (ctx.mapname != null) {
           String mapName = ctx.mapname.getText();
-          int mapLine = ctx.mapname.getStart().getLine();
           net.setAttributeMap(mapName);
-          net.setAttributeMapLine(mapLine);
+          _configuration.referenceStructure(
+              ROUTE_MAP, mapName, BGP_AGGREGATE_ATTRIBUTE_MAP, ctx.mapname.getStart().getLine());
         }
         proc.getAggregateIpv6Networks().put(prefix6, net);
       }
@@ -3494,9 +3592,9 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
 
     } else if (ctx.mapname != null) {
       String map = ctx.mapname.getText();
-      int line = ctx.mapname.getStart().getLine();
       _configuration.getBgpVrfAggregateAddressRouteMaps().add(map);
-      _configuration.referenceStructure(ROUTE_MAP, map, BGP_VRF_AGGREGATE_ROUTE_MAP, line);
+      _configuration.referenceStructure(
+          ROUTE_MAP, map, BGP_VRF_AGGREGATE_ROUTE_MAP, ctx.mapname.getStart().getLine());
     }
   }
 
@@ -3881,6 +3979,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       int line = ctx.map.getStart().getLine();
       _currentPeerGroup.setDefaultOriginateMap(mapName);
       _currentPeerGroup.setDefaultOriginateMapLine(line);
+      _configuration.referenceStructure(ROUTE_MAP, mapName, BGP_DEFAULT_ORIGINATE_ROUTE_MAP, line);
     }
   }
 
@@ -4427,6 +4526,31 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void exitIf_channel_group(If_channel_groupContext ctx) {
+    int num = toInteger(ctx.num);
+    String name = computeAggregatedInterfaceName(num, _format);
+    _currentInterfaces.forEach(i -> i.setChannelGroup(name));
+  }
+
+  private @Nullable String computeAggregatedInterfaceName(int num, ConfigurationFormat format) {
+    switch (format) {
+      case CISCO_ASA:
+      case ARISTA:
+      case FORCE10:
+      case CISCO_IOS:
+      case CISCO_NX:
+        return String.format("Port-Channel%d", num);
+
+      case CISCO_IOS_XR:
+        return String.format("Bundle-Ethernet%d", num);
+
+      default:
+        _w.redFlag("Don't know how to compute aggregated-interface name for format: " + format);
+        return null;
+    }
+  }
+
+  @Override
   public void exitIf_ip_access_group(If_ip_access_groupContext ctx) {
     String name = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
@@ -4602,6 +4726,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       currentInterface.setRoutingPolicy(policyName);
       currentInterface.setRoutingPolicyLine(policyLine);
     }
+    _configuration.referenceStructure(
+        ROUTE_MAP, policyName, INTERFACE_POLICY_ROUTING_MAP, policyLine);
   }
 
   @Override
@@ -4675,6 +4801,32 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   @Override
   public void exitIf_spanning_tree(If_spanning_treeContext ctx) {
     _no = false;
+  }
+
+  @Override
+  public void exitIf_speed_eos(If_speed_eosContext ctx) {
+    double bandwidth = toBandwidth(ctx.eos_bandwidth_specifier());
+    _currentInterfaces.forEach(i -> i.setBandwidth(bandwidth));
+  }
+
+  private double toBandwidth(Eos_bandwidth_specifierContext ctx) {
+    if (ctx.FORTYG_FULL() != null) {
+      return 40E9D;
+    } else if (ctx.TEN_THOUSAND_FULL() != null) {
+      return 10E9D;
+    } else if (ctx.ONE_HUNDRED_FULL() != null) {
+      return 100E6D;
+    } else if (ctx.ONE_THOUSAND_FULL() != null) {
+      return 1E9D;
+    } else {
+      throw convError(Double.class, ctx);
+    }
+  }
+
+  @Override
+  public void exitIf_speed_ios(If_speed_iosContext ctx) {
+    int mbits = toInteger(ctx.mbits);
+    _currentInterfaces.forEach(i -> i.setBandwidth(mbits * 1E6D));
   }
 
   @Override
@@ -5596,6 +5748,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (ctx.mapname != null) {
       map = ctx.mapname.getText();
       mapLine = ctx.mapname.getStart().getLine();
+      _configuration.referenceStructure(ROUTE_MAP, map, BGP_NETWORK_ORIGINATION_ROUTE_MAP, mapLine);
     }
     BgpNetwork bgpNetwork = new BgpNetwork(prefix, map, mapLine);
     BgpProcess proc = currentVrf().getBgpProcess();
@@ -5610,6 +5763,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (ctx.mapname != null) {
       map = ctx.mapname.getText();
       mapLine = ctx.mapname.getStart().getLine();
+      _configuration.referenceStructure(
+          ROUTE_MAP, map, BGP_NETWORK6_ORIGINATION_ROUTE_MAP, mapLine);
     }
     BgpProcess proc = currentVrf().getBgpProcess();
     BgpNetwork6 bgpNetwork6 = new BgpNetwork6(prefix6, map, mapLine);
@@ -5975,15 +6130,20 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   public void exitPrefix_list_bgp_tail(Prefix_list_bgp_tailContext ctx) {
     String listName = ctx.list_name.getText();
     int line = ctx.list_name.getLine();
+    CiscoStructureType type = _inIpv6BgpPeer ? PREFIX6_LIST : PREFIX_LIST;
+    CiscoStructureUsage usage;
     if (ctx.IN() != null) {
       _currentPeerGroup.setInboundPrefixList(listName);
       _currentPeerGroup.setInboundPrefixListLine(line);
+      usage = _inIpv6BgpPeer ? BGP_INBOUND_PREFIX6_LIST : BGP_INBOUND_PREFIX_LIST;
     } else if (ctx.OUT() != null) {
       _currentPeerGroup.setOutboundPrefixList(listName);
       _currentPeerGroup.setOutboundPrefixListLine(line);
+      usage = _inIpv6BgpPeer ? BGP_OUTBOUND_PREFIX6_LIST : BGP_OUTBOUND_PREFIX_LIST;
     } else {
       throw new BatfishException("bad direction");
     }
+    _configuration.referenceStructure(type, listName, usage, line);
   }
 
   @Override
@@ -6077,6 +6237,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         int mapLine = ctx.map.getStart().getLine();
         r.setRouteMap(map);
         r.setRouteMapLine(mapLine);
+        _configuration.referenceStructure(ROUTE_MAP, map, BGP_REDISTRIBUTE_CONNECTED_MAP, mapLine);
       }
     } else if (_currentIpPeerGroup != null || _currentNamedPeerGroup != null) {
       throw new BatfishException("do not currently handle per-neighbor redistribution policies");
@@ -6125,6 +6286,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         int mapLine = ctx.map.getStart().getLine();
         r.setRouteMap(map);
         r.setRouteMapLine(mapLine);
+        _configuration.referenceStructure(ROUTE_MAP, map, BGP_REDISTRIBUTE_OSPF_MAP, mapLine);
       }
       if (ctx.procnum != null) {
         int procNum = toInteger(ctx.procnum);
@@ -6161,6 +6323,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         int mapLine = ctx.map.getStart().getLine();
         r.setRouteMap(map);
         r.setRouteMapLine(mapLine);
+        _configuration.referenceStructure(ROUTE_MAP, map, BGP_REDISTRIBUTE_RIP_MAP, mapLine);
       }
     } else if (_currentIpPeerGroup != null || _currentNamedPeerGroup != null) {
       throw new BatfishException("do not currently handle per-neighbor redistribution policies");
@@ -6184,6 +6347,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         int mapLine = ctx.map.getStart().getLine();
         r.setRouteMap(map);
         r.setRouteMapLine(mapLine);
+        _configuration.referenceStructure(ROUTE_MAP, map, BGP_REDISTRIBUTE_STATIC_MAP, mapLine);
       }
     } else if (_currentIpPeerGroup != null || _currentNamedPeerGroup != null) {
       throw new BatfishException("do not currently handle per-neighbor redistribution policies");
@@ -6294,9 +6458,11 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       proc.setDefaultInformationMetricType(metricType);
     }
     if (ctx.map != null) {
+      String map = ctx.map.getText();
       int line = ctx.map.getLine();
-      proc.setDefaultInformationOriginateMap(ctx.map.getText());
+      proc.setDefaultInformationOriginateMap(map);
       proc.setDefaultInformationOriginateMapLine(line);
+      _configuration.referenceStructure(ROUTE_MAP, map, OSPF_DEFAULT_ORIGINATE_ROUTE_MAP, line);
     }
   }
 
@@ -6391,6 +6557,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       int mapLine = ctx.map.getLine();
       r.setRouteMap(map);
       r.setRouteMapLine(mapLine);
+      _configuration.referenceStructure(ROUTE_MAP, map, OSPF_REDISTRIBUTE_BGP_MAP, mapLine);
     }
     if (ctx.type != null) {
       int typeInt = toInteger(ctx.type);
@@ -6421,6 +6588,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       int mapLine = ctx.map.getLine();
       r.setRouteMap(map);
       r.setRouteMapLine(mapLine);
+      _configuration.referenceStructure(ROUTE_MAP, map, OSPF_REDISTRIBUTE_CONNECTED_MAP, mapLine);
     }
     if (ctx.type != null) {
       int typeInt = toInteger(ctx.type);
@@ -6456,6 +6624,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       int mapLine = ctx.map.getLine();
       r.setRouteMap(map);
       r.setRouteMapLine(mapLine);
+      _configuration.referenceStructure(ROUTE_MAP, map, OSPF_REDISTRIBUTE_STATIC_MAP, mapLine);
     }
     if (ctx.type != null) {
       int typeInt = toInteger(ctx.type);
@@ -6529,25 +6698,31 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     String mapName = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
     boolean ipv6 = _inIpv6BgpPeer || _currentIpv6PeerGroup != null;
+    CiscoStructureUsage usage;
     if (ctx.IN() != null) {
       if (ipv6) {
         _currentPeerGroup.setInboundRoute6Map(mapName);
         _currentPeerGroup.setInboundRoute6MapLine(line);
+        usage = BGP_INBOUND_ROUTE6_MAP;
       } else {
         _currentPeerGroup.setInboundRouteMap(mapName);
         _currentPeerGroup.setInboundRouteMapLine(line);
+        usage = BGP_INBOUND_ROUTE_MAP;
       }
     } else if (ctx.OUT() != null) {
       if (ipv6) {
         _currentPeerGroup.setOutboundRoute6Map(mapName);
         _currentPeerGroup.setOutboundRoute6MapLine(line);
+        usage = BGP_OUTBOUND_ROUTE6_MAP;
       } else {
         _currentPeerGroup.setOutboundRouteMap(mapName);
         _currentPeerGroup.setOutboundRouteMapLine(line);
+        usage = BGP_OUTBOUND_ROUTE_MAP;
       }
     } else {
       throw new BatfishException("bad direction");
     }
+    _configuration.referenceStructure(ROUTE_MAP, mapName, usage, ctx.getStart().getLine());
   }
 
   @Override
@@ -7877,7 +8052,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (ctx.DEC() != null) {
       int num = toInteger(ctx.DEC());
       return IpProtocol.fromNumber(num);
-    } else if (ctx.AHP() != null) {
+    } else if (ctx.AH() != null || ctx.AHP() != null) {
+      // Different Cisco variants use `ahp` or `ah` to mean the IPSEC authentication header protocol
       return IpProtocol.AHP;
     } else if (ctx.EIGRP() != null) {
       return IpProtocol.EIGRP;

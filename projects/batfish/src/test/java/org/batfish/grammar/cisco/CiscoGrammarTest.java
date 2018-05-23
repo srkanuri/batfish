@@ -1,5 +1,9 @@
 package org.batfish.grammar.cisco;
 
+import static org.batfish.datamodel.matchers.AaaAuthenticationLoginListMatchers.hasMethod;
+import static org.batfish.datamodel.matchers.AaaAuthenticationLoginMatchers.hasListForKey;
+import static org.batfish.datamodel.matchers.AaaAuthenticationMatchers.hasLogin;
+import static org.batfish.datamodel.matchers.AaaMatchers.hasAuthentication;
 import static org.batfish.datamodel.matchers.AndMatchExprMatchers.hasConjuncts;
 import static org.batfish.datamodel.matchers.AndMatchExprMatchers.isAndMatchExprThat;
 import static org.batfish.datamodel.matchers.BgpNeighborMatchers.hasRemoteAs;
@@ -14,6 +18,7 @@ import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasIpSpace;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasVendorFamily;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasVrfs;
 import static org.batfish.datamodel.matchers.DataModelMatchers.hasAclName;
+import static org.batfish.datamodel.matchers.DataModelMatchers.hasBandwidth;
 import static org.batfish.datamodel.matchers.DataModelMatchers.hasIpProtocols;
 import static org.batfish.datamodel.matchers.DataModelMatchers.hasMemberInterfaces;
 import static org.batfish.datamodel.matchers.DataModelMatchers.hasName;
@@ -35,6 +40,7 @@ import static org.batfish.datamodel.matchers.InterfaceMatchers.hasDeclaredNames;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasMtu;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasOspfArea;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.hasVrf;
+import static org.batfish.datamodel.matchers.InterfaceMatchers.isActive;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.isOspfPassive;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.isOspfPointToPoint;
 import static org.batfish.datamodel.matchers.InterfaceMatchers.isProxyArp;
@@ -56,6 +62,7 @@ import static org.batfish.datamodel.matchers.VrfMatchers.hasBgpProcess;
 import static org.batfish.datamodel.matchers.VrfMatchers.hasOspfProcess;
 import static org.batfish.datamodel.matchers.VrfMatchers.hasStaticRoutes;
 import static org.batfish.datamodel.vendor_family.VendorFamilyMatchers.hasCisco;
+import static org.batfish.datamodel.vendor_family.cisco.CiscoFamilyMatchers.hasAaa;
 import static org.batfish.datamodel.vendor_family.cisco.CiscoFamilyMatchers.hasLogging;
 import static org.batfish.datamodel.vendor_family.cisco.LoggingMatchers.isOn;
 import static org.batfish.representation.cisco.CiscoConfiguration.computeCombinedOutgoingAclName;
@@ -165,6 +172,90 @@ public class CiscoGrammarTest {
     Configuration noNewModelConfiguration = parseConfig("aaaNoNewmodel");
     aaaNewmodel = noNewModelConfiguration.getVendorFamily().getCisco().getAaa().getNewModel();
     assertFalse(aaaNewmodel);
+  }
+
+  @Test
+  public void testAaaAuthenticationLogin() throws IOException {
+    // test ASA config
+    Configuration aaaAuthAsaConfiguration = parseConfig("aaaAuthenticationAsa");
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(hasAuthentication(hasLogin(hasListForKey(hasMethod("LOCAL"), "ssh")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(hasLogin(hasListForKey(hasMethod("authServer"), "ssh")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(hasAuthentication(hasLogin(hasListForKey(hasMethod("LOCAL"), "http")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(hasLogin(hasListForKey(hasMethod("authServer"), "http")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(hasAuthentication(hasLogin(hasListForKey(hasMethod("LOCAL"), "serial")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(hasListForKey(not(hasMethod("authServer")), "serial")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(hasListForKey(not(hasMethod("LOCAL")), "telnet")))))));
+    assertThat(
+        aaaAuthAsaConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(hasListForKey(hasMethod("authServer"), "telnet")))))));
+
+    // test IOS config
+    Configuration aaaAuthIosConfiguration = parseConfig("aaaAuthenticationIos");
+    assertThat(
+        aaaAuthIosConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(hasListForKey(hasMethod("grouptacacs+"), "default")))))));
+    assertThat(
+        aaaAuthIosConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(hasLogin(hasListForKey(hasMethod("local"), "default")))))));
+    assertThat(
+        aaaAuthIosConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(hasListForKey(not(hasMethod("groupradius")), "default")))))));
+    assertThat(
+        aaaAuthIosConfiguration,
+        hasVendorFamily(
+            hasCisco(
+                hasAaa(
+                    hasAuthentication(
+                        hasLogin(not(hasListForKey(hasMethod("grouptacacs+"), "ssh"))))))));
   }
 
   @Test
@@ -419,6 +510,16 @@ public class CiscoGrammarTest {
   }
 
   @Test
+  public void testIosInterfaceSpeed() throws IOException {
+    String hostname = "ios-interface-speed";
+    Configuration c = parseConfig(hostname);
+
+    assertThat(c, hasInterface("GigabitEthernet0/0", hasBandwidth(1E9D)));
+    assertThat(c, hasInterface("GigabitEthernet0/1", hasBandwidth(1E9D)));
+    assertThat(c, hasInterface("GigabitEthernet0/2", hasBandwidth(100E6D)));
+  }
+
+  @Test
   public void testIosHttpInspection() throws IOException {
     String hostname = "ios-http-inspection";
     Batfish batfish = getBatfishForConfigurationNames(hostname);
@@ -457,18 +558,57 @@ public class CiscoGrammarTest {
 
   @Test
   public void testIosObjectGroupNetwork() throws IOException {
-    Configuration c = parseConfig("ios-object-group-network");
-    Ip ogn1TestIp = new Ip("1.128.0.0");
-    Ip ogn2TestIp1 = new Ip("2.0.0.0");
-    Ip ogn2TestIp2 = new Ip("2.0.0.1");
+    String hostname = "ios-object-group-network";
+    Configuration c = parseConfig(hostname);
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+    Ip ognWildcardIp = new Ip("1.128.0.0");
+    Ip ognHostIp = new Ip("2.0.0.1");
+    Ip ognUnmatchedIp = new Ip("2.0.0.0");
+
+    String ognNameHost = "ogn_host";
+    String ognNameIndirect = "ogn_indirect";
+    String ognNameNetworkObject = "ogn_network_object";
+    String ognNameNetworkObjectIndirect = "ogn_network_object_indirect";
+    String ognNameUndef = "ogn_undef";
+    String ognNameUnused = "ogn_unused";
+    String ognNameWildcard = "ogn_wildcard";
 
     /* Each object group should permit an IP iff it is in its space. */
-    assertThat(c, hasIpSpace("ogn1", containsIp(ogn1TestIp)));
-    assertThat(c, hasIpSpace("ogn1", not(containsIp(ogn2TestIp1))));
-    assertThat(c, hasIpSpace("ogn2", not(containsIp(ogn1TestIp))));
-    assertThat(c, hasIpSpace("ogn2", containsIp(ogn2TestIp1)));
-    assertThat(c, hasIpSpace("ogn2", containsIp(ogn2TestIp2)));
-    assertThat(c, hasIpSpace("ogn3", not(containsIp(ogn2TestIp2))));
+    assertThat(c, hasIpSpace(ognNameHost, containsIp(ognHostIp)));
+    assertThat(c, hasIpSpace(ognNameHost, not(containsIp(ognUnmatchedIp))));
+    assertThat(c, hasIpSpace(ognNameIndirect, containsIp(ognWildcardIp, c.getIpSpaces())));
+    assertThat(c, hasIpSpace(ognNameIndirect, not(containsIp(ognUnmatchedIp, c.getIpSpaces()))));
+    assertThat(c, hasIpSpace(ognNameNetworkObject, containsIp(ognHostIp)));
+    assertThat(c, hasIpSpace(ognNameNetworkObject, containsIp(ognWildcardIp)));
+    assertThat(c, hasIpSpace(ognNameNetworkObject, not(containsIp(ognUnmatchedIp))));
+    assertThat(c, hasIpSpace(ognNameNetworkObjectIndirect, containsIp(ognHostIp, c.getIpSpaces())));
+    assertThat(
+        c, hasIpSpace(ognNameNetworkObjectIndirect, containsIp(ognWildcardIp, c.getIpSpaces())));
+    assertThat(
+        c,
+        hasIpSpace(ognNameNetworkObjectIndirect, not(containsIp(ognUnmatchedIp, c.getIpSpaces()))));
+    assertThat(c, hasIpSpace(ognNameUnused, not(containsIp(ognUnmatchedIp))));
+    assertThat(c, hasIpSpace(ognNameWildcard, containsIp(ognWildcardIp)));
+    assertThat(c, hasIpSpace(ognNameWildcard, not(containsIp(ognUnmatchedIp))));
+
+    /* Confirm the used object groups have the correct number of referrers */
+    assertThat(
+        ccae,
+        hasNumReferrers(hostname, CiscoStructureType.NETWORK_OBJECT_GROUP, ognNameWildcard, 2));
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.NETWORK_OBJECT_GROUP, ognNameHost, 1));
+    assertThat(
+        ccae,
+        hasNumReferrers(hostname, CiscoStructureType.NETWORK_OBJECT_GROUP, ognNameIndirect, 1));
+    /* Confirm the unused object group has no referrers */
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.NETWORK_OBJECT_GROUP, ognNameUnused, 0));
+    /* Confirm the undefined reference shows up as such */
+    assertThat(
+        ccae,
+        hasUndefinedReference(hostname, CiscoStructureType.NETWORK_OBJECT_GROUP, ognNameUndef));
   }
 
   @Test
@@ -557,7 +697,25 @@ public class CiscoGrammarTest {
 
   @Test
   public void testIosObjectGroupService() throws IOException {
-    Configuration c = parseConfig("ios-object-group-service");
+    String hostname = "ios-object-group-service";
+    Configuration c = parseConfig(hostname);
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+
+    /* Confirm the used object groups have referrers */
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.SERVICE_OBJECT_GROUP, "og-icmp", 2));
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.SERVICE_OBJECT_GROUP, "og-tcp", 1));
+    /* Confirm the unused object group has no referrers */
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.SERVICE_OBJECT_GROUP, "og-udp", 0));
+    /* Confirm the undefined reference shows up as such */
+    assertThat(
+        ccae,
+        hasUndefinedReference(
+            hostname, CiscoStructureType.PROTOCOL_OR_SERVICE_OBJECT_GROUP, "og-undef"));
 
     /* og-icmp */
     assertThat(
@@ -702,6 +860,44 @@ public class CiscoGrammarTest {
     assertThat(
         defaults.getDefaultVrf().getOspfProcess().getReferenceBandwidth(),
         equalTo(getReferenceOspfBandwidth(ConfigurationFormat.CISCO_IOS)));
+  }
+
+  @Test
+  public void testIosPrefixList() throws IOException {
+    String hostname = "ios-prefix-list";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+
+    /* Confirm prefix list uses are counted correctly */
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.PREFIX_LIST, "pre_list", 2));
+    assertThat(
+        ccae, hasNumReferrers(hostname, CiscoStructureType.PREFIX_LIST, "pre_list_unused", 0));
+
+    /* Confirm undefined prefix lists are detected in different contexts */
+    /* Bgp neighbor context */
+    assertThat(
+        ccae, hasUndefinedReference(hostname, CiscoStructureType.PREFIX_LIST, "pre_list_undef1"));
+    /* Route-map match context */
+    assertThat(
+        ccae, hasUndefinedReference(hostname, CiscoStructureType.PREFIX_LIST, "pre_list_undef2"));
+  }
+
+  @Test
+  public void testIosRouteMap() throws IOException {
+    String hostname = "ios-route-map";
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+
+    /* Confirm route map uses are counted correctly */
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.ROUTE_MAP, "rm_if", 1));
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.ROUTE_MAP, "rm_ospf", 4));
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.ROUTE_MAP, "rm_bgp", 9));
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.ROUTE_MAP, "rm_unused", 0));
+
+    /* Confirm undefined route-map is detected */
+    assertThat(ccae, hasUndefinedReference(hostname, CiscoStructureType.ROUTE_MAP, "rm_undef"));
   }
 
   @Test
@@ -1280,6 +1476,20 @@ public class CiscoGrammarTest {
             containsString(
                 String.format(
                     "No remote-as set for peer: %s", neighborWithoutRemoteAs.getStartIp()))));
+  }
+
+  @Test
+  public void testEosPortChannel() throws IOException {
+    String hostname = "eos-port-channel";
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    Configuration c = batfish.loadConfigurations().get(hostname);
+
+    assertThat(c, hasInterface("Ethernet0", hasBandwidth(40E9D)));
+    assertThat(c, hasInterface("Ethernet1", hasBandwidth(40E9D)));
+    assertThat(c, hasInterface("Ethernet2", hasBandwidth(40E9D)));
+    assertThat(c, hasInterface("Port-Channel1", hasBandwidth(80E9D)));
+    assertThat(c, hasInterface("Port-Channel2", isActive(false)));
   }
 
   @Test
