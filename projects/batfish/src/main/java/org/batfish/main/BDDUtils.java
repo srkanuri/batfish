@@ -1,6 +1,8 @@
 package org.batfish.main;
 
 import com.google.common.collect.Streams;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -167,5 +169,30 @@ public class BDDUtils {
     int numInitialPredicates = initialPredicates.size();
 
     return atomicPredicates.atomize(initialPredicates);
+  }
+
+  public BDD acceptedAndDropped() {
+    List<BDD> accepts =
+        computeVrfAcceptBDDs()
+            .values()
+            .stream()
+            .map(Map::values)
+            .flatMap(Collection::stream)
+            .collect(Collectors.toList());
+    List<BDD> drops =
+        computeVrfDropBDDs()
+            .values()
+            .stream()
+            .map(Map::values)
+            .flatMap(Collection::stream)
+            .collect(Collectors.toList());
+
+    BDD r = _factory.zero();
+    for (BDD accept : accepts) {
+      for (BDD drop : drops) {
+        r = r.orWith(accept.and(drop));
+      }
+    }
+    return r;
   }
 }

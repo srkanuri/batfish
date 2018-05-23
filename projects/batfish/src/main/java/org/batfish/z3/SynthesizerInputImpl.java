@@ -263,7 +263,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
             : UniverseIpSpace.INSTANCE;
 
     BDDUtils bddUtils = new BDDUtils(_configurations, builder._forwardingAnalysis);
-    BDD specializeBDD = bddUtils.anyVrfAccepts(); // .and(bddUtils.anyVrfDrops());
+    BDD specializeBDD = bddUtils.acceptedAndDropped();
 
     _ipSpaceSpecializers =
         toImmutableMap(
