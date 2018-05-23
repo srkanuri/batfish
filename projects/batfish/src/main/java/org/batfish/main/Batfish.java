@@ -16,7 +16,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
-import com.google.common.collect.Streams;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
 import java.io.File;
@@ -55,8 +54,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.sf.javabdd.BDD;
-import net.sf.javabdd.BDDFactory;
-import net.sf.javabdd.JFactory;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
@@ -191,9 +188,6 @@ import org.batfish.specifier.SpecifierContextImpl;
 import org.batfish.specifier.VrfLocation;
 import org.batfish.symbolic.abstraction.BatfishCompressor;
 import org.batfish.symbolic.abstraction.Roles;
-import org.batfish.symbolic.bdd.AtomicPredicates;
-import org.batfish.symbolic.bdd.BDDInteger;
-import org.batfish.symbolic.bdd.IpSpaceToBDD;
 import org.batfish.symbolic.smt.PropertyChecker;
 import org.batfish.vendor.VendorConfiguration;
 import org.batfish.z3.AclLine;
@@ -4279,7 +4273,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Set<String> requiredTransitNodes = parameters.getRequiredTransitNodes();
     ForwardingAnalysis forwardingAnalysis = loadForwardingAnalysis(configurations, dataPlane);
 
-    Set<BDD> atoms = computeAtomicPredicates(forwardingAnalysis, configurations);
+    Set<BDD> atoms = BDDUtils.computeAtomicPredicates(forwardingAnalysis, configurations);
 
     Synthesizer dataPlaneSynthesizer =
         synthesizeDataPlane(
@@ -4396,44 +4390,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     AnswerElement answerElement = getHistory();
     return answerElement;
-  }
-
-  private Set<BDD> computeAtomicPredicates(
-      ForwardingAnalysis forwardingAnalysis, Map<String, Configuration> configurations) {
-
-    BDDFactory factory = JFactory.init(10000, 1000);
-    factory.disableReorder();
-    factory.setCacheRatio(64);
-    factory.setVarNum(32); // reserve 32 1-bit variables
-    BDDInteger ipAddrBdd = BDDInteger.makeFromIndex(factory, 32, 0, true);
-    IpSpaceToBDD ipSpaceToBdd = new IpSpaceToBDD(factory, ipAddrBdd);
-    AtomicPredicates atomicPredicates = new AtomicPredicates(factory);
-
-    long timeInitialPredicates = System.currentTimeMillis();
-    Set<BDD> initialPredicates =
-        Streams.concat(
-                forwardingAnalysis.getArpTrueEdge().values().stream(),
-                forwardingAnalysis
-                    .getNeighborUnreachable()
-                    .values()
-                    .stream()
-                    .flatMap(map -> map.values().stream().flatMap(map2 -> map2.values().stream())),
-                forwardingAnalysis
-                    .getNullRoutedIps()
-                    .values()
-                    .stream()
-                    .flatMap(map -> map.values().stream()),
-                forwardingAnalysis
-                    .getRoutableIps()
-                    .values()
-                    .stream()
-                    .flatMap(map -> map.values().stream()))
-            .map(ipSpaceToBdd::visit)
-            .collect(Collectors.toSet());
-    timeInitialPredicates = System.currentTimeMillis() - timeInitialPredicates;
-    int numInitialPredicates = initialPredicates.size();
-
-    return atomicPredicates.atomize(initialPredicates);
   }
 
   @Override
