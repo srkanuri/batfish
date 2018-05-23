@@ -54,7 +54,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import net.sf.javabdd.BDD;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
@@ -4295,7 +4294,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Set<String> requiredTransitNodes = parameters.getRequiredTransitNodes();
     ForwardingAnalysis forwardingAnalysis = loadForwardingAnalysis(configurations, dataPlane);
 
-    Set<BDD> atoms = BDDUtils.computeAtomicPredicates(forwardingAnalysis, configurations);
+    // Set<BDD> atoms = BDDUtils.computeAtomicPredicates(forwardingAnalysis, configurations);
 
     Synthesizer dataPlaneSynthesizer =
         synthesizeDataPlane(
@@ -4401,7 +4400,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                       query,
                       chunkIngressLocationsBySrcIpConstraint,
                       tag,
-                      parameters.getSpecialize());
+                      true /* parameters.getSpecialize()*/);
                 })
             .collect(Collectors.toList());
 

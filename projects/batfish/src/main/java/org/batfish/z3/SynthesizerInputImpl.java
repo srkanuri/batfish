@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import net.sf.javabdd.BDD;
 import org.batfish.common.BatfishException;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.AclIpSpace;
@@ -42,6 +43,7 @@ import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.UniverseIpSpace;
+import org.batfish.main.BDDUtils;
 import org.batfish.specifier.Location;
 import org.batfish.z3.expr.BooleanExpr;
 import org.batfish.z3.expr.IntExpr;
@@ -259,12 +261,17 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
                 AclIpSpace.difference(headerSpace.getDstIps(), headerSpace.getNotDstIps()),
                 UniverseIpSpace.INSTANCE)
             : UniverseIpSpace.INSTANCE;
+
+    BDDUtils bddUtils = new BDDUtils(_configurations, builder._forwardingAnalysis);
+    BDD specializeBDD = bddUtils.anyVrfAccepts(); // .and(bddUtils.anyVrfDrops());
+
     _ipSpaceSpecializers =
         toImmutableMap(
             _namedIpSpaces,
             Entry::getKey,
             namedIpSpacesEntry ->
-                new IpSpaceSpecializer(_specializationIpSpace, namedIpSpacesEntry.getValue()));
+                new BDDIpSpaceSpecializer(
+                    specializeBDD, bddUtils.getIpSpaceToBDD(), namedIpSpacesEntry.getValue()));
     _ipAccessListSpecializers =
         builder._specialize
             ? toImmutableMap(

@@ -10,6 +10,7 @@ import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
+import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.ForwardingAnalysis;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.Vrf;
@@ -26,7 +27,10 @@ public class BDDUtils {
   private final IpSpaceToBDD _ipSpaceToBDD;
   private final ForwardingAnalysis _forwardingAnalysis;
 
-  BDDUtils(ForwardingAnalysis forwardingAnalysis) {
+  private final Map<String, Configuration> _configs;
+
+  public BDDUtils(
+      Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
     _factory = JFactory.init(10000, 1000);
     _factory.disableReorder();
     _factory.setCacheRatio(64);
@@ -36,12 +40,36 @@ public class BDDUtils {
     _ipSpaceToBDD = new IpSpaceToBDD(_factory, _ipAddrBdd);
     _bddOps = new BDDOps(_factory);
     _forwardingAnalysis = forwardingAnalysis;
+
+    _configs = configurations;
   }
 
-  private Map<String, Map<String, BDD>> computeVrfAcceptBDDs(Map<String, Configuration> configs) {
+  public IpSpaceToBDD getIpSpaceToBDD() {
+    return _ipSpaceToBDD;
+  }
+
+  public BDD anyVrfAccepts() {
+    return _bddOps.or(
+        computeVrfAcceptBDDs()
+            .values()
+            .stream()
+            .flatMap(nodeMap -> nodeMap.values().stream())
+            .collect(Collectors.toList()));
+  }
+
+  public BDD anyVrfDrops() {
+    return _bddOps.or(
+        computeVrfDropBDDs()
+            .values()
+            .stream()
+            .flatMap(nodeMap -> nodeMap.values().stream())
+            .collect(Collectors.toList()));
+  }
+
+  public Map<String, Map<String, BDD>> computeVrfAcceptBDDs() {
     Map<String, Map<String, IpSpace>> vrfOwnedIpSpaces =
         CommonUtil.computeVrfOwnedIpSpaces(
-            CommonUtil.computeIpVrfOwners(false, CommonUtil.computeNodeInterfaces(configs)));
+            CommonUtil.computeIpVrfOwners(false, CommonUtil.computeNodeInterfaces(_configs)));
 
     return CommonUtil.toImmutableMap(
         vrfOwnedIpSpaces,
@@ -53,9 +81,9 @@ public class BDDUtils {
                 vrfEntry -> vrfEntry.getValue().accept(new IpSpaceToBDD(_factory, _ipAddrBdd))));
   }
 
-  private Map<String, Map<String, BDD>> computeVrfDropBDDs(Map<String, Configuration> configs) {
+  public Map<String, Map<String, BDD>> computeVrfDropBDDs() {
     return CommonUtil.toImmutableMap(
-        configs,
+        _configs,
         Entry::getKey,
         nodeEntry ->
             CommonUtil.toImmutableMap(
@@ -85,7 +113,7 @@ public class BDDUtils {
                       _forwardingAnalysis
                           .getArpReplies()
                           .get(node)
-                          .get(iface.getName())
+                          .getOrDefault(iface.getName(), EmptyIpSpace.INSTANCE)
                           .accept(_ipSpaceToBDD);
                   BDD aclOut = BDDAcl.create(iface.getOutgoingFilter()).getBdd();
                   return arpTrue.and(aclOut.not());

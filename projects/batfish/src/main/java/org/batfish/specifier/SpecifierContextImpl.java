@@ -1,5 +1,6 @@
 package org.batfish.specifier;
 
+import com.google.common.collect.ImmutableSortedSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -9,6 +10,7 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.main.Batfish;
 import org.batfish.role.NodeRole;
+import org.batfish.role.NodeRoleDimension;
 
 public class SpecifierContextImpl implements SpecifierContext {
   private final @Nonnull Batfish _batfish;
@@ -40,7 +42,10 @@ public class SpecifierContextImpl implements SpecifierContext {
   @Nonnull
   @Override
   public Set<NodeRole> getNodeRolesByDimension(String dimension) {
-    return _batfish.getNodeRoleDimension(dimension).getRoles();
+    return _batfish
+        .getNodeRoleDimension(dimension)
+        .map(NodeRoleDimension::getRoles)
+        .orElse(ImmutableSortedSet.of());
   }
 
   @Override

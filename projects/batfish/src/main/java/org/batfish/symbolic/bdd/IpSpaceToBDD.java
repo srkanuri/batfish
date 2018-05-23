@@ -39,6 +39,9 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
     return (BDD) o;
   }
 
+  public BDD[] getBitBDDs() {
+    return _bitBDDs.clone();
+  }
   /*
    * Check if the first length bits match the BDDInteger
    * representing the advertisement prefix.

@@ -36,9 +36,9 @@ import org.batfish.datamodel.acl.TrueExpr;
 public class IpAccessListSpecializer implements GenericAclLineMatchExprVisitor<AclLineMatchExpr> {
   private final boolean _canSpecialize;
   private final HeaderSpace _headerSpace;
-  private final IpSpaceSpecializer _dstIpSpaceSpecializer;
-  private final IpSpaceSpecializer _srcIpSpaceSpecializer;
-  private final IpSpaceSpecializer _srcOrDstIpSpaceSpecializer;
+  private final IpSpaceIpSpaceSpecializer _dstIpSpaceSpecializer;
+  private final IpSpaceIpSpaceSpecializer _srcIpSpaceSpecializer;
+  private final IpSpaceIpSpaceSpecializer _srcOrDstIpSpaceSpecializer;
 
   public IpAccessListSpecializer(HeaderSpace headerSpace, Map<String, IpSpace> namedIpSpaces) {
     _headerSpace = headerSpace;
@@ -62,11 +62,13 @@ public class IpAccessListSpecializer implements GenericAclLineMatchExprVisitor<A
             || notSrcIps != null;
 
     _dstIpSpaceSpecializer =
-        new IpSpaceSpecializer(difference(union(dstIps, srcOrDstIps), notDstIps), namedIpSpaces);
+        new IpSpaceIpSpaceSpecializer(
+            difference(union(dstIps, srcOrDstIps), notDstIps), namedIpSpaces);
     _srcIpSpaceSpecializer =
-        new IpSpaceSpecializer(difference(union(srcIps, srcOrDstIps), notSrcIps), namedIpSpaces);
+        new IpSpaceIpSpaceSpecializer(
+            difference(union(srcIps, srcOrDstIps), notSrcIps), namedIpSpaces);
     _srcOrDstIpSpaceSpecializer =
-        new IpSpaceSpecializer(
+        new IpSpaceIpSpaceSpecializer(
             difference(union(srcIps, dstIps, srcOrDstIps), union(notSrcIps, notDstIps)),
             namedIpSpaces);
   }
