@@ -23,12 +23,9 @@ import org.batfish.datamodel.visitors.IpSpaceMayIntersectWildcard;
 public class IpSpaceIpSpaceSpecializer extends IpSpaceSpecializer {
   private final IpSpace _ipSpace;
 
-  private final Map<String, IpSpace> _namedIpSpaces;
-
   public IpSpaceIpSpaceSpecializer(IpSpace ipSpace, Map<String, IpSpace> namedIpSpaces) {
     super(namedIpSpaces);
     _ipSpace = new IpSpaceSimplifier(namedIpSpaces).simplify(ipSpace);
-    _namedIpSpaces = ImmutableMap.copyOf(namedIpSpaces);
   }
 
   /**

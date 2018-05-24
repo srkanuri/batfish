@@ -271,7 +271,7 @@ public final class SynthesizerInputImpl implements SynthesizerInput {
             Entry::getKey,
             namedIpSpacesEntry ->
                 new BDDIpSpaceSpecializer(
-                    specializeBDD, bddUtils.getIpSpaceToBDD(), namedIpSpacesEntry.getValue()));
+                    specializeBDD, namedIpSpacesEntry.getValue(), bddUtils.getIpSpaceToBDD()));
     _ipAccessListSpecializers =
         builder._specialize
             ? toImmutableMap(

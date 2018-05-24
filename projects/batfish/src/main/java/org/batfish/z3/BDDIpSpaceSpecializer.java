@@ -1,28 +1,51 @@
 package org.batfish.z3;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.sf.javabdd.BDD;
+import net.sf.javabdd.BDDFactory;
+import net.sf.javabdd.JFactory;
 import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.UniverseIpSpace;
+import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.IpSpaceToBDD;
 
 public final class BDDIpSpaceSpecializer extends IpSpaceSpecializer {
   private final BDD _bdd;
   private final IpSpaceToBDD _ipSpaceToBDD;
-  private final Map<String, IpSpace> _namedIpSpaces;
 
+  public BDDIpSpaceSpecializer(IpSpace ipSpace, Map<String, IpSpace> namedIpSpaces) {
+    super(namedIpSpaces);
+
+    BDDFactory factory = JFactory.init(10000, 1000);
+    factory.disableReorder();
+    factory.setCacheRatio(64);
+    factory.setVarNum(32); // reserve 32 1-bit variables
+
+    BDDInteger ipAddrBdd = BDDInteger.makeFromIndex(factory, 32, 0, true);
+
+    _ipSpaceToBDD = new IpSpaceToBDD(factory, ipAddrBdd, namedIpSpaces);
+    _bdd = ipSpace.accept(_ipSpaceToBDD);
+  }
+
+  /**
+   * If you provide the specialization IpSpace as a BDD, you must also provide the IpSpaceToBDD
+   * object (which contains a BDDFactory, because we have to keep using the same BDDFactory that
+   * created the input BDD.
+   *
+   * @param bdd The IpSpace to specialize to.
+   * @param namedIpSpaces The named IpSpaces currently in scope.
+   * @param ipSpaceToBDD Converts IpSpaces to BDDs
+   */
   public BDDIpSpaceSpecializer(
-      BDD bdd, IpSpaceToBDD ipSpaceToBDD, Map<String, IpSpace> namedIpSpaces) {
+      BDD bdd, Map<String, IpSpace> namedIpSpaces, IpSpaceToBDD ipSpaceToBDD) {
     super(namedIpSpaces);
     _bdd = bdd;
     _ipSpaceToBDD = ipSpaceToBDD;
-    _namedIpSpaces = ImmutableMap.copyOf(namedIpSpaces);
   }
 
   @Override
@@ -31,7 +54,7 @@ public final class BDDIpSpaceSpecializer extends IpSpaceSpecializer {
         blacklist.stream().map(_ipSpaceToBDD::toBDD).map(BDD::not).reduce(_bdd, BDD::and);
     return refinedBDD.isZero()
         ? Optional.empty()
-        : Optional.of(new BDDIpSpaceSpecializer(refinedBDD, _ipSpaceToBDD, _namedIpSpaces));
+        : Optional.of(new BDDIpSpaceSpecializer(refinedBDD, _namedIpSpaces, _ipSpaceToBDD));
   }
 
   @Override

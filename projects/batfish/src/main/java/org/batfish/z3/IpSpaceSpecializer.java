@@ -26,7 +26,7 @@ import org.batfish.datamodel.visitors.GenericIpSpaceVisitor;
 
 public abstract class IpSpaceSpecializer implements GenericIpSpaceVisitor<IpSpace> {
   private final IpSpaceSimplifier _simplifier;
-  private final Map<String, IpSpace> _namedIpSpaces;
+  protected final Map<String, IpSpace> _namedIpSpaces;
   private final Map<String, IpSpace> _specializedNamedIpSpaces;
 
   protected IpSpaceSpecializer(Map<String, IpSpace> namedIpSpaces) {

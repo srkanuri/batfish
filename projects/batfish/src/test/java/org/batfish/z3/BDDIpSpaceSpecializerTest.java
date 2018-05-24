@@ -39,11 +39,11 @@ public class BDDIpSpaceSpecializerTest {
   }
 
   private BDDIpSpaceSpecializer specializer(BDD specializeBDD) {
-    return new BDDIpSpaceSpecializer(specializeBDD, _toBdd, ImmutableMap.of());
+    return new BDDIpSpaceSpecializer(specializeBDD, ImmutableMap.of(), _toBdd);
   }
 
   private BDDIpSpaceSpecializer specializer(IpSpace specializeIpSpace) {
-    return new BDDIpSpaceSpecializer(_toBdd.visit(specializeIpSpace), _toBdd, ImmutableMap.of());
+    return new BDDIpSpaceSpecializer(_toBdd.visit(specializeIpSpace), ImmutableMap.of(), _toBdd);
   }
 
   @Test
