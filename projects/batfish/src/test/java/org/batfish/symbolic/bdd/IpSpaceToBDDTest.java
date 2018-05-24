@@ -6,24 +6,28 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Streams;
 import java.util.Arrays;
+import java.util.Map;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
 import org.batfish.datamodel.AclIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpSpace;
+import org.batfish.datamodel.IpSpaceReference;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.Prefix;
 import org.junit.Before;
 import org.junit.Test;
 
 public class IpSpaceToBDDTest {
-  private BDDFactory _factory;
   private BDDOps _bddOps;
+  private BDDFactory _factory;
   private BDDInteger _ipAddrBdd;
   private IpSpaceToBDD _ipSpaceToBdd;
+  private Map<String, IpSpace> _namedIpSpaces;
 
   @Before
   public void init() {
@@ -33,7 +37,8 @@ public class IpSpaceToBDDTest {
     _factory.setVarNum(32); // reserve 32 1-bit variables
     _bddOps = new BDDOps(_factory);
     _ipAddrBdd = BDDInteger.makeFromIndex(_factory, 32, 0, true);
-    _ipSpaceToBdd = new IpSpaceToBDD(_factory, _ipAddrBdd);
+    _namedIpSpaces = ImmutableMap.of("foo", new Ip("1.2.3.4").toIpSpace());
+    _ipSpaceToBdd = new IpSpaceToBDD(_factory, _ipAddrBdd, _namedIpSpaces);
   }
 
   @Test
@@ -154,5 +159,17 @@ public class IpSpaceToBDDTest {
     IpSpace negIpSpace = aclIpSpace.complement();
     BDD negAclBDD = negIpSpace.accept(_ipSpaceToBdd);
     assertThat(negAclBDD, equalTo(aclBDD.not()));
+  }
+
+  @Test
+  public void testIpSpaceReference() {
+    IpSpace foo = new IpSpaceReference("foo");
+    assertThat(foo.accept(_ipSpaceToBdd), equalTo(_namedIpSpaces.get("foo").accept(_ipSpaceToBdd)));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testIpSpaceReference_undefined() {
+    IpSpace bar = new IpSpaceReference("bar");
+    bar.accept(_ipSpaceToBdd);
   }
 }

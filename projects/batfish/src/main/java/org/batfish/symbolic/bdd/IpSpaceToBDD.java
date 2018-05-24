@@ -1,15 +1,19 @@
 package org.batfish.symbolic.bdd;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
-import org.batfish.common.BatfishException;
 import org.batfish.datamodel.AclIpSpace;
 import org.batfish.datamodel.AclIpSpaceLine;
 import org.batfish.datamodel.EmptyIpSpace;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpIpSpace;
+import org.batfish.datamodel.IpSpace;
 import org.batfish.datamodel.IpSpaceReference;
 import org.batfish.datamodel.IpWildcard;
 import org.batfish.datamodel.IpWildcardIpSpace;
@@ -28,10 +32,24 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
   private final BDDFactory _factory;
 
+  private final Map<String, IpSpace> _namedIpSpaces;
+
+  private final Map<String, BDD> _namedIpSpaceBDDs;
+
   public IpSpaceToBDD(BDDFactory factory, BDDInteger var) {
     _bddOps = new BDDOps(factory);
     _bitBDDs = var.getBitvec();
     _factory = factory;
+    _namedIpSpaces = ImmutableMap.of();
+    _namedIpSpaceBDDs = ImmutableMap.of();
+  }
+
+  public IpSpaceToBDD(BDDFactory factory, BDDInteger var, Map<String, IpSpace> namedIpSpaces) {
+    _bddOps = new BDDOps(factory);
+    _bitBDDs = var.getBitvec();
+    _factory = factory;
+    _namedIpSpaces = ImmutableMap.copyOf(namedIpSpaces);
+    _namedIpSpaceBDDs = new HashMap<>();
   }
 
   @Override
@@ -42,6 +60,7 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
   public BDD[] getBitBDDs() {
     return _bitBDDs.clone();
   }
+
   /*
    * Check if the first length bits match the BDDInteger
    * representing the advertisement prefix.
@@ -125,7 +144,10 @@ public class IpSpaceToBDD implements GenericIpSpaceVisitor<BDD> {
 
   @Override
   public BDD visitIpSpaceReference(IpSpaceReference ipSpaceReference) {
-    throw new BatfishException("IpSpaceReference is unsupported");
+    String name = ipSpaceReference.getName();
+    Preconditions.checkArgument(
+        _namedIpSpaces.containsKey(name), "Undefined IpSpace reference: %s", name);
+    return _namedIpSpaceBDDs.computeIfAbsent(name, k -> _namedIpSpaces.get(name).accept(this));
   }
 
   @Override
