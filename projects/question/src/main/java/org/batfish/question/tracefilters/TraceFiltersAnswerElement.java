@@ -7,6 +7,8 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.LineAction;
+import org.batfish.datamodel.acl.AclTrace;
+import org.batfish.datamodel.acl.TraceEvent;
 import org.batfish.datamodel.answers.Schema;
 import org.batfish.datamodel.pojo.Node;
 import org.batfish.datamodel.questions.DisplayHints;
@@ -24,6 +26,7 @@ public class TraceFiltersAnswerElement extends TableAnswerElement {
   private static final String COLUMN_ACTION = "action";
   private static final String COLUMN_LINE_NUMBER = "lineNumber";
   private static final String COLUMN_LINE_CONTENT = "lineContent";
+  private static final String COLUMN_TRACE = "trace";
 
   /**
    * Creates a {@link TraceFiltersAnswerElement} object the right metadata
@@ -40,7 +43,9 @@ public class TraceFiltersAnswerElement extends TableAnswerElement {
             new ColumnMetadata(COLUMN_FLOW, Schema.FLOW, "Evaluated flow", true, false),
             new ColumnMetadata(COLUMN_ACTION, Schema.STRING, "Outcome", false, true),
             new ColumnMetadata(COLUMN_LINE_NUMBER, Schema.INTEGER, "Line number", false, true),
-            new ColumnMetadata(COLUMN_LINE_CONTENT, Schema.STRING, "Line content", false, true));
+            new ColumnMetadata(COLUMN_LINE_CONTENT, Schema.STRING, "Line content", false, true),
+            new ColumnMetadata(
+                COLUMN_TRACE, Schema.list(Schema.STRING), "Trace events", false, true));
     DisplayHints dhints = question.getDisplayHints();
     if (dhints == null) {
       dhints = new DisplayHints();
@@ -64,20 +69,28 @@ public class TraceFiltersAnswerElement extends TableAnswerElement {
     super(tableMetadata);
   }
 
-  public Row getRow(
+  public static Row createRow(
       String nodeName,
       String filterName,
       Flow flow,
       LineAction action,
       Integer matchLine,
-      String lineContent) {
+      String lineContent,
+      AclTrace trace) {
     RowBuilder row = Row.builder();
     row.put(COLUMN_NODE, new Node(nodeName))
         .put(COLUMN_FILTER_NAME, filterName)
         .put(COLUMN_FLOW, flow)
         .put(COLUMN_ACTION, action)
         .put(COLUMN_LINE_NUMBER, matchLine)
-        .put(COLUMN_LINE_CONTENT, lineContent);
+        .put(COLUMN_LINE_CONTENT, lineContent)
+        .put(
+            COLUMN_TRACE,
+            ImmutableList.copyOf(trace.getEvents())
+                .reverse()
+                .stream()
+                .map(TraceEvent::toString)
+                .collect(ImmutableList.toImmutableList()));
     return row.build();
   }
 }
