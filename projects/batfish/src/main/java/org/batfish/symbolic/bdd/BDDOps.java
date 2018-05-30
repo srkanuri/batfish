@@ -38,4 +38,8 @@ public class BDDOps {
     }
     return result;
   }
+
+  public BDDFactory getBDDFactory() {
+    return _factory;
+  }
 }

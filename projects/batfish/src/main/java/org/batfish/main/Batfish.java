@@ -59,6 +59,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
+import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
+import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -97,6 +99,7 @@ import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.FlowHistory;
 import org.batfish.datamodel.FlowTrace;
 import org.batfish.datamodel.ForwardingAction;
+import org.batfish.datamodel.ForwardingAnalysis;
 import org.batfish.datamodel.GenericConfigObject;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
@@ -4291,6 +4294,17 @@ public class Batfish extends PluginConsumer implements IBatfish {
         false);
   }
 
+  private void atomicPredicates(
+      Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
+    NetworkGraph graph =
+        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis)
+            .networkGraph();
+    Map<String, SortedSet<Integer>> reachableAps = graph.getReachableAps();
+    reachableAps.forEach(
+        (state, reachable) -> System.out.println(String.format("%s: %s", state, reachable)));
+    throw new BatfishException("Done baby");
+  }
+
   @Nonnull
   private Synthesizer synthesizeDataPlane(ResolvedReachabilityParameters parameters) {
     Map<String, Configuration> configs = parameters.getConfigurations();
@@ -4318,6 +4332,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
     _logger.resetTimer();
 
     _logger.info("Synthesizing Z3 logic...");
+
+    atomicPredicates(configurations, forwardingAnalysis);
 
     Synthesizer s =
         new Synthesizer(
