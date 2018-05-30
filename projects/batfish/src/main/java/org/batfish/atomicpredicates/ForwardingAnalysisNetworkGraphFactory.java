@@ -22,6 +22,7 @@ import org.batfish.symbolic.bdd.IpSpaceToBDD;
 
 public class ForwardingAnalysisNetworkGraphFactory {
   private final List<BDD> _apBDDs;
+  private final Map<String, Map<String, SortedSet<Integer>>> _apTransitions;
   private final Map<String, Map<String, BDD>> _bddTransitions;
   private final BDDUtils _bddUtils;
   private final Map<String, Configuration> _configs;
@@ -36,6 +37,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
     _bddTransitions = computeBDDTransitions();
     _apBDDs = computeAPBDDs();
+    _apTransitions = computeAPTransitions(_bddTransitions);
   }
 
   private List<BDD> computeAPBDDs() {
@@ -154,7 +156,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
                         .map(v -> vrf(config.getHostname(), v.getName())))
             .collect(ImmutableSet.toImmutableSet());
 
-    return new NetworkGraph(_apBDDs, roots, computeAPTransitions(computeBDDTransitions()));
+    return new NetworkGraph(_apBDDs, roots, _apTransitions);
   }
 
   private String ifaceVrf(String node, String iface) {

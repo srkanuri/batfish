@@ -1,18 +1,18 @@
 package org.batfish.atomicpredicates;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-import com.google.common.collect.Sets.SetView;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.TreeSet;
 import net.sf.javabdd.BDD;
 
-public class NetworkGraph {
+public final class NetworkGraph {
   private final List<BDD> _atomicPredicates;
 
   // preState --> postState --> predicate
@@ -20,7 +20,7 @@ public class NetworkGraph {
 
   private final Set<String> _graphRoots;
 
-  private final Map<String, SortedSet<Integer>> _reachableAps;
+  private final Map<String, Multimap<Integer, String>> _reachableAps;
 
   NetworkGraph(
       List<BDD> atomicPredicates,
@@ -31,11 +31,11 @@ public class NetworkGraph {
     _transitions = transitions;
     _reachableAps = new HashMap<>();
 
-    SortedSet<Integer> allAps = new TreeSet<>();
-    for (int i = 0; i < _atomicPredicates.size(); i++) {
-      allAps.add(i);
-    }
     for (String root : _graphRoots) {
+      Multimap<Integer, String> allAps = TreeMultimap.create();
+      for (int i = 0; i < _atomicPredicates.size(); i++) {
+        allAps.put(i, root);
+      }
       _reachableAps.put(root, allAps);
     }
 
@@ -50,31 +50,28 @@ public class NetworkGraph {
       Set<String> newDirty = new HashSet<>();
 
       for (String preState : dirty) {
-        SortedSet<Integer> preStateAps = _reachableAps.get(preState);
+        Multimap<Integer, String> preStateAps = _reachableAps.get(preState);
         _transitions
             .get(preState)
             .forEach(
-                (postState, transitionAps) -> {
-                  if (updatePredicates(postState, Sets.intersection(preStateAps, transitionAps))) {
-                    newDirty.add(postState);
-                  }
-                });
+                (postState, transitionAps) ->
+                    transitionAps.forEach(
+                        ap -> {
+                          if (!preStateAps.containsKey(ap)) {
+                            return;
+                          }
+                          Collection<String> sources = preStateAps.get(ap);
+                          if (_reachableAps.get(postState).putAll(ap, sources)) {
+                            newDirty.add(postState);
+                          }
+                        }));
       }
 
       dirty = newDirty;
     }
   }
 
-  private boolean updatePredicates(String state, SetView<Integer> newAps) {
-    if (_reachableAps.containsKey(state)) {
-      return _reachableAps.get(state).addAll(newAps);
-    } else {
-      _reachableAps.put(state, new TreeSet<>(newAps));
-      return true;
-    }
-  }
-
-  public Map<String, SortedSet<Integer>> getReachableAps() {
+  public Map<String, Multimap<Integer, String>> getReachableAps() {
     return _reachableAps;
   }
 }
