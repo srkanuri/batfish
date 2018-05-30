@@ -1,5 +1,6 @@
 package org.batfish.atomicpredicates;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
@@ -52,7 +53,7 @@ public final class NetworkGraph {
       for (String preState : dirty) {
         Multimap<Integer, String> preStateAps = _reachableAps.get(preState);
         _transitions
-            .get(preState)
+            .getOrDefault(preState, ImmutableMap.of())
             .forEach(
                 (postState, transitionAps) ->
                     transitionAps.forEach(
@@ -61,7 +62,9 @@ public final class NetworkGraph {
                             return;
                           }
                           Collection<String> sources = preStateAps.get(ap);
-                          if (_reachableAps.get(postState).putAll(ap, sources)) {
+                          if (_reachableAps
+                              .computeIfAbsent(postState, k -> TreeMultimap.create())
+                              .putAll(ap, sources)) {
                             newDirty.add(postState);
                           }
                         }));

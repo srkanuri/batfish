@@ -37,7 +37,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
     _bddTransitions = computeBDDTransitions();
     _apBDDs = computeAPBDDs();
-    _apTransitions = computeAPTransitions(_bddTransitions);
+    _apTransitions = computeAPTransitions();
   }
 
   private List<BDD> computeAPBDDs() {
@@ -116,10 +116,9 @@ public class ForwardingAnalysisNetworkGraphFactory {
     return bddTransitions;
   }
 
-  private Map<String, Map<String, SortedSet<Integer>>> computeAPTransitions(
-      Map<String, Map<String, BDD>> bddTransitions) {
+  private Map<String, Map<String, SortedSet<Integer>>> computeAPTransitions() {
     return toImmutableMap(
-        bddTransitions,
+        _bddTransitions,
         Entry::getKey,
         preStateEntry ->
             toImmutableMap(

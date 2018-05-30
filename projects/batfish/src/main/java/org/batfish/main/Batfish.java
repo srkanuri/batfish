@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
@@ -4301,7 +4302,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     NetworkGraph graph =
         new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis)
             .networkGraph();
-    Map<String, SortedSet<Integer>> reachableAps = graph.getReachableAps();
+    Map<String, Multimap<Integer, String>> reachableAps = graph.getReachableAps();
     reachableAps.forEach(
         (state, reachable) -> System.out.println(String.format("%s: %s", state, reachable)));
     throw new BatfishException("Done baby");
