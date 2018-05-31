@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.google.common.collect.TreeMultimap;
 import java.util.Collection;
 import java.util.HashMap;
@@ -44,19 +45,11 @@ public final class NetworkGraph {
   }
 
   private void initializeReachableAps() {
-    Set<String> allStates =
-        Sets.union(
-            _transitions.keySet(),
-            _transitions
-                .values()
-                .stream()
-                .map(Map::keySet)
-                .flatMap(Set::stream)
-                .collect(Collectors.toSet()));
-
-    for (String state : allStates) {
-      _reachableAps.put(state, TreeMultimap.create());
-    }
+    Streams.concat(
+            _graphRoots.stream(),
+            _transitions.keySet().stream(),
+            _transitions.values().stream().map(Map::keySet).flatMap(Set::stream))
+        .forEach(state -> _reachableAps.put(state, TreeMultimap.create()));
 
     _graphRoots
         .parallelStream()
