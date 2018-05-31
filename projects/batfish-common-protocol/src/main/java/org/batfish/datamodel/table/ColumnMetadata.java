@@ -6,8 +6,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
 import org.batfish.datamodel.answers.Schema;
 
+@ParametersAreNonnullByDefault
 public class ColumnMetadata {
   private static final String PROP_DESCRIPTION = "description";
   private static final String PROP_IS_KEY = "isKey";
@@ -29,13 +32,32 @@ public class ColumnMetadata {
     this(name, schema, description, null, null);
   }
 
-  @JsonCreator
   public ColumnMetadata(
-      @Nonnull @JsonProperty(PROP_NAME) String name,
-      @Nonnull @JsonProperty(PROP_SCHEMA) Schema schema,
-      @Nonnull @JsonProperty(PROP_DESCRIPTION) String description,
-      @JsonProperty(PROP_IS_KEY) Boolean isKey,
-      @JsonProperty(PROP_IS_VALUE) Boolean isValue) {
+      String name,
+      Schema schema,
+      String description,
+      @Nullable Boolean isKey,
+      @Nullable Boolean isValue) {
+    if (!isLegalColumnName(name)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Illegal column name '%s'. Column names should match '%s",
+              name, COLUMN_NAME_PATTERN.toString()));
+    }
+    _name = name;
+    _schema = schema;
+    _description = description;
+    _isKey = firstNonNull(isKey, true);
+    _isValue = firstNonNull(isValue, true);
+  }
+
+  @JsonCreator
+  private static ColumnMetadata jsonCreator(
+      @Nullable @JsonProperty(PROP_NAME) String name,
+      @Nullable @JsonProperty(PROP_SCHEMA) Schema schema,
+      @Nullable @JsonProperty(PROP_DESCRIPTION) String description,
+      @Nullable @JsonProperty(PROP_IS_KEY) Boolean isKey,
+      @Nullable @JsonProperty(PROP_IS_VALUE) Boolean isValue) {
     if (name == null) {
       throw new IllegalArgumentException("'name' cannot be null for ColumnMetadata");
     }
@@ -51,11 +73,7 @@ public class ColumnMetadata {
               "Illegal column name '%s'. Column names should match '%s",
               name, COLUMN_NAME_PATTERN.toString()));
     }
-    _name = name;
-    _schema = schema;
-    _description = description;
-    _isKey = firstNonNull(isKey, true);
-    _isValue = firstNonNull(isValue, true);
+    return new ColumnMetadata(name, schema, description, isKey, isValue);
   }
 
   public static boolean isLegalColumnName(String name) {

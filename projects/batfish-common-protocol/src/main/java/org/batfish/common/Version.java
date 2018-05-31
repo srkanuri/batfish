@@ -95,13 +95,14 @@ public final class Version {
   // Visible for testing.
   static boolean isCompatibleVersion(
       String myName, String myVersion, String otherName, @Nullable String otherVersion) {
-    otherVersion = firstNonNull(otherVersion, UNKNOWN_VERSION);
+    String effectiveOtherVersion = firstNonNull(otherVersion, UNKNOWN_VERSION);
 
-    if (otherVersion.equals(INCOMPATIBLE_VERSION) || myVersion.equals(INCOMPATIBLE_VERSION)) {
+    if (effectiveOtherVersion.equals(INCOMPATIBLE_VERSION)
+        || myVersion.equals(INCOMPATIBLE_VERSION)) {
       return false;
     }
 
-    if (otherVersion.equals(UNKNOWN_VERSION) || myVersion.equals(UNKNOWN_VERSION)) {
+    if (effectiveOtherVersion.equals(UNKNOWN_VERSION) || myVersion.equals(UNKNOWN_VERSION)) {
       // Either version is unknown, assume compatible.
       return true;
     }

@@ -2,9 +2,9 @@ package org.batfish.client.config;
 
 import java.nio.file.Path;
 import org.batfish.common.BaseSettings;
-import org.batfish.common.BatfishLogger;
 import org.batfish.common.BfConsts;
 import org.batfish.common.CoordConsts;
+import org.batfish.common.BatfishLogger.LogLevel;
 import org.batfish.common.util.CommonUtil;
 
 public class Settings extends BaseSettings {
@@ -192,15 +192,14 @@ public class Settings extends BaseSettings {
 
   private void initConfigDefaults() {
     setDefaultProperty(ARG_API_KEY, CoordConsts.DEFAULT_API_KEY);
-    setDefaultProperty(
-        ARG_BATFISH_LOG_LEVEL, BatfishLogger.getLogLevelStr(BatfishLogger.LEVEL_WARN));
+    setDefaultProperty(ARG_BATFISH_LOG_LEVEL, LogLevel.WARN.toString());
     setDefaultProperty(ARG_COORDINATOR_HOST, "localhost");
     setDefaultProperty(ARG_DATAMODEL_DIR, "datamodel");
     setDefaultProperty(BfConsts.ARG_SSL_DISABLE, CoordConsts.SVC_CFG_WORK_SSL_DISABLE);
     setDefaultProperty(BfConsts.ARG_SSL_TRUST_ALL_CERTS, false);
     setDefaultProperty(ARG_HELP, false);
     setDefaultProperty(ARG_LOG_FILE, null);
-    setDefaultProperty(ARG_LOG_LEVEL, BatfishLogger.getLogLevelStr(BatfishLogger.LEVEL_OUTPUT));
+    setDefaultProperty(ARG_LOG_LEVEL, LogLevel.OUTPUT.toString());
     setDefaultProperty(ARG_NO_SANITY_CHECK, false);
     setDefaultProperty(ARG_PERIOD_CHECK_WORK, 1000);
     setDefaultProperty(ARG_PRETTY_PRINT_ANSWERS, true);

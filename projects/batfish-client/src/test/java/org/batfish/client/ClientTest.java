@@ -107,6 +107,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.batfish.client.answer.LoadQuestionAnswerElement;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
+import org.batfish.common.BatfishLogger.LogLevel;
 import org.batfish.common.BfConsts;
 import org.batfish.common.Pair;
 import org.batfish.common.util.BatfishObjectMapper;
@@ -889,7 +890,7 @@ public class ClientTest {
     // Reading the answer written by load-questions
     Answer answerLoadQuestions =
         _mapper.readValue(
-            client.getLogger().getHistory().toString(BatfishLogger.LEVEL_OUTPUT), Answer.class);
+            client.getLogger().getHistory().toString(LogLevel.OUTPUT.priority()), Answer.class);
     LoadQuestionAnswerElement ae =
         (LoadQuestionAnswerElement) answerLoadQuestions.getAnswerElements().get(0);
 

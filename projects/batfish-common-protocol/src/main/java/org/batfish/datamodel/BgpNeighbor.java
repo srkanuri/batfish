@@ -11,11 +11,13 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
 import org.batfish.common.util.ComparableStructure;
 import org.batfish.datamodel.NetworkFactory.NetworkFactoryBuilder;
 
 /** Represents a configured BGP peering, at the control plane level */
 @JsonSchemaDescription("A configured e/iBGP peering relationship")
+@ParametersAreNonnullByDefault
 public final class BgpNeighbor extends ComparableStructure<Prefix> {
 
   public static class Builder extends NetworkFactoryBuilder<BgpNeighbor> {
@@ -545,7 +547,7 @@ public final class BgpNeighbor extends ComparableStructure<Prefix> {
 
   @JsonProperty(PROP_LOCAL_IP)
   @JsonPropertyDescription("The local (source) IPV4 address of this peering")
-  public Ip getLocalIp() {
+  public @Nullable Ip getLocalIp() {
     return _localIp;
   }
 

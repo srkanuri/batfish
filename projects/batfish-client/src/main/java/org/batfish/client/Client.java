@@ -59,6 +59,7 @@ import org.batfish.client.config.Settings.RunMode;
 import org.batfish.client.params.InitEnvironmentParams;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
+import org.batfish.common.BatfishLogger.LogLevel;
 import org.batfish.common.BfConsts;
 import org.batfish.common.Container;
 import org.batfish.common.CoordConsts;
@@ -2378,7 +2379,7 @@ public class Client extends AbstractClient implements IClient {
       logOutput(outWriter, answerStringToPrint);
 
       // tests serialization/deserialization when running in debug mode
-      if (_logger.getLogLevel() >= BatfishLogger.LEVEL_DEBUG) {
+      if (_logger.getLogLevel().atLeast(LogLevel.DEBUG)) {
         try {
           ObjectMapper reader = BatfishObjectMapper.mapper();
           Answer answer = reader.readValue(answerString, Answer.class);
@@ -2397,7 +2398,7 @@ public class Client extends AbstractClient implements IClient {
       }
     }
     // get and print the log when in debugging mode
-    if (_logger.getLogLevel() >= BatfishLogger.LEVEL_DEBUG) {
+    if (_logger.getLogLevel().atLeast(LogLevel.DEBUG)) {
       _logger.output("---------------- Service Log --------------\n");
       String logFileName = wItem.getId() + BfConsts.SUFFIX_LOG_FILE;
       String downloadedFileStr =
@@ -2428,7 +2429,7 @@ public class Client extends AbstractClient implements IClient {
   private void printWorkStatusResponse(
       Pair<WorkStatusCode, String> response, boolean unconditionalPrint) {
 
-    if (unconditionalPrint || _logger.getLogLevel() >= BatfishLogger.LEVEL_INFO) {
+    if (unconditionalPrint || _logger.getLogLevel().atLeast(LogLevel.INFO)) {
       WorkStatusCode status = response.getFirst();
       _logger.outputf("status: %s\n", status);
 
@@ -2908,7 +2909,7 @@ public class Client extends AbstractClient implements IClient {
       return false;
     }
     String logLevelStr = parameters.get(0).toLowerCase();
-    if (!BatfishLogger.isValidLogLevel(logLevelStr)) {
+    if (LogLevel.valueOf(logLevelStr) == null) {
       _logger.errorf("Undefined loglevel value: %s\n", logLevelStr);
       return false;
     }
@@ -2975,8 +2976,10 @@ public class Client extends AbstractClient implements IClient {
     if (!isValidArgument(options, parameters, 0, 1, 1, Command.SET_LOGLEVEL)) {
       return false;
     }
-    String logLevelStr = parameters.get(0).toLowerCase();
-    if (!BatfishLogger.isValidLogLevel(logLevelStr)) {
+    String logLevelStr = parameters.get(0);
+    try {
+      _logger.setLogLevel(logLevelStr);
+    } catch (IllegalArgumentException | NullPointerException e) {
       _logger.errorf("Undefined loglevel value: %s\n", logLevelStr);
       return false;
     }
@@ -3069,7 +3072,7 @@ public class Client extends AbstractClient implements IClient {
     if (!isValidArgument(options, parameters, 0, 0, 0, Command.SHOW_LOGLEVEL)) {
       return false;
     }
-    _logger.outputf("Current client log level is %s\n", _logger.getLogLevelStr());
+    _logger.outputf("Current client log level is %s\n", _logger.getLogLevel());
     return true;
   }
 

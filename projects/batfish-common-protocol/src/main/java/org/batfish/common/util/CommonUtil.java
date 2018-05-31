@@ -1,5 +1,7 @@
 package org.batfish.common.util;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Comparators;
 import com.google.common.collect.ImmutableMap;
@@ -117,6 +119,7 @@ import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.datamodel.Vrf;
+import org.batfish.datamodel.VrrpGroup;
 import org.batfish.datamodel.collections.NodeInterfacePair;
 import org.glassfish.grizzly.ssl.SSLContextConfigurator;
 import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
@@ -416,8 +419,11 @@ public class CommonUtil {
           Interface vrrpMaster =
               Collections.max(
                   candidates,
-                  Comparator.comparingInt(
-                          (Interface o) -> o.getVrrpGroups().get(groupNum).getPriority())
+                  Comparator.comparing(
+                          (Interface o) -> {
+                            VrrpGroup g = o.getVrrpGroups().get(groupNum);
+                            return g != null ? g.getPriority() : null;
+                          })
                       .thenComparing(o -> o.getAddress().getIp()));
           ipOwners
               .computeIfAbsent(address.getIp(), k -> new HashMap<>())
@@ -902,7 +908,6 @@ public class CommonUtil {
    * <p><b>Warning:</b> Notion of directionality is important here, we are assuming {@code src} is
    * initiating the connection according to its local configuration
    */
-  @Nullable
   private static boolean isReachableBgpNeighbor(
       BgpNeighbor src,
       BgpNeighbor dst,
@@ -1083,30 +1088,32 @@ public class CommonUtil {
         // Passive end of the peering cannot initiate a connection
         continue;
       }
-      Set<BgpNeighbor> candidates = localAddresses.get(neighbor.getAddress());
+      Ip neighborAdddress = neighbor.getAddress();
+      Set<BgpNeighbor> candidates = localAddresses.get(neighborAdddress);
       if (candidates == null) {
         // Check maybe it's trying to reach a dynamic neighbor
         candidates = localAddresses.get(Ip.AUTO);
-        if (candidates == null || neighbor.getAddress() == null) {
+        if (candidates == null || neighborAdddress == null) {
           continue;
         }
         candidates =
             candidates
                 .stream()
-                .filter(c -> c.getPrefix().containsIp(neighbor.getAddress()))
+                .filter(c -> c.getPrefix().containsIp(neighborAdddress))
                 .collect(ImmutableSet.toImmutableSet());
         if (candidates.isEmpty()) {
           // No remote connection candidates
           continue;
         }
       }
-      long localLocalAs = neighbor.getLocalAs();
-      long localRemoteAs = neighbor.getRemoteAs();
+      long localLocalAs = requireNonNull(neighbor.getLocalAs());
+      long localRemoteAs = requireNonNull(neighbor.getRemoteAs());
       for (BgpNeighbor candidateNeighbor : candidates) {
-        long remoteLocalAs = candidateNeighbor.getLocalAs();
-        long remoteRemoteAs = candidateNeighbor.getRemoteAs();
-        if (neighbor.getLocalIp() == null
-            || !candidateNeighbor.getPrefix().containsIp(neighbor.getLocalIp())
+        long remoteLocalAs = requireNonNull(candidateNeighbor.getLocalAs());
+        long remoteRemoteAs = requireNonNull(candidateNeighbor.getRemoteAs());
+        Ip localIp = neighbor.getLocalIp();
+        if (localIp == null
+            || !candidateNeighbor.getPrefix().containsIp(localIp)
             || localLocalAs != remoteRemoteAs
             || localRemoteAs != remoteLocalAs) {
           // Short-circuit if there is no way the remote end will accept our connection

@@ -3,7 +3,7 @@ package org.batfish.allinone.config;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.batfish.common.BaseSettings;
-import org.batfish.common.BatfishLogger;
+import org.batfish.common.BatfishLogger.LogLevel;
 import org.batfish.common.BfConsts;
 import org.batfish.common.Version;
 import org.batfish.common.util.CommonUtil;
@@ -123,7 +123,7 @@ public class Settings extends BaseSettings {
     // .toAbsolutePath().toString());
     setDefaultProperty(ARG_HELP, false);
     setDefaultProperty(ARG_LOG_FILE, null);
-    setDefaultProperty(ARG_LOG_LEVEL, BatfishLogger.getLogLevelStr(BatfishLogger.LEVEL_OUTPUT));
+    setDefaultProperty(ARG_LOG_LEVEL, LogLevel.OUTPUT.toString());
     setDefaultProperty(ARG_BATFISH_ARGS, "");
     setDefaultProperty(ARG_BATFISH_RUN_MODE, RunMode.WORKSERVICE.toString());
     setDefaultProperty(ARG_CLIENT_ARGS, "");

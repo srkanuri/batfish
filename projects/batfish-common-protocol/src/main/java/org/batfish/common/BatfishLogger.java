@@ -8,8 +8,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 public class BatfishLogger {
 
@@ -45,56 +43,33 @@ public class BatfishLogger {
     }
   }
 
-  public static final int LEVEL_DEBUG = 500;
+  public static enum LogLevel {
+    ERROR(200),
+    DEBUG(500),
+    FATAL(100),
+    INFO(400),
+    OUTPUT(220),
+    PEDANTIC(550),
+    REDFLAG(250),
+    UNIMPLEMENTED(270),
+    WARN(300);
 
-  public static final int LEVEL_ERROR = 200;
+    private final int _priority;
 
-  public static final int LEVEL_FATAL = 100;
+    private LogLevel(int priority) {
+      _priority = priority;
+    }
 
-  public static final int LEVEL_INFO = 400;
+    public boolean atLeast(LogLevel minimumVerbosityLevel) {
+      return _priority >= minimumVerbosityLevel._priority;
+    }
 
-  public static final int LEVEL_OUTPUT = 220;
-
-  public static final int LEVEL_PEDANTIC = 550;
-
-  public static final int LEVEL_REDFLAG = 250;
-
-  public static final int LEVEL_UNIMPLEMENTED = 270;
-
-  public static final int LEVEL_WARN = 300;
-
-  public static final String LEVELSTR_DEBUG = "debug";
-
-  public static final String LEVELSTR_ERROR = "error";
-
-  public static final String LEVELSTR_FATAL = "fatal";
-
-  public static final String LEVELSTR_INFO = "info";
-
-  public static final String LEVELSTR_OUTPUT = "output";
-
-  public static final String LEVELSTR_PEDANTIC = "pedantic";
-
-  public static final String LEVELSTR_REDFLAG = "redflag";
-
-  public static final String LEVELSTR_UNIMPLEMENTED = "unimplemented";
-
-  public static final String LEVELSTR_WARN = "warn";
-
-  private static final Map<String, Integer> LOG_LEVELS = initializeLogLevels();
-
-  private static final Map<Integer, String> LOG_LEVELSTRS = initializeLogLevelStrs();
+    public int priority() {
+      return _priority;
+    }
+  }
 
   private static final int LOG_ROTATION_THRESHOLD = 10000;
-
-  public static int getLogLevel(String levelStr) {
-    String canonicalLevelStr = levelStr.toLowerCase();
-    return LOG_LEVELS.get(canonicalLevelStr);
-  }
-
-  public static String getLogLevelStr(int level) {
-    return LOG_LEVELSTRS.get(level);
-  }
 
   private static String getRotatedLogFilename(String logFilename) {
     DateFormat df = new SimpleDateFormat("yyyyMMdd-HHmmss.SSS");
@@ -112,41 +87,9 @@ public class BatfishLogger {
     return returnFilename;
   }
 
-  private static Map<String, Integer> initializeLogLevels() {
-    Map<String, Integer> levels = new HashMap<>();
-    levels.put(LEVELSTR_DEBUG, LEVEL_DEBUG);
-    levels.put(LEVELSTR_ERROR, LEVEL_ERROR);
-    levels.put(LEVELSTR_FATAL, LEVEL_FATAL);
-    levels.put(LEVELSTR_INFO, LEVEL_INFO);
-    levels.put(LEVELSTR_OUTPUT, LEVEL_OUTPUT);
-    levels.put(LEVELSTR_PEDANTIC, LEVEL_PEDANTIC);
-    levels.put(LEVELSTR_REDFLAG, LEVEL_REDFLAG);
-    levels.put(LEVELSTR_UNIMPLEMENTED, LEVEL_UNIMPLEMENTED);
-    levels.put(LEVELSTR_WARN, LEVEL_WARN);
-    return levels;
-  }
-
-  private static Map<Integer, String> initializeLogLevelStrs() {
-    Map<Integer, String> levels = new HashMap<>();
-    levels.put(LEVEL_DEBUG, LEVELSTR_DEBUG);
-    levels.put(LEVEL_ERROR, LEVELSTR_ERROR);
-    levels.put(LEVEL_FATAL, LEVELSTR_FATAL);
-    levels.put(LEVEL_INFO, LEVELSTR_INFO);
-    levels.put(LEVEL_OUTPUT, LEVELSTR_OUTPUT);
-    levels.put(LEVEL_PEDANTIC, LEVELSTR_PEDANTIC);
-    levels.put(LEVEL_REDFLAG, LEVELSTR_REDFLAG);
-    levels.put(LEVEL_UNIMPLEMENTED, LEVELSTR_UNIMPLEMENTED);
-    levels.put(LEVEL_WARN, LEVELSTR_WARN);
-    return levels;
-  }
-
-  public static boolean isValidLogLevel(String levelStr) {
-    return LOG_LEVELS.containsKey(levelStr);
-  }
-
   private final BatfishLoggerHistory _history;
 
-  private int _level;
+  private LogLevel _level;
 
   private String _logFile;
 
@@ -230,7 +173,7 @@ public class BatfishLogger {
   }
 
   public void debug(String msg) {
-    write(LEVEL_DEBUG, msg);
+    write(LogLevel.DEBUG.priority(), msg);
   }
 
   public void debugf(String format, Object... args) {
@@ -238,7 +181,7 @@ public class BatfishLogger {
   }
 
   public void error(String msg) {
-    write(LEVEL_ERROR, msg);
+    write(LogLevel.ERROR.priority(), msg);
   }
 
   public void errorf(String format, Object... args) {
@@ -246,7 +189,7 @@ public class BatfishLogger {
   }
 
   public void fatal(String msg) {
-    write(LEVEL_FATAL, msg);
+    write(LogLevel.FATAL.priority(), msg);
   }
 
   private double getElapsedTime(long beforeTime) {
@@ -259,20 +202,12 @@ public class BatfishLogger {
     return _history;
   }
 
-  public int getLogLevel() {
-    return _level;
-  }
-
-  public String getLogLevelStr() {
-    return LOG_LEVELSTRS.get(_level);
-  }
-
   public PrintStream getPrintStream() {
     return _ps;
   }
 
   public void info(String msg) {
-    write(LEVEL_INFO, msg);
+    write(LogLevel.INFO.priority(), msg);
   }
 
   public void infof(String format, Object... args) {
@@ -280,11 +215,11 @@ public class BatfishLogger {
   }
 
   public boolean isActive(int level) {
-    return level <= _level;
+    return level <= _level._priority;
   }
 
   public void output(String msg) {
-    write(LEVEL_OUTPUT, msg);
+    write(LogLevel.OUTPUT.priority(), msg);
   }
 
   public void outputf(String format, Object... args) {
@@ -292,7 +227,7 @@ public class BatfishLogger {
   }
 
   public void pedantic(String msg) {
-    write(LEVEL_PEDANTIC, msg);
+    write(LogLevel.PEDANTIC.priority(), msg);
   }
 
   public void printElapsedTime() {
@@ -301,7 +236,7 @@ public class BatfishLogger {
   }
 
   public void redflag(String msg) {
-    write(LEVEL_REDFLAG, msg);
+    write(LogLevel.REDFLAG.priority(), msg);
   }
 
   public void resetTimer() {
@@ -339,16 +274,24 @@ public class BatfishLogger {
     }
   }
 
-  public void setLogLevel(String levelStr) {
-    _level = getLogLevel(levelStr);
+  public LogLevel getLogLevel() {
+    return _level;
+  }
+
+  public void setLogLevel(LogLevel logLevel) {
+    _level = logLevel;
+  }
+
+  public void setLogLevel(String logLevel) {
+    _level = LogLevel.valueOf(logLevel.toUpperCase());
   }
 
   public void unimplemented(String msg) {
-    write(LEVEL_UNIMPLEMENTED, msg);
+    write(LogLevel.UNIMPLEMENTED.priority(), msg);
   }
 
   public void warn(String msg) {
-    write(LEVEL_WARN, msg);
+    write(LogLevel.WARN.priority(), msg);
   }
 
   public void warnf(String format, Object... args) {

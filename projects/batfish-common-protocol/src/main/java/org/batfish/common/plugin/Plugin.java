@@ -1,12 +1,14 @@
 package org.batfish.common.plugin;
 
+import java.util.Comparator;
+
 public abstract class Plugin implements Comparable<Plugin> {
 
   protected PluginConsumer _pluginConsumer;
 
   @Override
   public final int compareTo(Plugin o) {
-    return getClass().getCanonicalName().compareTo(o.getClass().getCanonicalName());
+    return Comparator.comparing(pc -> pc.getClass().getCanonicalName()).compare(this, o);
   }
 
   @Override
