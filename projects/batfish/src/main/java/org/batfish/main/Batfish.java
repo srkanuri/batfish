@@ -4304,8 +4304,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
             .networkGraph();
     Map<String, Multimap<Integer, String>> reachableAps = graph.getReachableAps();
     graph.detectMultipathInconsistency();
-    reachableAps.forEach(
-        (state, reachable) -> System.out.println(String.format("%s: %s", state, reachable)));
+    /*reachableAps.forEach(
+    (state, reachable) -> System.out.println(String.format("%s: %s", state, reachable)));
+    */
     throw new BatfishException("Done baby");
   }
 
