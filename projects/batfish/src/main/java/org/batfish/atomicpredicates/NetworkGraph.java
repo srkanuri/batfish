@@ -12,7 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
 import org.batfish.common.BatfishException;
 
@@ -35,15 +38,89 @@ public final class NetworkGraph {
     _transitions = transitions;
     _reachableAps = new HashMap<>();
 
-    for (String root : _graphRoots) {
-      Multimap<Integer, String> allAps = TreeMultimap.create();
-      for (int i = 0; i < _atomicPredicates.size(); i++) {
-        allAps.put(i, root);
-      }
-      _reachableAps.put(root, allAps);
+    // computeReachability();
+    initializeReachableAps();
+    allPairsReachability();
+  }
+
+  private void initializeReachableAps() {
+    Set<String> allStates =
+        Sets.union(
+            _transitions.keySet(),
+            _transitions
+                .values()
+                .stream()
+                .map(Map::keySet)
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet()));
+
+    for (String state : allStates) {
+      _reachableAps.put(state, TreeMultimap.create());
     }
 
-    computeReachability();
+    _graphRoots
+        .parallelStream()
+        .forEach(
+            root -> {
+              Multimap<Integer, String> allAps = _reachableAps.get(root);
+              for (int i = 0; i < _atomicPredicates.size(); i++) {
+                allAps.put(i, root);
+              }
+              _reachableAps.put(root, allAps);
+            });
+  }
+
+  private void allPairsReachability() {
+    Set<String> dirty = _graphRoots;
+
+    while (!dirty.isEmpty()) {
+      dirty =
+          dirty
+              .parallelStream()
+              .filter(_transitions::containsKey)
+              .flatMap(
+                  preState ->
+                      _transitions
+                          .get(preState)
+                          .entrySet()
+                          .stream()
+                          .flatMap(
+                              transitionEntry -> {
+                                String postState = transitionEntry.getKey();
+                                Set<Integer> transitionAps = transitionEntry.getValue();
+
+                                Multimap<Integer, String> preStateAps = _reachableAps.get(preState);
+                                Multimap<Integer, String> postStateAps =
+                                    _reachableAps.get(postState);
+
+                                /*
+                                 * To prevent deadlock, obtain the map locks in order determined by
+                                 * the state names.
+                                 */
+                                boolean preStateFirst = preState.compareTo(postState) < 0;
+                                Object lock1 = preStateFirst ? preStateAps : postStateAps;
+                                Object lock2 = preStateFirst ? postStateAps : preStateAps;
+
+                                synchronized (lock1) {
+                                  synchronized (lock2) {
+                                    boolean updated =
+                                        preStateAps
+                                            .asMap()
+                                            .entrySet()
+                                            .stream()
+                                            .filter(entry -> transitionAps.contains(entry.getKey()))
+                                            .map(
+                                                entry ->
+                                                    postStateAps.putAll(
+                                                        entry.getKey(), entry.getValue()))
+                                            // non-short-circuiting version of anyMatch
+                                            .reduce(false, (b1, b2) -> b1 || b2);
+                                    return updated ? Stream.of(postState) : Stream.empty();
+                                  }
+                                }
+                              }))
+              .collect(Collectors.toSet());
+    }
   }
 
   private void computeReachability() {
@@ -94,37 +171,43 @@ public final class NetworkGraph {
     Set<String> terminalStates = Sets.difference(postStates, preStates);
 
     // root -> AP -> terminal State
-    Map<String, Multimap<Integer, String>> apTerminalStates = new HashMap<>();
+    Map<String, Map<Integer, Set<String>>> apTerminalStates = new ConcurrentHashMap<>();
     // root -> AP -> disposition
-    Map<String, Multimap<Integer, String>> apDispositions = new HashMap<>();
-    _reachableAps.forEach(
-        (terminalState, aps) -> {
-          if (!terminalStates.contains(terminalState)) {
-            return;
-          }
-          aps.forEach(
-              (ap, root) -> {
-                apTerminalStates
-                    .computeIfAbsent(root, k -> TreeMultimap.create())
-                    .put(ap, terminalState);
-                apDispositions
-                    .computeIfAbsent(root, k -> TreeMultimap.create())
-                    .put(ap, dispostion(terminalState));
-              });
-        });
+    Map<String, Map<Integer, Set<String>>> apDispositions = new ConcurrentHashMap<>();
+    _reachableAps
+        .entrySet()
+        .parallelStream()
+        .filter(entry -> terminalStates.contains(entry.getKey()))
+        .forEach(
+            entry -> {
+              String terminalState = entry.getKey();
+              Multimap<Integer, String> aps = entry.getValue();
+              if (!terminalStates.contains(terminalState)) {
+                return;
+              }
+              aps.forEach(
+                  (ap, root) -> {
+                    apTerminalStates
+                        .computeIfAbsent(root, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent(ap, k -> new ConcurrentSkipListSet<>())
+                        .add(terminalState);
+                    apDispositions
+                        .computeIfAbsent(root, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent(ap, k -> new ConcurrentSkipListSet<>())
+                        .add(dispostion(terminalState));
+                  });
+            });
     apDispositions.forEach(
         (root, rootApDispositions) ->
-            rootApDispositions
-                .asMap()
-                .forEach(
-                    (ap, dispositions) -> {
-                      if (dispositions.size() > 1) {
-                        System.out.println(
-                            String.format(
-                                "detected multipath inconsistency: %s -> %s -> %s",
-                                root, ap, apTerminalStates.get(root).get(ap)));
-                      }
-                    }));
+            rootApDispositions.forEach(
+                (ap, dispositions) -> {
+                  if (dispositions.size() > 1) {
+                    System.out.println(
+                        String.format(
+                            "detected multipath inconsistency: %s -> %s -> %s",
+                            root, ap, apTerminalStates.get(root).get(ap)));
+                  }
+                }));
   }
 
   private String dispostion(String state) {
