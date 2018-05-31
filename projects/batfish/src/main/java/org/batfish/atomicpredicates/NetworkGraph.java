@@ -3,6 +3,7 @@ package org.batfish.atomicpredicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.common.collect.TreeMultimap;
 import java.util.Collection;
 import java.util.HashMap;
@@ -11,7 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
+import org.batfish.common.BatfishException;
 
 public final class NetworkGraph {
   private final List<BDD> _atomicPredicates;
@@ -76,5 +79,61 @@ public final class NetworkGraph {
 
   public Map<String, Multimap<Integer, String>> getReachableAps() {
     return _reachableAps;
+  }
+
+  public void detectMultipathInconsistency() {
+    // for each root and AP, find the set of reachable terminal nodes
+
+    Set<String> preStates = _transitions.keySet();
+    Set<String> postStates =
+        _transitions
+            .values()
+            .stream()
+            .flatMap(m -> m.keySet().stream())
+            .collect(Collectors.toSet());
+    Set<String> terminalStates = Sets.difference(postStates, preStates);
+
+    // root -> AP -> terminal State
+    Map<String, Multimap<Integer, String>> apTerminalStates = new HashMap<>();
+    // root -> AP -> disposition
+    Map<String, Multimap<Integer, String>> apDispositions = new HashMap<>();
+    _reachableAps.forEach(
+        (terminalState, aps) -> {
+          if (!terminalStates.contains(terminalState)) {
+            return;
+          }
+          aps.forEach(
+              (ap, root) -> {
+                apTerminalStates
+                    .computeIfAbsent(root, k -> TreeMultimap.create())
+                    .put(ap, terminalState);
+                apDispositions
+                    .computeIfAbsent(root, k -> TreeMultimap.create())
+                    .put(ap, dispostion(terminalState));
+              });
+        });
+    apDispositions.forEach(
+        (root, rootApDispositions) ->
+            rootApDispositions
+                .asMap()
+                .forEach(
+                    (ap, dispositions) -> {
+                      if (dispositions.size() > 1) {
+                        System.out.println(
+                            String.format(
+                                "detected multipath inconsistency: %s -> %s -> %s",
+                                root, ap, apTerminalStates.get(root).get(ap)));
+                      }
+                    }));
+  }
+
+  private String dispostion(String state) {
+    if (state.startsWith("VrfAccept") || state.startsWith("NeighborUnreachable")) {
+      return "Accept";
+    }
+    if (state.startsWith("VrfDrop") || state.startsWith("VrfNullRouted")) {
+      return "Drop";
+    }
+    throw new BatfishException("WTF");
   }
 }
