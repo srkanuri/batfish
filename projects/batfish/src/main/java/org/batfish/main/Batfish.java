@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
@@ -200,6 +201,7 @@ import org.batfish.z3.Synthesizer;
 import org.batfish.z3.SynthesizerInputImpl;
 import org.batfish.z3.expr.BooleanExpr;
 import org.batfish.z3.expr.OrExpr;
+import org.batfish.z3.expr.StateExpr;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -4300,6 +4302,17 @@ public class Batfish extends PluginConsumer implements IBatfish {
         new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis)
             .networkGraph();
     graph.detectMultipathInconsistency();
+    Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
+    for (StateExpr terminalState : graph.getTerminalStates()) {
+      reachableAps
+          .get(terminalState)
+          .asMap()
+          .forEach(
+              (ap, sources) ->
+                  System.out.println(
+                      String.format("%s received %s from %s", terminalState, ap, sources)));
+    }
+
     throw new BatfishException("Done baby");
   }
 

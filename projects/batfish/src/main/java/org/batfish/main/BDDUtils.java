@@ -20,6 +20,7 @@ import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDAcl;
 import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
+import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.bdd.IpSpaceToBDD;
 
 public class BDDUtils {
@@ -33,12 +34,11 @@ public class BDDUtils {
 
   public BDDUtils(
       Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
-    _factory = JFactory.init(10000, 1000);
-    _factory.disableReorder();
-    _factory.setCacheRatio(64);
-    _factory.setVarNum(32); // reserve 32 1-bit variables
+    _factory = BDDPacket.factory;
 
-    _ipAddrBdd = BDDInteger.makeFromIndex(_factory, 32, 0, true);
+    // always use the BDD vars assigned to dstIp by BDDPacket to model dstIps
+    _ipAddrBdd = new BDDPacket().getDstIp();
+
     _ipSpaceToBDD = new IpSpaceToBDD(_factory, _ipAddrBdd);
     _bddOps = new BDDOps(_factory);
     _forwardingAnalysis = forwardingAnalysis;
