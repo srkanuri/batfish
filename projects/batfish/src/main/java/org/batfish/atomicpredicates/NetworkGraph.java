@@ -1,12 +1,13 @@
 package org.batfish.atomicpredicates;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
-import com.google.common.collect.TreeMultimap;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,30 +15,33 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
-import org.batfish.common.BatfishException;
+import org.apache.commons.lang3.builder.CompareToBuilder;
+import org.batfish.z3.expr.StateExpr;
 
 public final class NetworkGraph {
   private final List<BDD> _atomicPredicates;
 
   // preState --> postState --> predicate
-  private final Map<String, Map<String, SortedSet<Integer>>> _transitions;
+  private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _transitions;
 
-  private final Set<String> _graphRoots;
+  private final Set<StateExpr> _graphRoots;
 
-  private final Map<String, Multimap<Integer, String>> _reachableAps;
+  private final Map<StateExpr, Multimap<Integer, StateExpr>> _reachableAps;
+
+  private Set<StateExpr> _terminalStates;
 
   NetworkGraph(
       List<BDD> atomicPredicates,
-      Set<String> graphRoots,
-      Map<String, Map<String, SortedSet<Integer>>> transitions) {
+      Set<StateExpr> graphRoots,
+      Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> transitions) {
     _atomicPredicates = atomicPredicates;
     _graphRoots = ImmutableSet.copyOf(graphRoots);
     _transitions = transitions;
     _reachableAps = new HashMap<>();
+    _terminalStates = computeTerminalStates();
 
     // computeReachability();
     initializeReachableAps();
@@ -49,13 +53,13 @@ public final class NetworkGraph {
             _graphRoots.stream(),
             _transitions.keySet().stream(),
             _transitions.values().stream().map(Map::keySet).flatMap(Set::stream))
-        .forEach(state -> _reachableAps.put(state, TreeMultimap.create()));
+        .forEach(state -> _reachableAps.put(state, HashMultimap.create()));
 
     _graphRoots
         .parallelStream()
         .forEach(
             root -> {
-              Multimap<Integer, String> allAps = _reachableAps.get(root);
+              Multimap<Integer, StateExpr> allAps = _reachableAps.get(root);
               for (int i = 0; i < _atomicPredicates.size(); i++) {
                 allAps.put(i, root);
               }
@@ -64,7 +68,7 @@ public final class NetworkGraph {
   }
 
   private void allPairsReachability() {
-    Set<String> dirty = _graphRoots;
+    Set<StateExpr> dirty = _graphRoots;
 
     while (!dirty.isEmpty()) {
       dirty =
@@ -79,18 +83,28 @@ public final class NetworkGraph {
                           .stream()
                           .flatMap(
                               transitionEntry -> {
-                                String postState = transitionEntry.getKey();
+                                StateExpr postState = transitionEntry.getKey();
                                 Set<Integer> transitionAps = transitionEntry.getValue();
 
-                                Multimap<Integer, String> preStateAps = _reachableAps.get(preState);
-                                Multimap<Integer, String> postStateAps =
+                                Multimap<Integer, StateExpr> preStateAps =
+                                    _reachableAps.get(preState);
+                                Multimap<Integer, StateExpr> postStateAps =
                                     _reachableAps.get(postState);
 
                                 /*
                                  * To prevent deadlock, obtain the map locks in order determined by
                                  * the state names.
+                                 * TODO make StateExpr comparable
                                  */
-                                boolean preStateFirst = preState.compareTo(postState) < 0;
+                                boolean preStateFirst =
+                                    preState.getClass() == postState.getClass()
+                                        ? CompareToBuilder.reflectionCompare(preState, postState)
+                                            < 0
+                                        : preState
+                                                .getClass()
+                                                .getSimpleName()
+                                                .compareTo(postState.getClass().getSimpleName())
+                                            < 0;
                                 Object lock1 = preStateFirst ? preStateAps : postStateAps;
                                 Object lock2 = preStateFirst ? postStateAps : preStateAps;
 
@@ -118,13 +132,13 @@ public final class NetworkGraph {
 
   private void computeReachability() {
     // each iteration, only process nodes that we need to.
-    Set<String> dirty = _graphRoots;
+    Set<StateExpr> dirty = _graphRoots;
 
     while (!dirty.isEmpty()) {
-      Set<String> newDirty = new HashSet<>();
+      Set<StateExpr> newDirty = new HashSet<>();
 
-      for (String preState : dirty) {
-        Multimap<Integer, String> preStateAps = _reachableAps.get(preState);
+      for (StateExpr preState : dirty) {
+        Multimap<Integer, StateExpr> preStateAps = _reachableAps.get(preState);
         _transitions
             .getOrDefault(preState, ImmutableMap.of())
             .forEach(
@@ -134,9 +148,9 @@ public final class NetworkGraph {
                           if (!preStateAps.containsKey(ap)) {
                             return;
                           }
-                          Collection<String> sources = preStateAps.get(ap);
+                          Collection<StateExpr> sources = preStateAps.get(ap);
                           if (_reachableAps
-                              .computeIfAbsent(postState, k -> TreeMultimap.create())
+                              .computeIfAbsent(postState, k -> HashMultimap.create())
                               .putAll(ap, sources)) {
                             newDirty.add(postState);
                           }
@@ -147,69 +161,58 @@ public final class NetworkGraph {
     }
   }
 
-  public Map<String, Multimap<Integer, String>> getReachableAps() {
+  public Map<StateExpr, Multimap<Integer, StateExpr>> getReachableAps() {
     return _reachableAps;
   }
 
-  public void detectMultipathInconsistency() {
-    // for each root and AP, find the set of reachable terminal nodes
-
-    Set<String> preStates = _transitions.keySet();
-    Set<String> postStates =
+  private Set<StateExpr> computeTerminalStates() {
+    Set<StateExpr> preStates = _transitions.keySet();
+    Set<StateExpr> postStates =
         _transitions
             .values()
             .stream()
             .flatMap(m -> m.keySet().stream())
             .collect(Collectors.toSet());
-    Set<String> terminalStates = Sets.difference(postStates, preStates);
+    return ImmutableSet.copyOf(Sets.difference(postStates, preStates));
+  }
 
+  public Set<StateExpr> getTerminalStates() {
+    return _terminalStates;
+  }
+
+  public void detectMultipathInconsistency() {
     // root -> AP -> terminal State
-    Map<String, Map<Integer, Set<String>>> apTerminalStates = new ConcurrentHashMap<>();
-    // root -> AP -> disposition
-    Map<String, Map<Integer, Set<String>>> apDispositions = new ConcurrentHashMap<>();
+    Map<StateExpr, Map<Integer, Set<StateExpr>>> apTerminalStates = new ConcurrentHashMap<>();
     _reachableAps
         .entrySet()
         .parallelStream()
-        .filter(entry -> terminalStates.contains(entry.getKey()))
+        .filter(entry -> _terminalStates.contains(entry.getKey()))
         .forEach(
             entry -> {
-              String terminalState = entry.getKey();
-              Multimap<Integer, String> aps = entry.getValue();
-              if (!terminalStates.contains(terminalState)) {
+              StateExpr terminalState = entry.getKey();
+              Multimap<Integer, StateExpr> aps = entry.getValue();
+              if (!_terminalStates.contains(terminalState)) {
                 return;
               }
               aps.forEach(
                   (ap, root) -> {
                     apTerminalStates
                         .computeIfAbsent(root, k -> new ConcurrentHashMap<>())
-                        .computeIfAbsent(ap, k -> new ConcurrentSkipListSet<>())
+                        .computeIfAbsent(
+                            ap, k -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
                         .add(terminalState);
-                    apDispositions
-                        .computeIfAbsent(root, k -> new ConcurrentHashMap<>())
-                        .computeIfAbsent(ap, k -> new ConcurrentSkipListSet<>())
-                        .add(dispostion(terminalState));
                   });
             });
-    apDispositions.forEach(
+    apTerminalStates.forEach(
         (root, rootApDispositions) ->
             rootApDispositions.forEach(
-                (ap, dispositions) -> {
-                  if (dispositions.size() > 1) {
+                (ap, terminals) -> {
+                  if (terminals.size() > 1) {
                     System.out.println(
                         String.format(
                             "detected multipath inconsistency: %s -> %s -> %s",
-                            root, ap, apTerminalStates.get(root).get(ap)));
+                            root, ap, terminals));
                   }
                 }));
-  }
-
-  private String dispostion(String state) {
-    if (state.startsWith("VrfAccept") || state.startsWith("NeighborUnreachable")) {
-      return "Accept";
-    }
-    if (state.startsWith("VrfDrop") || state.startsWith("VrfNullRouted")) {
-      return "Drop";
-    }
-    throw new BatfishException("WTF");
   }
 }

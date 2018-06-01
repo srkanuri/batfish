@@ -21,7 +21,7 @@ import org.batfish.datamodel.Prefix;
  */
 public class BDDPacket {
 
-  static BDDFactory factory;
+  public static BDDFactory factory;
 
   private static BDDPairing pairing;
 
@@ -80,7 +80,7 @@ public class BDDPacket {
    * Creates a collection of BDD variables representing the
    * various attributes of a control plane advertisement.
    */
-  BDDPacket() {
+  public BDDPacket() {
 
     // Make sure we have the right number of variables
     int numVars = factory.varNum();
