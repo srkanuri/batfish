@@ -3578,10 +3578,11 @@ public final class CiscoConfiguration extends VendorConfiguration {
     IpsecPolicy policy = new IpsecPolicy(name);
     policy.setPfsKeyGroup(ipsecProfile.getPfsGroup());
 
-    String transformSetName = ipsecProfile.getTransformSet();
-    IpsecProposal ipsecProposalName = configuration.getIpsecProposals().get(transformSetName);
-    if (ipsecProposalName != null) {
-      policy.getProposals().put(transformSetName, ipsecProposalName);
+    for (String transformSetName : ipsecProfile.getTransformSets()) {
+      IpsecProposal ipsecProposalName = configuration.getIpsecProposals().get(transformSetName);
+      if (ipsecProposalName != null) {
+        policy.getProposals().put(transformSetName, ipsecProposalName);
+      }
     }
 
     String isakmpProfileName = ipsecProfile.getIsakmpProfile();

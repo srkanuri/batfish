@@ -1711,7 +1711,7 @@ public class CiscoGrammarTest {
   }
 
   @Test
-  public void testIpsecPolicy() throws IOException {
+  public void testIpsecProfile() throws IOException {
     Configuration c = parseConfig("ios-crypto-ipsec-profile");
 
     assertThat(
@@ -1719,18 +1719,26 @@ public class CiscoGrammarTest {
         hasIpsecPolicy(
             "IPSEC-PROFILE",
             allOf(
-                hasPfsKeyGroup(DiffieHellmanGroup.GROUP14),
                 IpsecPolicyMatchers.hasIkeGateway(
-                    allOf(hasAddress(new Ip("1.2.3.5")), hasLocalIp(new Ip("2.3.4.6")))),
+                    allOf(hasAddress(new Ip("1.2.3.4")), hasLocalIp(new Ip("2.3.4.6")))),
                 IpsecPolicyMatchers.hasIpsecProposal(
-                    "TRANSFORM-SET",
+                    "TRANSFORM-SET1",
                     allOf(
                         IpsecProposalMatchers.hasEncryptionAlgorithm(
                             EncryptionAlgorithm.AES_256_CBC),
                         IpsecProposalMatchers.hasAuthenticationAlgorithm(
-                            IpsecAuthenticationAlgorithm.HMAC_MD5_96))))));
+                            IpsecAuthenticationAlgorithm.HMAC_MD5_96))),
+                IpsecPolicyMatchers.hasIpsecProposal(
+                    "TRANSFORM-SET2",
+                    allOf(
+                        IpsecProposalMatchers.hasEncryptionAlgorithm(
+                            EncryptionAlgorithm.AES_256_CBC),
+                        IpsecProposalMatchers.hasAuthenticationAlgorithm(
+                            IpsecAuthenticationAlgorithm.HMAC_SHA1_96))),
+                hasPfsKeyGroup(DiffieHellmanGroup.GROUP14))));
   }
 
+  @Test
   public void testArubaIpsecTransformset() throws IOException {
     Configuration c = parseConfig("arubaCryptoTransformSet");
     assertThat(

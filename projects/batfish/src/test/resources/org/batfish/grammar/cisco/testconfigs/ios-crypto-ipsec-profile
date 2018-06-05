@@ -11,11 +11,14 @@ crypto isakmp profile ISAKMP-PROFILE
   keepalive 10 retry 3
   local-address 2.3.4.6
 !
-crypto ipsec transform-set TRANSFORM-SET esp-aes 256 esp-md5-hmac
+crypto ipsec transform-set TRANSFORM-SET1 esp-aes 256 esp-md5-hmac
+  mode tunnel
+!
+crypto ipsec transform-set TRANSFORM-SET2 esp-aes 256 esp-sha-hmac
   mode tunnel
 !
 crypto ipsec profile IPSEC-PROFILE
-  set transform-set TRANSFORM-SET
+  set transform-set TRANSFORM-SET1 TRANSFORM-SET2
   set isakmp-profile ISAKMP-PROFILE
   set pfs group14
 !
