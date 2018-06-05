@@ -150,6 +150,7 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.POLICY_MAP_EV
 import static org.batfish.representation.cisco.CiscoStructureUsage.QOS_ENFORCE_RULE_SERVICE_CLASS;
 import static org.batfish.representation.cisco.CiscoStructureUsage.RIP_DISTRIBUTE_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.ROUTER_ISIS_DISTRIBUTE_LIST_ACL;
+import static org.batfish.representation.cisco.CiscoStructureUsage.ROUTE_MAP_MATCH_COMMUNITY_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.ROUTE_MAP_MATCH_IPV4_ACCESS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.ROUTE_MAP_MATCH_IPV4_PREFIX_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.ROUTE_MAP_MATCH_IPV6_ACCESS_LIST;
@@ -5586,7 +5587,15 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     for (VariableContext name : ctx.name_list) {
       names.add(name.getText());
       _configuration.referenceStructure(
-          IPV6_ACCESS_LIST, v.getText(), ROUTE_MAP_MATCH_IPV6_ACCESS_LIST, v.getStart().getLine());
+          COMMUNITY_LIST_EXPANDED,
+          name.getText(),
+          ROUTE_MAP_MATCH_COMMUNITY_LIST,
+          name.getStart().getLine());
+      _configuration.referenceStructure(
+          COMMUNITY_LIST_STANDARD,
+          name.getText(),
+          ROUTE_MAP_MATCH_COMMUNITY_LIST,
+          name.getStart().getLine());
     }
     RouteMapMatchCommunityListLine line = new RouteMapMatchCommunityListLine(names, statementLine);
     _currentRouteMapClause.addMatchLine(line);
