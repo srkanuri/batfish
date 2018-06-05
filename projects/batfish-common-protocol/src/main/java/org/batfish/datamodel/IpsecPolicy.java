@@ -17,6 +17,8 @@ public class IpsecPolicy extends ComparableStructure<String> {
   /** */
   private static final long serialVersionUID = 1L;
 
+  private IkeGateway _ikeGateway;
+
   private DiffieHellmanGroup _pfsKeyGroup;
 
   private boolean _pfsKeyGroupDynamicIke;
@@ -37,6 +39,10 @@ public class IpsecPolicy extends ComparableStructure<String> {
 
   public boolean getPfsKeyGroupDynamicIke() {
     return _pfsKeyGroupDynamicIke;
+  }
+
+  public IkeGateway getIkeGateway() {
+    return _ikeGateway;
   }
 
   @JsonProperty(PROP_PROPOSALS)
@@ -60,6 +66,10 @@ public class IpsecPolicy extends ComparableStructure<String> {
         _proposals.put(name, owner.getIpsecProposals().get(name));
       }
     }
+  }
+
+  public void setIkeGateway(IkeGateway ikeGateway) {
+    _ikeGateway = ikeGateway;
   }
 
   public void setPfsKeyGroup(DiffieHellmanGroup dhGroup) {
