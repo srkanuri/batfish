@@ -1721,7 +1721,14 @@ public class CiscoGrammarTest {
             allOf(
                 hasPfsKeyGroup(DiffieHellmanGroup.GROUP14),
                 IpsecPolicyMatchers.hasIkeGateway(
-                    allOf(hasAddress(new Ip("1.2.3.5")), hasLocalIp(new Ip("2.3.4.6")))))));
+                    allOf(hasAddress(new Ip("1.2.3.5")), hasLocalIp(new Ip("2.3.4.6")))),
+                IpsecPolicyMatchers.hasIpsecProposal(
+                    "TRANSFORM-SET",
+                    allOf(
+                        IpsecProposalMatchers.hasEncryptionAlgorithm(
+                            EncryptionAlgorithm.AES_256_CBC),
+                        IpsecProposalMatchers.hasAuthenticationAlgorithm(
+                            IpsecAuthenticationAlgorithm.HMAC_MD5_96))))));
   }
 
   public void testArubaIpsecTransformset() throws IOException {
