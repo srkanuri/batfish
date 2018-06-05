@@ -526,6 +526,7 @@ import org.batfish.grammar.cisco.CiscoParser.Ip_route_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Ip_ssh_versionContext;
 import org.batfish.grammar.cisco.CiscoParser.Ipsec_authenticationContext;
 import org.batfish.grammar.cisco.CiscoParser.Ipsec_encryptionContext;
+import org.batfish.grammar.cisco.CiscoParser.Ipsec_encryption_arubaContext;
 import org.batfish.grammar.cisco.CiscoParser.Ipv6_prefix_list_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Ipv6_prefix_list_tailContext;
 import org.batfish.grammar.cisco.CiscoParser.Is_type_is_stanzaContext;
@@ -1538,15 +1539,20 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     _currentIpsecTransformSet = new IpsecTransformSet(ctx.name.getText(), ctx.getStart().getLine());
     defineStructure(IPSEC_TRANSFORM_SET, ctx.name.getText(), ctx);
     IpsecProposal proposal = _currentIpsecTransformSet.getProposal();
-    proposal.setEncryptionAlgorithm(toEncryptionAlgorithm(ctx.ipsec_encryption()));
+    if (ctx.ipsec_encryption() != null) {
+      proposal.setEncryptionAlgorithm(toEncryptionAlgorithm(ctx.ipsec_encryption()));
+    } else if (ctx.ipsec_encryption_aruba() != null) {
+      proposal.setEncryptionAlgorithm(toEncryptionAlgorithm(ctx.ipsec_encryption_aruba()));
+    }
+    // If any encryption algorithm was set then ESP protocol is used
+    if (proposal.getEncryptionAlgorithm() != null) {
+      proposal.getProtocols().add(IpsecProtocol.ESP);
+    }
+
     if (ctx.ipsec_authentication() != null) {
       proposal.setAuthenticationAlgorithm(
           toIpsecAuthenticationAlgorithm(ctx.ipsec_authentication()));
-      proposal.setProtocol(toProtocol(ctx.ipsec_authentication()));
-    } else {
-      // default values
-      proposal.setAuthenticationAlgorithm(IpsecAuthenticationAlgorithm.HMAC_SHA1_96);
-      proposal.setProtocol(IpsecProtocol.ESP);
+      proposal.getProtocols().add(toProtocol(ctx.ipsec_authentication()));
     }
   }
 
@@ -1556,6 +1562,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         || ctx.ESP_SHA512_HMAC() != null
         || ctx.ESP_SHA_HMAC() != null) {
       return IpsecProtocol.ESP;
+    } else if (ctx.AH_SHA_HMAC() != null || ctx.AH_MD5_HMAC() != null) {
+      return IpsecProtocol.AH;
     } else {
       throw convError(IpsecProtocol.class, ctx);
     }
@@ -7822,9 +7830,9 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
 
   private IpsecAuthenticationAlgorithm toIpsecAuthenticationAlgorithm(
       Ipsec_authenticationContext ctx) {
-    if (ctx.ESP_MD5_HMAC() != null) {
+    if (ctx.ESP_MD5_HMAC() != null || ctx.AH_MD5_HMAC() != null) {
       return IpsecAuthenticationAlgorithm.HMAC_MD5_96;
-    } else if (ctx.ESP_SHA_HMAC() != null) {
+    } else if (ctx.ESP_SHA_HMAC() != null || ctx.AH_SHA_HMAC() != null) {
       return IpsecAuthenticationAlgorithm.HMAC_SHA1_96;
     } else if (ctx.ESP_SHA256_HMAC() != null) {
       return IpsecAuthenticationAlgorithm.HMAC_SHA_256_128;
@@ -8014,8 +8022,9 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   private EncryptionAlgorithm toEncryptionAlgorithm(Ipsec_encryptionContext ctx) {
+    int strength;
     if (ctx.ESP_AES() != null) {
-      int strength = ctx.strength == null ? 128 : toInteger(ctx.strength);
+      strength = ctx.strength == null ? 128 : toInteger(ctx.strength);
       switch (strength) {
         case 128:
           return EncryptionAlgorithm.AES_128_CBC;
@@ -8026,6 +8035,54 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
         default:
           throw convError(EncryptionAlgorithm.class, ctx);
       }
+    } else if (ctx.ESP_DES() != null) {
+      return EncryptionAlgorithm.DES_CBC;
+    } else if (ctx.ESP_3DES() != null) {
+      return EncryptionAlgorithm.THREEDES_CBC;
+    } else if (ctx.ESP_GCM() != null) {
+      strength = ctx.strength == null ? 128 : toInteger(ctx.strength);
+      switch (strength) {
+        case 128:
+          return EncryptionAlgorithm.AES_128_GCM;
+        case 192:
+          return EncryptionAlgorithm.AES_192_GCM;
+        case 256:
+          return EncryptionAlgorithm.AES_256_GCM;
+        default:
+          throw convError(EncryptionAlgorithm.class, ctx);
+      }
+    } else if (ctx.ESP_GMAC() != null) {
+      strength = ctx.strength == null ? 128 : toInteger(ctx.strength);
+      switch (strength) {
+        case 128:
+          return EncryptionAlgorithm.AES_128_GMAC;
+        case 192:
+          return EncryptionAlgorithm.AES_192_GMAC;
+        case 256:
+          return EncryptionAlgorithm.AES_256_GMAC;
+        default:
+          throw convError(EncryptionAlgorithm.class, ctx);
+      }
+    } else if (ctx.ESP_NULL() != null) {
+      return EncryptionAlgorithm.NULL;
+    } else if (ctx.ESP_SEAL() != null) {
+      return EncryptionAlgorithm.AES_SEAL_160;
+    } else {
+      throw convError(EncryptionAlgorithm.class, ctx);
+    }
+  }
+
+  private EncryptionAlgorithm toEncryptionAlgorithm(Ipsec_encryption_arubaContext ctx) {
+    if (ctx.ESP_AES128() != null) {
+      return EncryptionAlgorithm.AES_128_CBC;
+    } else if (ctx.ESP_AES128_GCM() != null) {
+      return EncryptionAlgorithm.AES_128_GCM;
+    } else if (ctx.ESP_AES192() != null) {
+      return EncryptionAlgorithm.AES_192_CBC;
+    } else if (ctx.ESP_AES256() != null) {
+      return EncryptionAlgorithm.AES_256_CBC;
+    } else if (ctx.ESP_AES256_GCM() != null) {
+      return EncryptionAlgorithm.AES_256_GCM;
     } else if (ctx.ESP_DES() != null) {
       return EncryptionAlgorithm.DES_CBC;
     } else if (ctx.ESP_3DES() != null) {
