@@ -1887,40 +1887,34 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   @Override
   public void enterIp_community_list_expanded_stanza(Ip_community_list_expanded_stanzaContext ctx) {
     String name;
-    int definitionLine;
     if (ctx.num != null) {
       name = ctx.num.getText();
-      definitionLine = ctx.num.getLine();
     } else if (ctx.name != null) {
       name = ctx.name.getText();
-      definitionLine = ctx.name.getStart().getLine();
     } else {
       throw new BatfishException("Invalid community-list name");
     }
     _currentExpandedCommunityList =
         _configuration
             .getExpandedCommunityLists()
-            .computeIfAbsent(name, n -> new ExpandedCommunityList(n, definitionLine));
+            .computeIfAbsent(name, ExpandedCommunityList::new);
     defineStructure(COMMUNITY_LIST_EXPANDED, name, ctx);
   }
 
   @Override
   public void enterIp_community_list_standard_stanza(Ip_community_list_standard_stanzaContext ctx) {
     String name;
-    int definitionLine;
     if (ctx.num != null) {
       name = ctx.num.getText();
-      definitionLine = ctx.num.getLine();
     } else if (ctx.name != null) {
       name = ctx.name.getText();
-      definitionLine = ctx.name.getStart().getLine();
     } else {
       throw new BatfishException("Invalid standard community-list name");
     }
     _currentStandardCommunityList =
         _configuration
             .getStandardCommunityLists()
-            .computeIfAbsent(name, n -> new StandardCommunityList(n, definitionLine));
+            .computeIfAbsent(name, StandardCommunityList::new);
     defineStructure(COMMUNITY_LIST_STANDARD, name, ctx);
   }
 
@@ -5591,6 +5585,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     Set<String> names = new TreeSet<>();
     for (VariableContext name : ctx.name_list) {
       names.add(name.getText());
+      _configuration.referenceStructure(
+          IPV6_ACCESS_LIST, v.getText(), ROUTE_MAP_MATCH_IPV6_ACCESS_LIST, v.getStart().getLine());
     }
     RouteMapMatchCommunityListLine line = new RouteMapMatchCommunityListLine(names, statementLine);
     _currentRouteMapClause.addMatchLine(line);

@@ -3552,7 +3552,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
     markConcreteStructure(CiscoStructureType.NAT_POOL, CiscoStructureUsage.IP_NAT_SOURCE_POOL);
     // record references to defined structures
-    recordCommunityLists();
+    // recordCommunityLists();
     recordDocsisPolicies();
     recordDocsisPolicyRules();
     recordStructure(_asPathAccessLists, CiscoStructureType.AS_PATH_ACCESS_LIST);
@@ -3979,10 +3979,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return false;
   }
 
-  private void recordCommunityLists() {
-    recordStructure(_expandedCommunityLists, CiscoStructureType.COMMUNITY_LIST_EXPANDED);
-    recordStructure(_standardCommunityLists, CiscoStructureType.COMMUNITY_LIST_STANDARD);
-  }
+  // private void recordCommunityLists() {
+  //  recordStructure(_expandedCommunityLists, CiscoStructureType.COMMUNITY_LIST_EXPANDED);
+  //  recordStructure(_standardCommunityLists, CiscoStructureType.COMMUNITY_LIST_STANDARD);
+  // }
 
   private void recordDocsisPolicies() {
     if (_cf.getCable() != null) {
