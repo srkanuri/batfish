@@ -6,6 +6,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -14,14 +19,24 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
+import net.sf.javabdd.BDDException;
+import net.sf.javabdd.BDDFactory;
+import net.sf.javabdd.JFactory;
+import org.batfish.common.BatfishException;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ForwardingAnalysis;
 import org.batfish.datamodel.IpAccessList;
+import org.batfish.datamodel.IpSpace;
 import org.batfish.main.BDDUtils;
 import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDAcl;
+import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.bdd.IpSpaceToBDD;
@@ -46,6 +61,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
   private final IpSpaceToBDD _ipSpaceToBDD;
+  private ParallelIpSpaceToBDD _parallelIpSpaceToBDD;
 
   public ForwardingAnalysisNetworkGraphFactory(
       Map<String, Configuration> configs, ForwardingAnalysis forwardingAnalysis) {
@@ -54,10 +70,80 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _configs = configs;
     _forwardingAnalysis = forwardingAnalysis;
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
+
+    benchmark();
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
     _aclBDDs = computeAclBDDs();
     _bddTransitions = computeBDDTransitions();
     _apBDDs = computeAPBDDs();
     _apTransitions = computeAPTransitions();
+  }
+
+  private class ParallelIpSpaceToBDD {
+    private final BlockingQueue<BDDFactory> _generatorFactories;
+    private final BDDFactory _loaderFactory;
+    private BDD _loaderFactoryOne;
+    private BDD _loaderFactoryZero;
+
+    ParallelIpSpaceToBDD(BDDFactory loaderFactory, int capacity) {
+      _generatorFactories = new ArrayBlockingQueue<>(capacity);
+      _loaderFactory = loaderFactory;
+      _loaderFactoryOne = loaderFactory.one();
+      _loaderFactoryZero = loaderFactory.zero();
+
+      while (_generatorFactories.remainingCapacity() > 0) {
+        BDDFactory factory = JFactory.init(10000, 1000);
+        factory.disableReorder();
+        factory.setCacheRatio(64);
+        factory.setVarNum(40);
+        _generatorFactories.add(factory);
+      }
+    }
+
+    BDD toBDD(IpSpace ipSpace) {
+      BDDFactory generatorFactory = null;
+      try {
+        generatorFactory = _generatorFactories.take();
+        BDD result = toBDD(ipSpace, generatorFactory);
+        _generatorFactories.put(generatorFactory);
+        return result;
+      } catch (InterruptedException e) {
+        throw new BatfishException("Interrupted", e);
+      }
+    }
+
+    BDD toBDD(IpSpace ipSpace, BDDFactory generatorFactory) {
+      // magic numbers: match the indexes used in BDDPacket (and thus _loaderFactory) for dstIp ;)
+      BDDInteger dstIp = BDDInteger.makeFromIndex(generatorFactory, 32, 8, true);
+      IpSpaceToBDD ipSpaceToBDD = new IpSpaceToBDD(generatorFactory, dstIp);
+      BDD bdd = ipSpace.accept(ipSpaceToBDD);
+
+      // special case: one, zero crash (de)serialization
+      if (bdd.isOne()) {
+        return _loaderFactoryOne;
+      }
+      if (bdd.isZero()) {
+        return _loaderFactoryZero;
+      }
+
+      StringWriter stringWriter = new StringWriter();
+      BufferedWriter writer = new BufferedWriter(stringWriter);
+
+      try {
+        generatorFactory.save(writer, bdd);
+      } catch (IOException e) {
+        throw new BatfishException("Error saving BDD", e);
+      }
+
+      try {
+        synchronized (_loaderFactory) {
+          return _loaderFactory.load(new BufferedReader(new StringReader(stringWriter.toString())));
+        }
+      } catch (IOException | BDDException e) {
+        throw new BatfishException("Error loading BDD", e);
+      }
+    }
   }
 
   private Map<String, Map<String, BDD>> computeAclBDDs() {
@@ -138,11 +224,131 @@ public class ForwardingAnalysisNetworkGraphFactory {
     }
   }
   */
+  private void benchmark() {
+    long start = System.currentTimeMillis();
+    /*
+    computeNeighborUnreachableBDDsSequential();
+    long sequential = System.currentTimeMillis() - start;
+    */
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 1);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel1 = System.currentTimeMillis() - start;
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel2 = System.currentTimeMillis() - start;
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 4);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel4 = System.currentTimeMillis() - start;
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 8);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel8 = System.currentTimeMillis() - start;
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 16);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel16 = System.currentTimeMillis() - start;
+
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 32);
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsParallel();
+    long parallel32 = System.currentTimeMillis() - start;
+  }
+
+  public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsSequential() {
+    return toImmutableMap(
+        _forwardingAnalysis.getNeighborUnreachable(),
+        Entry::getKey,
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey,
+                vrfEntry ->
+                    toImmutableMap(
+                        vrfEntry.getValue(),
+                        Entry::getKey,
+                        ifaceEntry -> ifaceEntry.getValue().accept(_ipSpaceToBDD))));
+  }
+
+  public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsParallel() {
+    class Tuple<T> {
+      String _node;
+      String _vrf;
+      String _iface;
+      T _ipSpace;
+
+      Tuple(String node, String vrf, String iface, T ipSpace) {
+        _node = node;
+        _vrf = vrf;
+        _iface = iface;
+        _ipSpace = ipSpace;
+      }
+
+      <U> Tuple<U> mapIpSpace(Function<T, U> mapper) {
+        return new Tuple<>(_node, _vrf, _iface, mapper.apply(_ipSpace));
+      }
+    }
+
+    Map<String, Map<String, Map<String, BDD>>> result = new HashMap<>();
+    _forwardingAnalysis
+        .getNeighborUnreachable()
+        .entrySet()
+        .parallelStream()
+        .flatMap(
+            nodeEntry -> {
+              String node = nodeEntry.getKey();
+              return nodeEntry
+                  .getValue()
+                  .entrySet()
+                  .stream()
+                  .flatMap(
+                      vrfEntry -> {
+                        String vrf = vrfEntry.getKey();
+                        return vrfEntry
+                            .getValue()
+                            .entrySet()
+                            .stream()
+                            .map(
+                                ifaceEntry -> {
+                                  String iface = ifaceEntry.getKey();
+                                  IpSpace ipSpace = ifaceEntry.getValue();
+                                  return new Tuple<>(node, vrf, iface, ipSpace);
+                                });
+                      });
+            })
+        .map(t -> t.mapIpSpace(_parallelIpSpaceToBDD::toBDD))
+        .forEachOrdered(
+            t ->
+                result
+                    .computeIfAbsent(t._node, k -> new HashMap<>())
+                    .computeIfAbsent(t._vrf, k -> new HashMap<>())
+                    .put(t._iface, t._ipSpace));
+    return result;
+  }
 
   private Map<StateExpr, Map<StateExpr, BDD>> computeBDDTransitions() {
     Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = new HashMap<>();
 
     BDD one = _bddOps.getBDDFactory().one();
+
+    Supplier<BDDFactory> factorySupplier =
+        () -> {
+          BDDFactory factory = JFactory.init(10000, 1000);
+          factory.disableReorder();
+          factory.setCacheRatio(64);
+          return factory;
+        };
+
+    BlockingQueue<BDDFactory> bddFactories = new ArrayBlockingQueue<>(2);
+    bddFactories.add(factorySupplier.get());
+    bddFactories.add(factorySupplier.get());
 
     /*
      * PreInInterface --> PostInVrf
@@ -154,26 +360,22 @@ public class ForwardingAnalysisNetworkGraphFactory {
         .map(Configuration::getVrfs)
         .map(Map::values)
         .flatMap(Collection::stream)
+        .flatMap(vrf -> vrf.getInterfaces().values().stream())
         .forEach(
-            vrf ->
-                vrf.getInterfaces()
-                    .values()
-                    .forEach(
-                        iface -> {
-                          String nodeName = iface.getOwner().getName();
-                          String vrfName = vrf.getName();
-                          String ifaceName = iface.getName();
-                          BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, one);
-                          bddTransitions.put(
-                              new PreInInterface(nodeName, ifaceName),
-                              ImmutableMap.of(
-                                  new PostInVrf(nodeName, vrfName),
-                                  inAclBDD,
-                                  Drop.INSTANCE,
-                                  inAclBDD.not()));
-                        }));
+            iface -> {
+              String nodeName = iface.getOwner().getName();
+              String vrfName = iface.getVrfName();
+              String ifaceName = iface.getName();
+
+              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, one);
+              bddTransitions.put(
+                  new PreInInterface(nodeName, ifaceName),
+                  ImmutableMap.of(
+                      new PostInVrf(nodeName, vrfName), inAclBDD, Drop.INSTANCE, inAclBDD.not()));
+            });
 
     // PreOutVrf --> NeighborUnreachable
+
     _forwardingAnalysis
         .getNeighborUnreachable()
         .forEach(
