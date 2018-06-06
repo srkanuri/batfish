@@ -23,6 +23,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDException;
 import net.sf.javabdd.BDDFactory;
@@ -316,6 +317,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
                                 });
                       });
             })
+        // creating extra work
+        .flatMap(t -> Stream.of(t, t, t, t, t))
         .map(t -> t.mapIpSpace(_parallelIpSpaceToBDD::toBDD))
         .forEachOrdered(
             t ->
