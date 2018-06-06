@@ -226,10 +226,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
   */
   private void benchmark() {
     long start = System.currentTimeMillis();
-    /*
     computeNeighborUnreachableBDDsSequential();
     long sequential = System.currentTimeMillis() - start;
-    */
 
     _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 1);
     start = System.currentTimeMillis();
