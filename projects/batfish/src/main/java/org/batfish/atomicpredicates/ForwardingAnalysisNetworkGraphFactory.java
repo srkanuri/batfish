@@ -133,8 +133,9 @@ public class ForwardingAnalysisNetworkGraphFactory {
       }
 
       try {
+        BufferedReader reader = new BufferedReader(new StringReader(stringWriter.toString()));
         synchronized (_loaderFactory) {
-          return _loaderFactory.load(new BufferedReader(new StringReader(stringWriter.toString())));
+          return _loaderFactory.load(reader);
         }
       } catch (IOException | BDDException e) {
         throw new BatfishException("Error loading BDD", e);
