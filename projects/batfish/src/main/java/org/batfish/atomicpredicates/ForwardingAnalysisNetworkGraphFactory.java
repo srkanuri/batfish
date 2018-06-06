@@ -22,7 +22,6 @@ import java.util.SortedSet;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDException;
@@ -93,11 +92,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
       _loaderFactoryZero = loaderFactory.zero();
 
       while (_generatorFactories.remainingCapacity() > 0) {
-        BDDFactory factory = JFactory.init(10000, 1000);
-        factory.disableReorder();
-        factory.setCacheRatio(64);
-        factory.setVarNum(40);
-        _generatorFactories.add(factory);
+        _generatorFactories.add(newBDDFactory());
       }
     }
 
@@ -229,32 +224,32 @@ public class ForwardingAnalysisNetworkGraphFactory {
     computeNeighborUnreachableBDDsSequential();
     long sequential = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 1);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 1);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel1 = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 2);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel2 = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 4);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 4);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel4 = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 8);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 8);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel8 = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 16);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 16);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel16 = System.currentTimeMillis() - start;
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 32);
+    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 32);
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel32 = System.currentTimeMillis() - start;
@@ -331,22 +326,22 @@ public class ForwardingAnalysisNetworkGraphFactory {
     return result;
   }
 
+  private static BDDFactory newBDDFactory() {
+    BDDFactory factory = JFactory.init(10000, 1000);
+    factory.disableReorder();
+    factory.setCacheRatio(64);
+    factory.setVarNum(40);
+    return factory;
+  }
+
   private Map<StateExpr, Map<StateExpr, BDD>> computeBDDTransitions() {
     Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = new HashMap<>();
 
     BDD one = _bddOps.getBDDFactory().one();
 
-    Supplier<BDDFactory> factorySupplier =
-        () -> {
-          BDDFactory factory = JFactory.init(10000, 1000);
-          factory.disableReorder();
-          factory.setCacheRatio(64);
-          return factory;
-        };
-
     BlockingQueue<BDDFactory> bddFactories = new ArrayBlockingQueue<>(2);
-    bddFactories.add(factorySupplier.get());
-    bddFactories.add(factorySupplier.get());
+    bddFactories.add(newBDDFactory());
+    bddFactories.add(newBDDFactory());
 
     /*
      * PreInInterface --> PostInVrf
