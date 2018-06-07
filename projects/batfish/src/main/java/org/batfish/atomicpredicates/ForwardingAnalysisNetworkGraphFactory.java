@@ -29,6 +29,7 @@ import net.sf.javabdd.BDDException;
 import net.sf.javabdd.BDDFactory;
 import net.sf.javabdd.JFactory;
 import org.batfish.common.BatfishException;
+import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ForwardingAnalysis;
 import org.batfish.datamodel.IpAccessList;
@@ -55,17 +56,20 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final Map<String, Map<String, BDD>> _aclBDDs;
   private final List<BDD> _apBDDs;
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
-  private final Map<StateExpr, Map<StateExpr, BDD>> _bddTransitions;
+  private final BDDFactory _bddFactory;
   private final BDDOps _bddOps;
+  private final Map<StateExpr, Map<StateExpr, BDD>> _bddTransitions;
   private final BDDUtils _bddUtils;
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
   private final IpSpaceToBDD _ipSpaceToBDD;
+  private final Map<String, Map<String, BDD>> _vrfAcceptBDDs;
   private ParallelIpSpaceToBDD _parallelIpSpaceToBDD;
 
   public ForwardingAnalysisNetworkGraphFactory(
       Map<String, Configuration> configs, ForwardingAnalysis forwardingAnalysis) {
     _bddUtils = new BDDUtils(configs, forwardingAnalysis);
+    _bddFactory = _bddUtils.getBDDFactory();
     _bddOps = new BDDOps(_bddUtils.getBDDFactory());
     _configs = configs;
     _forwardingAnalysis = forwardingAnalysis;
@@ -75,6 +79,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
 
     _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
     _aclBDDs = computeAclBDDs();
+    _vrfAcceptBDDs = computeVrfAcceptBDDs();
     _bddTransitions = computeBDDTransitions();
     _apBDDs = computeAPBDDs();
     _apTransitions = computeAPTransitions();
@@ -343,10 +348,6 @@ public class ForwardingAnalysisNetworkGraphFactory {
 
     BDD one = _bddOps.getBDDFactory().one();
 
-    BlockingQueue<BDDFactory> bddFactories = new ArrayBlockingQueue<>(2);
-    bddFactories.add(newBDDFactory());
-    bddFactories.add(newBDDFactory());
-
     /*
      * PreInInterface --> PostInVrf
      * PreInInterface --> Drop
@@ -433,26 +434,20 @@ public class ForwardingAnalysisNetworkGraphFactory {
                       new PreInInterface(node2, iface2), outAcl, Drop.INSTANCE, outAcl.not()));
             });
 
-    _bddUtils
-        .computeVrfAcceptBDDs()
-        .forEach(
-            (node, vrfAcceptBDDs) ->
-                vrfAcceptBDDs.forEach(
-                    (vrf, acceptBDD) -> {
-                      Map<StateExpr, BDD> vrfTransitions =
-                          bddTransitions.computeIfAbsent(
-                              new PostInVrf(node, vrf), k -> new HashMap<>());
-                      BDD routableBDD =
-                          _forwardingAnalysis
-                              .getRoutableIps()
-                              .get(node)
-                              .get(vrf)
-                              .accept(_ipSpaceToBDD);
-                      BDD forwardBDD = acceptBDD.not();
-                      vrfTransitions.put(new NodeAccept(node), acceptBDD);
-                      vrfTransitions.put(new PreOutVrf(node, vrf), forwardBDD.and(routableBDD));
-                      vrfTransitions.put(Drop.INSTANCE, forwardBDD.and(routableBDD.not()));
-                    }));
+    _vrfAcceptBDDs.forEach(
+        (node, vrfAcceptBDDs) ->
+            vrfAcceptBDDs.forEach(
+                (vrf, acceptBDD) -> {
+                  Map<StateExpr, BDD> vrfTransitions =
+                      bddTransitions.computeIfAbsent(
+                          new PostInVrf(node, vrf), k -> new HashMap<>());
+                  BDD routableBDD =
+                      _forwardingAnalysis.getRoutableIps().get(node).get(vrf).accept(_ipSpaceToBDD);
+                  BDD forwardBDD = acceptBDD.not();
+                  vrfTransitions.put(new NodeAccept(node), acceptBDD);
+                  vrfTransitions.put(new PreOutVrf(node, vrf), forwardBDD.and(routableBDD));
+                  vrfTransitions.put(Drop.INSTANCE, forwardBDD.and(routableBDD.not()));
+                }));
 
     _configs
         .keySet()
@@ -506,5 +501,20 @@ public class ForwardingAnalysisNetworkGraphFactory {
 
   private String ifaceVrf(String node, String iface) {
     return _configs.get(node).getInterfaces().get(iface).getVrfName();
+  }
+
+  private Map<String, Map<String, BDD>> computeVrfAcceptBDDs() {
+    Map<String, Map<String, IpSpace>> vrfOwnedIpSpaces =
+        CommonUtil.computeVrfOwnedIpSpaces(
+            CommonUtil.computeIpVrfOwners(false, CommonUtil.computeNodeInterfaces(_configs)));
+
+    return CommonUtil.toImmutableMap(
+        vrfOwnedIpSpaces,
+        Entry::getKey,
+        nodeEntry ->
+            CommonUtil.toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey,
+                vrfEntry -> vrfEntry.getValue().accept(_ipSpaceToBDD)));
   }
 }
