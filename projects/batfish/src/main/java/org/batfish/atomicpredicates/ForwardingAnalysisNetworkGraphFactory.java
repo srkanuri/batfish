@@ -41,6 +41,7 @@ import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.bdd.IpSpaceToBDD;
+import org.batfish.symbolic.bdd.MemoizedIpSpaceToBDD;
 import org.batfish.z3.expr.StateExpr;
 import org.batfish.z3.state.Accept;
 import org.batfish.z3.state.Drop;
@@ -62,7 +63,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final BDDUtils _bddUtils;
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
-  private final IpSpaceToBDD _ipSpaceToBDD;
+  private IpSpaceToBDD _ipSpaceToBDD;
   private final Map<String, Map<String, BDD>> _vrfAcceptBDDs;
   private ParallelIpSpaceToBDD _parallelIpSpaceToBDD;
 
@@ -75,7 +76,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _forwardingAnalysis = forwardingAnalysis;
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
 
-    benchmark();
+    benchmarkMemoizedIpSpaceToBDD();
 
     _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
     _aclBDDs = computeAclBDDs();
@@ -260,6 +261,22 @@ public class ForwardingAnalysisNetworkGraphFactory {
     start = System.currentTimeMillis();
     computeNeighborUnreachableBDDsParallel();
     long parallel32 = System.currentTimeMillis() - start;
+  }
+
+  private void benchmarkMemoizedIpSpaceToBDD() {
+    _ipSpaceToBDD = new IpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+
+    long start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsSequential();
+    long unMemoized = System.currentTimeMillis() - start;
+
+    _ipSpaceToBDD = new MemoizedIpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+
+    start = System.currentTimeMillis();
+    computeNeighborUnreachableBDDsSequential();
+    long memoized = System.currentTimeMillis() - start;
+
+    return;
   }
 
   public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsSequential() {
