@@ -278,7 +278,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
 
       factory = newBDDFactory();
       dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
-      _ipSpaceToBDD = new MemoizedIpSpaceToBDD(factory, dstIp);
+      MemoizedIpSpaceToBDD memoizedIpSpaceToBDD = new MemoizedIpSpaceToBDD(factory, dstIp);
+      _ipSpaceToBDD = memoizedIpSpaceToBDD;
 
       _aclBDDs = computeAclBDDs();
       _vrfAcceptBDDs = computeVrfAcceptBDDs();
@@ -288,8 +289,10 @@ public class ForwardingAnalysisNetworkGraphFactory {
 
       System.out.println(
           String.format(
-              "unMemoized=%d\nmemoized=%d\n",
-              unMemoized.get(unMemoized.size() - 1), memoized.get(memoized.size() - 1)));
+              "unMemoized=%d\nmemoized=%d\nhits=%d\n",
+              unMemoized.get(unMemoized.size() - 1),
+              memoized.get(memoized.size() - 1),
+              memoizedIpSpaceToBDD.getHits()));
     }
   }
 
