@@ -14,11 +14,22 @@ import org.batfish.datamodel.PrefixIpSpace;
 /** Extends {@link IpSpaceToBDD} to memoize IpSpaces. */
 public final class MemoizedIpSpaceToBDD extends IpSpaceToBDD {
   private final IdentityHashMap<IpSpace, BDD> _memoTable;
-  private int hits = 0;
+  private int _hits = 0;
 
   public MemoizedIpSpaceToBDD(BDDFactory factory, BDDInteger var) {
     super(factory, var);
     _memoTable = new IdentityHashMap<>();
+  }
+
+  public int getHits() {
+    return _hits;
+  }
+
+  private <T extends IpSpace> BDD memoize(T ipSpace, Function<T, BDD> method) {
+    if (_memoTable.containsKey(ipSpace)) {
+      _hits++;
+    }
+    return _memoTable.computeIfAbsent(ipSpace, x -> method.apply(ipSpace));
   }
 
   @Override
@@ -44,12 +55,5 @@ public final class MemoizedIpSpaceToBDD extends IpSpaceToBDD {
   @Override
   public BDD visitPrefixIpSpace(PrefixIpSpace ipSpace) {
     return memoize(ipSpace, super::visitPrefixIpSpace);
-  }
-
-  private <T extends IpSpace> BDD memoize(T ipSpace, Function<T, BDD> method) {
-    if (_memoTable.containsKey(ipSpace)) {
-      hits++;
-    }
-    return _memoTable.computeIfAbsent(ipSpace, x -> method.apply(ipSpace));
   }
 }
