@@ -55,7 +55,7 @@ import org.batfish.z3.state.PreOutEdgePostNat;
 import org.batfish.z3.state.PreOutVrf;
 
 public class ForwardingAnalysisNetworkGraphFactory {
-  private final Map<String, Map<String, BDD>> _aclBDDs;
+  private Map<String, Map<String, BDD>> _aclBDDs;
   private final List<BDD> _apBDDs;
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
   private final BDDFactory _bddFactory;
@@ -65,7 +65,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
   private IpSpaceToBDD _ipSpaceToBDD;
-  private final Map<String, Map<String, BDD>> _vrfAcceptBDDs;
+  private Map<String, Map<String, BDD>> _vrfAcceptBDDs;
   private ParallelIpSpaceToBDD _parallelIpSpaceToBDD;
 
   public ForwardingAnalysisNetworkGraphFactory(
@@ -77,8 +77,6 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _forwardingAnalysis = forwardingAnalysis;
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
 
-    _aclBDDs = computeAclBDDs();
-    _vrfAcceptBDDs = computeVrfAcceptBDDs();
     benchmarkMemoizedIpSpaceToBDD();
 
     _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
@@ -272,6 +270,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
       BDDInteger dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
       _ipSpaceToBDD = new IpSpaceToBDD(factory, dstIp);
 
+      _aclBDDs = computeAclBDDs();
+      _vrfAcceptBDDs = computeVrfAcceptBDDs();
       long start = System.currentTimeMillis();
       computeBDDTransitions();
       unMemoized.add(System.currentTimeMillis() - start);
@@ -280,6 +280,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
       dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
       _ipSpaceToBDD = new MemoizedIpSpaceToBDD(factory, dstIp);
 
+      _aclBDDs = computeAclBDDs();
+      _vrfAcceptBDDs = computeVrfAcceptBDDs();
       start = System.currentTimeMillis();
       computeBDDTransitions();
       memoized.add(System.currentTimeMillis() - start);
