@@ -11,6 +11,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -264,19 +265,26 @@ public class ForwardingAnalysisNetworkGraphFactory {
   }
 
   private void benchmarkMemoizedIpSpaceToBDD() {
-    _ipSpaceToBDD = new IpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+    List<Long> memoized = new ArrayList<>();
+    List<Long> unMemoized = new ArrayList<>();
+    while (true) {
+      _ipSpaceToBDD = new IpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
 
-    long start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsSequential();
-    long unMemoized = System.currentTimeMillis() - start;
+      long start = System.currentTimeMillis();
+      computeNeighborUnreachableBDDsSequential();
+      unMemoized.add(System.currentTimeMillis() - start);
 
-    _ipSpaceToBDD = new MemoizedIpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+      _ipSpaceToBDD = new MemoizedIpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
 
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsSequential();
-    long memoized = System.currentTimeMillis() - start;
+      start = System.currentTimeMillis();
+      computeNeighborUnreachableBDDsSequential();
+      memoized.add(System.currentTimeMillis() - start);
 
-    return;
+      System.out.println(
+          String.format(
+              "unMemoized=%d\nmemoized=%d\n",
+              unMemoized.get(unMemoized.size() - 1), memoized.get(memoized.size() - 1)));
+    }
   }
 
   public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsSequential() {
@@ -308,7 +316,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
         _ipSpace = ipSpace;
       }
 
-      <U> Tuple<U> mapIpSpace(Function<T, U> mapper) {
+      private <U> Tuple<U> mapIpSpace(Function<T, U> mapper) {
         return new Tuple<>(_node, _vrf, _iface, mapper.apply(_ipSpace));
       }
     }
