@@ -78,10 +78,10 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
 
     _aclBDDs = computeAclBDDs();
+    _vrfAcceptBDDs = computeVrfAcceptBDDs();
     benchmarkMemoizedIpSpaceToBDD();
 
     _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
-    _vrfAcceptBDDs = computeVrfAcceptBDDs();
     _bddTransitions = computeBDDTransitions();
     _apBDDs = computeAPBDDs();
     _apTransitions = computeAPTransitions();
