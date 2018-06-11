@@ -268,13 +268,17 @@ public class ForwardingAnalysisNetworkGraphFactory {
     List<Long> memoized = new ArrayList<>();
     List<Long> unMemoized = new ArrayList<>();
     while (true) {
-      _ipSpaceToBDD = new IpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+      BDDFactory factory = newBDDFactory();
+      BDDInteger dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
+      _ipSpaceToBDD = new IpSpaceToBDD(factory, dstIp);
 
       long start = System.currentTimeMillis();
       computeNeighborUnreachableBDDsSequential();
       unMemoized.add(System.currentTimeMillis() - start);
 
-      _ipSpaceToBDD = new MemoizedIpSpaceToBDD(newBDDFactory(), new BDDPacket().getDstIp());
+      factory = newBDDFactory();
+      dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
+      _ipSpaceToBDD = new MemoizedIpSpaceToBDD(factory, dstIp);
 
       start = System.currentTimeMillis();
       computeNeighborUnreachableBDDsSequential();
