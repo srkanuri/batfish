@@ -40,7 +40,7 @@ public class RoutePolicyBooleanAsPathIn extends RoutePolicyBoolean {
             _expressionLine);
         return BooleanExprs.FALSE;
       } else {
-        asPathSet.getReferers().put(this, "as-path in");
+        asPathSet.addReference(this, "as-path in");
       }
     }
     MatchAsPath match = new MatchAsPath(_asExpr);

@@ -1013,7 +1013,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
     if (policy == null) {
       return;
     }
-    policy.getReferers().put(referer, description);
+    policy.addReference(referer, description);
     List<PsTerm> terms = new ArrayList<>();
     terms.add(policy.getDefaultTerm());
     terms.addAll(policy.getTerms().values());
@@ -1178,8 +1178,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
     if (newIkePolicy != null) {
       _ikePolicies
           .get(ikePolicyName)
-          .getReferers()
-          .put(oldIkeGateway, "IKE policy for IKE gateway: " + oldIkeGateway);
+          .addReference(oldIkeGateway, "IKE policy for IKE gateway: " + oldIkeGateway);
       newIkeGateway.setIkePolicy(newIkePolicy);
     }
 
@@ -1226,15 +1225,13 @@ public final class JuniperConfiguration extends VendorConfiguration {
       FirewallFilter zoneInboundInterfaceFilter = zone.getInboundInterfaceFilters().get(iface);
       if (zoneInboundInterfaceFilter != null) {
         String zoneInboundInterfaceFilterName = zoneInboundInterfaceFilter.getName();
-        zoneInboundInterfaceFilter
-            .getReferers()
-            .put(
-                iface,
-                "Interface: '"
-                    + iface.getName()
-                    + "' refers to inbound filter for interface in zone : '"
-                    + zoneName
-                    + "'");
+        zoneInboundInterfaceFilter.addReference(
+            iface,
+            "Interface: '"
+                + iface.getName()
+                + "' refers to inbound filter for interface in zone : '"
+                + zoneName
+                + "'");
         IpAccessList zoneInboundInterfaceFilterList =
             _c.getIpAccessLists().get(zoneInboundInterfaceFilterName);
         newIface.setInboundFilter(zoneInboundInterfaceFilterList);
@@ -1242,15 +1239,13 @@ public final class JuniperConfiguration extends VendorConfiguration {
         // filter for zone
         FirewallFilter zoneInboundFilter = zone.getInboundFilter();
         String zoneInboundFilterName = zoneInboundFilter.getName();
-        zoneInboundFilter
-            .getReferers()
-            .put(
-                iface,
-                "Interface: '"
-                    + iface.getName()
-                    + "' refers to inbound filter for zone : '"
-                    + zoneName
-                    + "'");
+        zoneInboundFilter.addReference(
+            iface,
+            "Interface: '"
+                + iface.getName()
+                + "' refers to inbound filter for zone : '"
+                + zoneName
+                + "'");
         IpAccessList zoneInboundFilterList = _c.getIpAccessLists().get(zoneInboundFilterName);
         newIface.setInboundFilter(zoneInboundFilterList);
       }
@@ -1267,7 +1262,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
             inAclLine);
       } else {
         FirewallFilter inFilter = _filters.get(inAclName);
-        inFilter.getReferers().put(iface, "Incoming ACL for interface: " + iface.getName());
+        inFilter.addReference(iface, "Incoming ACL for interface: " + iface.getName());
         newIface.setIncomingFilter(inAcl);
         if (inFilter.getRoutingPolicy()) {
           RoutingPolicy routingPolicy = _c.getRoutingPolicies().get(inAclName);
@@ -1399,8 +1394,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
       } else {
         _filters
             .get(outAclName)
-            .getReferers()
-            .put(iface, "Outgoing ACL for interface: " + iface.getName());
+            .addReference(iface, "Outgoing ACL for interface: " + iface.getName());
       }
     }
 
@@ -1547,8 +1541,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
               } else {
                 _ipsecProposals
                     .get(ipsecProposalName)
-                    .getReferers()
-                    .put(oldIpsecPolicy, "IPSEC proposal for IPSEC policy: " + oldIpsecPolicy);
+                    .addReference(
+                        oldIpsecPolicy, "IPSEC proposal for IPSEC policy: " + oldIpsecPolicy);
                 newIpsecPolicy.getProposals().add(ipsecProposal);
               }
             });
@@ -1576,7 +1570,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
             JuniperStructureUsage.IPSEC_VPN_BIND_INTERFACE,
             bindInterfaceLine);
       } else {
-        oldBindInterface.getReferers().put(oldIpsecVpn, "Bind interface for IPSEC VPN: " + name);
+        oldBindInterface.addReference(oldIpsecVpn, "Bind interface for IPSEC VPN: " + name);
         newIpsecVpn.setBindInterface(newBindInterface);
       }
     } else {
@@ -1590,8 +1584,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
       if (ikeGateway != null) {
         _ikeGateways
             .get(ikeGatewayName)
-            .getReferers()
-            .put(oldIpsecVpn, "IKE gateway for IPSEC VPN: " + name);
+            .addReference(oldIpsecVpn, "IKE gateway for IPSEC VPN: " + name);
         newIpsecVpn.setIkeGateway(ikeGateway);
       }
     } else {
@@ -1612,8 +1605,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
       } else {
         _ipsecPolicies
             .get(ipsecPolicyName)
-            .getReferers()
-            .put(oldIpsecVpn, "IPSEC policy for IPSEC VPN: " + name);
+            .addReference(oldIpsecVpn, "IPSEC policy for IPSEC VPN: " + name);
         newIpsecVpn.setIpsecPolicy(ipsecPolicy);
       }
     } else {
@@ -2138,9 +2130,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
             int listLine = community.getAccessListLine();
             PrefixList prefixList = _prefixLists.get(listName);
             if (prefixList != null) {
-              prefixList
-                  .getReferers()
-                  .put(community, "prefix-list for community: " + community.getName());
+              prefixList.addReference(
+                  community, "prefix-list for community: " + community.getName());
             } else {
               undefined(
                   JuniperStructureType.PREFIX_LIST,
@@ -2276,25 +2267,21 @@ public final class JuniperConfiguration extends VendorConfiguration {
     FirewallFilter inboundFilter = zone.getInboundFilter();
     IpAccessList inboundFilterList = null;
     if (inboundFilter != null) {
-      inboundFilter.getReferers().put(zone, "inbound filter for zone: '" + zone.getName() + "'");
+      inboundFilter.addReference(zone, "inbound filter for zone: '" + zone.getName() + "'");
       inboundFilterList = _c.getIpAccessLists().get(inboundFilter.getName());
     }
 
     FirewallFilter fromHostFilter = zone.getFromHostFilter();
     IpAccessList fromHostFilterList = null;
     if (fromHostFilter != null) {
-      fromHostFilter
-          .getReferers()
-          .put(zone, "filter from junos-host to zone: '" + zone.getName() + "'");
+      fromHostFilter.addReference(zone, "filter from junos-host to zone: '" + zone.getName() + "'");
       fromHostFilterList = _c.getIpAccessLists().get(fromHostFilter.getName());
     }
 
     FirewallFilter toHostFilter = zone.getToHostFilter();
     IpAccessList toHostFilterList = null;
     if (toHostFilter != null) {
-      toHostFilter
-          .getReferers()
-          .put(zone, "filter from zone: '" + zone.getName() + "' to junos-host");
+      toHostFilter.addReference(zone, "filter from zone: '" + zone.getName() + "' to junos-host");
       toHostFilterList = _c.getIpAccessLists().get(toHostFilter.getName());
     }
 
@@ -2305,15 +2292,13 @@ public final class JuniperConfiguration extends VendorConfiguration {
       Interface inboundInterface = e.getKey();
       FirewallFilter inboundInterfaceFilter = e.getValue();
       String inboundInterfaceName = inboundInterface.getName();
-      inboundInterfaceFilter
-          .getReferers()
-          .put(
-              zone,
-              "inbound interface filter for zone: '"
-                  + zone.getName()
-                  + "', interface: '"
-                  + inboundInterfaceName
-                  + "'");
+      inboundInterfaceFilter.addReference(
+          zone,
+          "inbound interface filter for zone: '"
+              + zone.getName()
+              + "', interface: '"
+              + inboundInterfaceName
+              + "'");
       String inboundInterfaceFilterName = inboundInterfaceFilter.getName();
       org.batfish.datamodel.Interface newIface = _c.getInterfaces().get(inboundInterfaceName);
       IpAccessList inboundInterfaceFilterList =
@@ -2324,15 +2309,13 @@ public final class JuniperConfiguration extends VendorConfiguration {
     for (Entry<String, FirewallFilter> e : zone.getToZonePolicies().entrySet()) {
       String toZoneName = e.getKey();
       FirewallFilter toZoneFilter = e.getValue();
-      toZoneFilter
-          .getReferers()
-          .put(
-              zone,
-              "cross-zone firewall filter from zone: '"
-                  + zone.getName()
-                  + "' to zone: '"
-                  + toZoneName
-                  + "'");
+      toZoneFilter.addReference(
+          zone,
+          "cross-zone firewall filter from zone: '"
+              + zone.getName()
+              + "' to zone: '"
+              + toZoneName
+              + "'");
       String toZoneFilterName = toZoneFilter.getName();
       IpAccessList toZoneFilterList = _c.getIpAccessLists().get(toZoneFilterName);
       newZone.getToZonePolicies().put(toZoneName, toZoneFilterList);

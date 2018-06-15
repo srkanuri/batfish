@@ -210,7 +210,7 @@ public abstract class VendorConfiguration implements Serializable, GenericConfig
 
   public void recordStructure(
       ReferenceCountedStructure structure, StructureType structureType, String name, int line) {
-    recordStructure(structureType, name, structure.getReferers().size(), line);
+    recordStructure(structureType, name, structure.getNumReferers(), line);
   }
 
   protected <T extends DefinedStructure<String>> void recordStructure(

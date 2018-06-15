@@ -38,7 +38,7 @@ public class RoutePolicyPrefixSetName extends RoutePolicyPrefixSet {
           _expressionLine);
     } else {
       Prefix6List list = cc.getPrefix6Lists().get(_name);
-      list.getReferers().put(this, "route policy named ipv6 prefix-set: '" + _name + "'");
+      list.addReference(this, "route policy named ipv6 prefix-set: '" + _name + "'");
     }
     return new NamedPrefix6Set(_name);
   }
@@ -56,7 +56,7 @@ public class RoutePolicyPrefixSetName extends RoutePolicyPrefixSet {
           _expressionLine);
     } else {
       PrefixList list = cc.getPrefixLists().get(_name);
-      list.getReferers().put(this, "route policy named ipv4 prefix-set: '" + _name + "'");
+      list.addReference(this, "route policy named ipv4 prefix-set: '" + _name + "'");
     }
     return new NamedPrefixSet(_name);
   }

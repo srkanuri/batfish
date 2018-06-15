@@ -13,20 +13,20 @@ public abstract class ReferenceCountedStructure implements Serializable {
   private transient Map<Object, String> _referers;
 
   @JsonIgnore
-  public Map<Object, String> getReferers() {
-    initReferers();
-    return _referers;
-  }
-
-  private void initReferers() {
+  public void addReference(Object referer, String description) {
     if (_referers == null) {
       _referers = new HashMap<>();
     }
+    _referers.put(referer, description);
+  }
+
+  @JsonIgnore
+  public int getNumReferers() {
+    return _referers == null ? 0 : _referers.size();
   }
 
   @JsonIgnore
   public boolean isUnused() {
-    initReferers();
-    return _referers.isEmpty();
+    return _referers == null || _referers.isEmpty();
   }
 }

@@ -31,7 +31,7 @@ public class RouteMapMatchIpPrefixListLine extends RouteMapMatchLine {
     for (String listName : _listNames) {
       PrefixList list = cc.getPrefixLists().get(listName);
       if (list != null) {
-        list.getReferers().put(this, "route-map match prefix-list");
+        list.addReference(this, "route-map match prefix-list");
         disjuncts.add(new MatchPrefixSet(new DestinationNetwork(), new NamedPrefixSet(listName)));
       }
     }

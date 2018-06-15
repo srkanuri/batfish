@@ -41,11 +41,11 @@ public class RouteMapMatchCommunityListLine extends RouteMapMatchLine {
         String msg = "match community line";
         StandardCommunityList standardCommunityList = cc.getStandardCommunityLists().get(listName);
         if (standardCommunityList != null) {
-          standardCommunityList.getReferers().put(this, msg);
+          standardCommunityList.addReference(this, msg);
         }
         ExpandedCommunityList expandedCommunityList = cc.getExpandedCommunityLists().get(listName);
         if (expandedCommunityList != null) {
-          expandedCommunityList.getReferers().put(this, msg);
+          expandedCommunityList.addReference(this, msg);
         }
         disjuncts.add(new MatchCommunitySet(new NamedCommunitySet(listName)));
       } else {

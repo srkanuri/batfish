@@ -28,7 +28,7 @@ public final class FwFromDestinationPrefixListExcept extends FwFrom {
       Configuration c) {
     PrefixList pl = jc.getPrefixLists().get(_name);
     if (pl != null) {
-      pl.getReferers().put(this, "firewall from destination-prefix-list");
+      pl.addReference(this, "firewall from destination-prefix-list");
       if (pl.getIpv6()) {
         return;
       }

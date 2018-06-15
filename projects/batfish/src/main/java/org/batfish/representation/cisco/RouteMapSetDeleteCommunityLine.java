@@ -29,11 +29,11 @@ public class RouteMapSetDeleteCommunityLine extends RouteMapSetLine {
       String msg = "match community line";
       StandardCommunityList standardCommunityList = cc.getStandardCommunityLists().get(_listName);
       if (standardCommunityList != null) {
-        standardCommunityList.getReferers().put(this, msg);
+        standardCommunityList.addReference(this, msg);
       }
       ExpandedCommunityList expandedCommunityList = cc.getExpandedCommunityLists().get(_listName);
       if (expandedCommunityList != null) {
-        expandedCommunityList.getReferers().put(this, msg);
+        expandedCommunityList.addReference(this, msg);
       }
       statements.add(new DeleteCommunity(new NamedCommunitySet(_listName)));
     } else {

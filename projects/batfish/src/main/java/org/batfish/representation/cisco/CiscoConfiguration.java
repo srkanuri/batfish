@@ -1491,7 +1491,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
         if (attributeMap != null) {
           // need to apply attribute changes if this specific route is matched
           weInterior = new CallExpr(attributeMapName);
-          attributeMap.getReferers().put(aggNet, "attribute-map of aggregate route: " + prefix);
+          attributeMap.addReference(aggNet, "attribute-map of aggregate route: " + prefix);
           gr.setAttributePolicy(attributeMapName);
         }
       }
@@ -1536,9 +1536,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
       if (attributeMapName != null) {
         RouteMap attributeMap = _routeMaps.get(attributeMapName);
         if (attributeMap != null) {
-          attributeMap
-              .getReferers()
-              .put(aggNet, "attribute-map of aggregate ipv6 route: " + prefix6);
+          attributeMap.addReference(aggNet, "attribute-map of aggregate ipv6 route: " + prefix6);
           gr.setAttributePolicy(attributeMapName);
         }
       }
@@ -1556,7 +1554,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
       if (mapName != null) {
         RouteMap redistributeRipRouteMap = _routeMaps.get(mapName);
         if (redistributeRipRouteMap != null) {
-          redistributeRipRouteMap.getReferers().put(proc, "RIP redistribution route-map");
+          redistributeRipRouteMap.addReference(proc, "RIP redistribution route-map");
           weInterior = new CallExpr(mapName);
         } else {
           undefined(
@@ -1583,7 +1581,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
       if (mapName != null) {
         RouteMap redistributeStaticRouteMap = _routeMaps.get(mapName);
         if (redistributeStaticRouteMap != null) {
-          redistributeStaticRouteMap.getReferers().put(proc, "static redistribution route-map");
+          redistributeStaticRouteMap.addReference(proc, "static redistribution route-map");
           weInterior = new CallExpr(mapName);
         } else {
           undefined(
@@ -1610,9 +1608,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
       if (mapName != null) {
         RouteMap redistributeConnectedRouteMap = _routeMaps.get(mapName);
         if (redistributeConnectedRouteMap != null) {
-          redistributeConnectedRouteMap
-              .getReferers()
-              .put(proc, "connected redistribution route-map");
+          redistributeConnectedRouteMap.addReference(proc, "connected redistribution route-map");
           weInterior = new CallExpr(mapName);
         } else {
           undefined(
@@ -1639,7 +1635,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
       if (mapName != null) {
         RouteMap redistributeOspfRouteMap = _routeMaps.get(mapName);
         if (redistributeOspfRouteMap != null) {
-          redistributeOspfRouteMap.getReferers().put(proc, "ospf redistribution route-map");
+          redistributeOspfRouteMap.addReference(proc, "ospf redistribution route-map");
           weInterior = new CallExpr(mapName);
         } else {
           undefined(
@@ -1720,7 +1716,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
                 RouteMap routeMap = _routeMaps.get(mapName);
                 if (routeMap != null) {
                   weExpr = new CallExpr(mapName);
-                  routeMap.getReferers().put(proc, "bgp ipv4 advertised network route-map");
+                  routeMap.addReference(proc, "bgp ipv4 advertised network route-map");
                 } else {
                   undefined(
                       CiscoStructureType.ROUTE_MAP,
@@ -1764,7 +1760,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
                 if (mapName != null) {
                   RouteMap routeMap = _routeMaps.get(mapName);
                   if (routeMap != null) {
-                    routeMap.getReferers().put(proc, "bgp ipv6 advertised network route-map");
+                    routeMap.addReference(proc, "bgp ipv6 advertised network route-map");
                     BooleanExpr we =
                         bgpRedistributeWithEnvironmentExpr(new CallExpr(mapName), OriginType.IGP);
                     Conjunction exportNetwork6Conditions = new Conjunction();
@@ -1819,9 +1815,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
               lpg.getInboundRouteMapLine());
         } else {
           RouteMap inboundRouteMap = _routeMaps.get(inboundRouteMapName);
-          inboundRouteMap
-              .getReferers()
-              .put(lpg, "inbound route-map for leaf peer-group: " + lpg.getName());
+          inboundRouteMap.addReference(
+              lpg, "inbound route-map for leaf peer-group: " + lpg.getName());
         }
       }
       String inboundRoute6MapName = lpg.getInboundRoute6Map();
@@ -1835,9 +1830,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
               lpg.getInboundRoute6MapLine());
         } else {
           RouteMap inboundRouteMap = _routeMaps.get(inboundRoute6MapName);
-          inboundRouteMap
-              .getReferers()
-              .put(lpg, "inbound route-map for leaf peer-group: " + lpg.getName());
+          inboundRouteMap.addReference(
+              lpg, "inbound route-map for leaf peer-group: " + lpg.getName());
         }
       }
       String peerExportPolicyName =
@@ -1873,9 +1867,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
               CiscoStructureUsage.BGP_OUTBOUND_ROUTE_MAP,
               lpg.getOutboundRouteMapLine());
         } else {
-          outboundRouteMap
-              .getReferers()
-              .put(lpg, "outbound route-map for leaf peer-group: " + lpg.getName());
+          outboundRouteMap.addReference(
+              lpg, "outbound route-map for leaf peer-group: " + lpg.getName());
           peerExportConditions.getConjuncts().add(new CallExpr(outboundRouteMapName));
         }
       }
@@ -1889,9 +1882,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
               CiscoStructureUsage.BGP_OUTBOUND_ROUTE6_MAP,
               lpg.getOutboundRoute6MapLine());
         } else {
-          outboundRoute6Map
-              .getReferers()
-              .put(lpg, "outbound ipv6 route-map for leaf peer-group: " + lpg.getName());
+          outboundRoute6Map.addReference(
+              lpg, "outbound ipv6 route-map for leaf peer-group: " + lpg.getName());
         }
       }
 
@@ -1942,9 +1934,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
                 lpg.getDefaultOriginateMapLine());
           } else {
             RouteMap defaultRouteGenerationRouteMap = _routeMaps.get(defaultOriginateMapName);
-            defaultRouteGenerationRouteMap
-                .getReferers()
-                .put(lpg, "default route generation policy for leaf peer-group: " + lpg.getName());
+            defaultRouteGenerationRouteMap.addReference(
+                lpg, "default route generation policy for leaf peer-group: " + lpg.getName());
             defaultRoute.setGenerationPolicy(defaultOriginateMapName);
           }
         } else {
@@ -1981,9 +1972,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
           inboundPrefixList = _prefix6Lists.get(inboundPrefixListName);
         }
         if (inboundPrefixList != null) {
-          inboundPrefixList
-              .getReferers()
-              .put(lpg, "inbound prefix-list for neighbor: '" + lpg.getName() + "'");
+          inboundPrefixList.addReference(
+              lpg, "inbound prefix-list for neighbor: '" + lpg.getName() + "'");
         } else {
           if (ipv4) {
             undefined(
@@ -2009,9 +1999,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
           outboundPrefixList = _prefix6Lists.get(outboundPrefixListName);
         }
         if (outboundPrefixList != null) {
-          outboundPrefixList
-              .getReferers()
-              .put(lpg, "outbound prefix-list for neighbor: '" + lpg.getName() + "'");
+          outboundPrefixList.addReference(
+              lpg, "outbound prefix-list for neighbor: '" + lpg.getName() + "'");
         } else {
           if (ipv4) {
             undefined(
@@ -2118,11 +2107,11 @@ public final class CiscoConfiguration extends VendorConfiguration {
       String msg = "source nat acl for interface: " + iface.getName();
       ExtendedAccessList sourceNatExtendedAccessList = _extendedAccessLists.get(sourceNatAclName);
       if (sourceNatExtendedAccessList != null) {
-        sourceNatExtendedAccessList.getReferers().put(iface, msg);
+        sourceNatExtendedAccessList.addReference(iface, msg);
       }
       StandardAccessList sourceNatStandardAccessList = _standardAccessLists.get(sourceNatAclName);
       if (sourceNatStandardAccessList != null) {
-        sourceNatStandardAccessList.getReferers().put(iface, msg);
+        sourceNatStandardAccessList.addReference(iface, msg);
       }
     }
 
@@ -2131,7 +2120,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     if (sourceNatPoolName != null) {
       NatPool sourceNatPool = _natPools.get(sourceNatPoolName);
       if (sourceNatPool != null) {
-        sourceNatPool.getReferers().put(iface, "source nat pool for interface: " + iface.getName());
+        sourceNatPool.addReference(iface, "source nat pool for interface: " + iface.getName());
         Ip firstIp = sourceNatPool.getFirst();
         if (firstIp != null) {
           Ip lastIp = sourceNatPool.getLast();
@@ -2311,9 +2300,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
             CiscoStructureUsage.INTERFACE_POLICY_ROUTING_MAP,
             iface.getRoutingPolicyLine());
       } else {
-        routingPolicyRouteMap
-            .getReferers()
-            .put(iface, "routing policy for interface: " + iface.getName());
+        routingPolicyRouteMap.addReference(
+            iface, "routing policy for interface: " + iface.getName());
       }
       newIface.setRoutingPolicy(routingPolicyName);
     }
@@ -2419,7 +2407,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
             structureType,
             policy.getRouteMapLine());
       } else {
-        exportRouteMap.getReferers().put(proc, structureType.getDescription());
+        exportRouteMap.addReference(proc, structureType.getDescription());
         ospfExportConditions.getConjuncts().add(new CallExpr(exportRouteMapName));
       }
     }
@@ -2568,7 +2556,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
               proc.getDefaultInformationOriginateMapLine());
         } else {
           RouteMap generationRouteMap = _routeMaps.get(defaultOriginateMapName);
-          generationRouteMap.getReferers().put(proc, "ospf default-originate route-map");
+          generationRouteMap.addReference(proc, "ospf default-originate route-map");
           GeneratedRoute.Builder route = new GeneratedRoute.Builder();
           route.setNetwork(Prefix.ZERO);
           route.setAdmin(MAX_ADMINISTRATIVE_COST);
@@ -2712,7 +2700,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
               proc.getDefaultInformationOriginateMapLine());
         } else {
           RouteMap generationRouteMap = _routeMaps.get(defaultOriginateMapName);
-          generationRouteMap.getReferers().put(proc, "rip default-originate route-map");
+          generationRouteMap.addReference(proc, "rip default-originate route-map");
           GeneratedRoute.Builder route = new GeneratedRoute.Builder();
           route.setNetwork(Prefix.ZERO);
           route.setAdmin(MAX_ADMINISTRATIVE_COST);
@@ -2758,7 +2746,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
               CiscoStructureUsage.RIP_REDISTRIBUTE_CONNECTED_MAP,
               rcp.getRouteMapLine());
         } else {
-          exportConnectedRouteMap.getReferers().put(proc, "rip redistribute connected route-map");
+          exportConnectedRouteMap.addReference(proc, "rip redistribute connected route-map");
           ripExportConnectedConditions
               .getConjuncts()
               .add(new CallExpr(exportConnectedRouteMapName));
@@ -2796,7 +2784,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
               CiscoStructureUsage.RIP_REDISTRIBUTE_STATIC_MAP,
               rsp.getRouteMapLine());
         } else {
-          exportStaticRouteMap.getReferers().put(proc, "rip redistribute static route-map");
+          exportStaticRouteMap.addReference(proc, "rip redistribute static route-map");
           ripExportStaticConditions.getConjuncts().add(new CallExpr(exportStaticRouteMapName));
         }
       }
@@ -2832,7 +2820,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
               CiscoStructureUsage.RIP_REDISTRIBUTE_BGP_MAP,
               rbp.getRouteMapLine());
         } else {
-          exportBgpRouteMap.getReferers().put(proc, "rip redistribute bgp route-map");
+          exportBgpRouteMap.addReference(proc, "rip redistribute bgp route-map");
           ripExportBgpConditions.getConjuncts().add(new CallExpr(exportBgpRouteMapName));
         }
       }
@@ -3134,9 +3122,9 @@ public final class CiscoConfiguration extends VendorConfiguration {
         String msg = "used for routing";
         StandardAccessList parent = eaList.getParent();
         if (parent != null) {
-          parent.getReferers().put(this, msg);
+          parent.addReference(this, msg);
         } else {
-          eaList.getReferers().put(this, msg);
+          eaList.addReference(this, msg);
         }
         RouteFilterList rfList = CiscoConversions.toRouteFilterList(eaList);
         c.getRouteFilterLists().put(rfList.getName(), rfList);
@@ -3178,9 +3166,9 @@ public final class CiscoConfiguration extends VendorConfiguration {
         String msg = "used for routing";
         StandardIpv6AccessList parent = eaList.getParent();
         if (parent != null) {
-          parent.getReferers().put(this, msg);
+          parent.addReference(this, msg);
         } else {
-          eaList.getReferers().put(this, msg);
+          eaList.addReference(this, msg);
         }
         Route6FilterList rfList = CiscoConversions.toRoute6FilterList(eaList);
         c.getRoute6FilterLists().put(rfList.getName(), rfList);
