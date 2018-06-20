@@ -1,6 +1,14 @@
 package org.batfish.symbolic.bdd;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSet.Builder;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDException;
 import net.sf.javabdd.BDDFactory;
@@ -47,6 +55,76 @@ public class BDDInteger {
     return bdd;
   }
 
+  /** Find a representative value of the represented integer that satisfies a given constraint. */
+  public Optional<Long> getValueSatisfying(BDD bdd) {
+    BDD satAssignment = bdd.fullSatOne();
+    return satAssignment.isZero()
+        ? Optional.empty()
+        : Optional.of(satAssignmentToLong(satAssignment));
+  }
+
+  /** @param satAssignment a satisfying assignment (i.e. produced by fullSat, allSat, etc) */
+  private Long satAssignmentToLong(BDD satAssignment) {
+    if (_bitvec.length > Long.SIZE) {
+      throw new IllegalArgumentException(
+          "Can't get a representative of a BDDInteger with more than Long.SIZE bits");
+    }
+
+    long value = 0;
+    for (int i = 0; i < _bitvec.length; i++) {
+      BDD bitBDD = _bitvec[_bitvec.length - i - 1];
+      if (!satAssignment.and(bitBDD).isZero()) {
+        value |= 1 << i;
+      }
+    }
+    return value;
+  }
+
+  public List<Long> getValuesSatisfying(BDD bdd, int max) {
+    ImmutableList.Builder<Long> values = new ImmutableList.Builder<>();
+
+    checkArgument(max > 0, "max must be > 0");
+
+    int num = 0;
+    while (num < max) {
+      BDD satAssignment = bdd.fullSatOne();
+      if (satAssignment.isZero()) {
+        break;
+      }
+
+      Long val = satAssignmentToLong(satAssignment);
+      values.add(val);
+      bdd = bdd.and(value(val).not());
+      num++;
+    }
+    return values.build();
+  }
+
+  public Set<Long> getValuesSatisfying_bad(BDD bdd) {
+    ImmutableSet.Builder<Long> values = new Builder<>();
+    @SuppressWarnings("unchecked")
+    List<byte[]> satAssignments = (List<byte[]>) bdd.allsat();
+    for (byte[] bitvec : satAssignments) {
+      long value = 0;
+      for (int i = 0; i < bitvec.length; i++) {
+        byte bit = bitvec[bitvec.length - i - 1];
+        assert bit == 0 || bit == 1;
+        if (bit == 1) {
+          value += 1 << i;
+        }
+      }
+      values.add(value);
+    }
+    return values.build();
+    /*
+    List<BDD> satAssignments = (List<BDD>) bdd.allsat();
+    return satAssignments
+        .stream()
+        .map(this::satAssignmentToLong)
+        .collect(ImmutableSet.toImmutableSet());
+        */
+  }
+
   /*
    * Create an integer and initialize it to a concrete value
    */
@@ -70,8 +148,8 @@ public class BDDInteger {
   /*
    * Create a BDD representing the exact value
    */
-  public BDD value(int val) {
-    int currentVal = val;
+  public BDD value(long val) {
+    long currentVal = val;
     BDD bdd = _factory.one();
     for (int i = this._bitvec.length - 1; i >= 0; i--) {
       BDD b = this._bitvec[i];

@@ -15,7 +15,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
@@ -60,8 +59,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
-import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
-import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -201,7 +198,6 @@ import org.batfish.z3.Synthesizer;
 import org.batfish.z3.SynthesizerInputImpl;
 import org.batfish.z3.expr.BooleanExpr;
 import org.batfish.z3.expr.OrExpr;
-import org.batfish.z3.expr.StateExpr;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -4300,6 +4296,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   private void atomicPredicates(
       Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
+    /*
     NetworkGraph graph =
         new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis)
             .networkGraph();
@@ -4316,6 +4313,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     }
 
     throw new BatfishException("Done baby");
+    */
   }
 
   @Nonnull
@@ -4346,7 +4344,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     _logger.info("Synthesizing Z3 logic...");
 
-    atomicPredicates(configurations, forwardingAnalysis);
+    // atomicPredicates(configurations, forwardingAnalysis);
 
     Synthesizer s =
         new Synthesizer(

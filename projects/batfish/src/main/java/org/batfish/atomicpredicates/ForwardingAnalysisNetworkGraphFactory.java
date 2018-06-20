@@ -36,6 +36,10 @@ import org.batfish.datamodel.ForwardingAnalysis;
 import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.main.BDDUtils;
+import org.batfish.specifier.InterfaceLinkLocation;
+import org.batfish.specifier.InterfaceLocation;
+import org.batfish.specifier.IpSpaceAssignment;
+import org.batfish.specifier.LocationVisitor;
 import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDAcl;
 import org.batfish.symbolic.bdd.BDDInteger;
@@ -49,6 +53,8 @@ import org.batfish.z3.state.Drop;
 import org.batfish.z3.state.NeighborUnreachable;
 import org.batfish.z3.state.NodeAccept;
 import org.batfish.z3.state.NodeInterfaceNeighborUnreachable;
+import org.batfish.z3.state.OriginateInterfaceLink;
+import org.batfish.z3.state.OriginateVrf;
 import org.batfish.z3.state.PostInVrf;
 import org.batfish.z3.state.PreInInterface;
 import org.batfish.z3.state.PreOutEdgePostNat;
@@ -59,7 +65,6 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final List<BDD> _apBDDs;
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
   private final BDDFactory _bddFactory;
-  private final BDDOps _bddOps;
   private final Map<StateExpr, Map<StateExpr, BDD>> _bddTransitions;
   private final BDDUtils _bddUtils;
   private final Map<String, Configuration> _configs;
@@ -72,85 +77,28 @@ public class ForwardingAnalysisNetworkGraphFactory {
       Map<String, Configuration> configs, ForwardingAnalysis forwardingAnalysis) {
     _bddUtils = new BDDUtils(configs, forwardingAnalysis);
     _bddFactory = _bddUtils.getBDDFactory();
-    _bddOps = new BDDOps(_bddUtils.getBDDFactory());
     _configs = configs;
     _forwardingAnalysis = forwardingAnalysis;
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
 
-    benchmarkMemoizedIpSpaceToBDD();
+    _aclBDDs = computeAclBDDs(configs, _bddFactory);
+    _arpTrueEdgeBDDs = computeArpTrueEdgeBDDs(forwardingAnalysis, _ipSpaceToBDD);
+    _neighborUnreachableBDDs = computeNeighborUnreachableBDDs(forwardingAnalysis, _ipSpaceToBDD);
+    _routableBDDs = computeRoutableBDDs(forwardingAnalysis, _ipSpaceToBDD);
+    _vrfAcceptBDDs = computeVrfAcceptBDDs(configs, _ipSpaceToBDD);
+    _vrfNotAcceptBDDs = computeVrfNotAcceptBDDs(_vrfAcceptBDDs);
 
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(_bddOps.getBDDFactory(), 2);
     _bddTransitions = computeBDDTransitions();
+
     _apBDDs = computeAPBDDs();
     _apTransitions = computeAPTransitions();
   }
 
-  private class ParallelIpSpaceToBDD {
-    private final BlockingQueue<BDDFactory> _generatorFactories;
-    private final BDDFactory _loaderFactory;
-    private BDD _loaderFactoryOne;
-    private BDD _loaderFactoryZero;
-
-    ParallelIpSpaceToBDD(BDDFactory loaderFactory, int capacity) {
-      _generatorFactories = new ArrayBlockingQueue<>(capacity);
-      _loaderFactory = loaderFactory;
-      _loaderFactoryOne = loaderFactory.one();
-      _loaderFactoryZero = loaderFactory.zero();
-
-      while (_generatorFactories.remainingCapacity() > 0) {
-        _generatorFactories.add(newBDDFactory());
-      }
-    }
-
-    BDD toBDD(IpSpace ipSpace) {
-      BDDFactory generatorFactory = null;
-      try {
-        generatorFactory = _generatorFactories.take();
-        BDD result = toBDD(ipSpace, generatorFactory);
-        _generatorFactories.put(generatorFactory);
-        return result;
-      } catch (InterruptedException e) {
-        throw new BatfishException("Interrupted", e);
-      }
-    }
-
-    BDD toBDD(IpSpace ipSpace, BDDFactory generatorFactory) {
-      // magic numbers: match the indexes used in BDDPacket (and thus _loaderFactory) for dstIp ;)
-      BDDInteger dstIp = BDDInteger.makeFromIndex(generatorFactory, 32, 8, true);
-      IpSpaceToBDD ipSpaceToBDD = new IpSpaceToBDD(generatorFactory, dstIp);
-      BDD bdd = ipSpace.accept(ipSpaceToBDD);
-
-      // special case: one, zero crash (de)serialization
-      if (bdd.isOne()) {
-        return _loaderFactoryOne;
-      }
-      if (bdd.isZero()) {
-        return _loaderFactoryZero;
-      }
-
-      StringWriter stringWriter = new StringWriter();
-      BufferedWriter writer = new BufferedWriter(stringWriter);
-
-      try {
-        generatorFactory.save(writer, bdd);
-      } catch (IOException e) {
-        throw new BatfishException("Error saving BDD", e);
-      }
-
-      try {
-        BufferedReader reader = new BufferedReader(new StringReader(stringWriter.toString()));
-        synchronized (_loaderFactory) {
-          return _loaderFactory.load(reader);
-        }
-      } catch (IOException | BDDException e) {
-        throw new BatfishException("Error loading BDD", e);
-      }
-    }
-  }
-
-  private Map<String, Map<String, BDD>> computeAclBDDs() {
+  private static Map<String, Map<String, BDD>> computeAclBDDs(
+      Map<String, Configuration> configs, BDDFactory factory) {
+    BDDOps bddOps = new BDDOps(factory);
     return toImmutableMap(
-        _configs,
+        configs,
         Entry::getKey,
         nodeEntry ->
             toImmutableMap(
@@ -160,7 +108,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
                   BDDAcl bddAcl = BDDAcl.create(aclEntry.getValue());
                   BDDPacket pkt = bddAcl.getPkt();
                   BDD nonIpVars =
-                      _bddOps.and(
+                      bddOps.and(
                           pkt.getTcpAck(),
                           pkt.getTcpCwr(),
                           pkt.getTcpEce(),
@@ -168,12 +116,12 @@ public class ForwardingAnalysisNetworkGraphFactory {
                           pkt.getTcpPsh(),
                           pkt.getTcpRst(),
                           pkt.getTcpSyn(),
-                          _bddOps.and(pkt.getDstPort().getBitvec()),
-                          _bddOps.and(pkt.getIcmpCode().getBitvec()),
-                          _bddOps.and(pkt.getIcmpType().getBitvec()),
-                          _bddOps.and(pkt.getIpProtocol().getBitvec()),
-                          _bddOps.and(pkt.getSrcIp().getBitvec()),
-                          _bddOps.and(pkt.getSrcPort().getBitvec()));
+                          bddOps.and(pkt.getDstPort().getBitvec()),
+                          bddOps.and(pkt.getIcmpCode().getBitvec()),
+                          bddOps.and(pkt.getIcmpType().getBitvec()),
+                          bddOps.and(pkt.getIpProtocol().getBitvec()),
+                          bddOps.and(pkt.getSrcIp().getBitvec()),
+                          bddOps.and(pkt.getSrcPort().getBitvec()));
                   return bddAcl.getBdd().exist(nonIpVars);
                 }));
   }
@@ -189,116 +137,96 @@ public class ForwardingAnalysisNetworkGraphFactory {
                 .collect(Collectors.toList())));
   }
 
-  /**
-   * private Map<String, Map<String, BDD>> computeBDDTransitionsFib() { Map<String, Map<String,
-   * Set<Ip>>> interfaceOwnedIps = null; Map<String, Map<String, Fib>> fibs = null;
-   *
-   * <p>}
-   */
+  private Map<StateExpr, Map<StateExpr, BDD>> computeBDDTransitions() {
+    Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = new HashMap<>();
 
-  /**
-   * Compute all the BDD transitions for a Vrf in a single-pass, sharing as much of the BDD
-   * computation as possible.
-   */
-  /*
-  private void computeVrfBDDTransitions(Set<Ip> ownedIps, Fib fib) {
-    BDD ownedIpsBDD = null;
+    generateRules()
+        .forEach(
+            edge ->
+                bddTransitions
+                    .computeIfAbsent(edge._preState, k -> new HashMap<>())
+                    .put(edge._postState, edge._constraint));
 
-    fib.getNextHopInterfaces()
-
-    List<AbstractRoute> routes = null;
-    // sort by increasing prefix length
-    routes.sort(
-        (route1, route2) -> {
-          int byLen = route1.getNetwork().getPrefixLength() - route2.getNetwork().getPrefixLength();
-          return byLen != 0
-              ? byLen
-              : route1.getNetwork().getStartIp().compareTo(route2.getNetwork().getStartIp());
-        });
-    // sort by decreasing prefix length
-    Lists.reverse(routes);
-
-    BDD reach = ownedIpsBDD.not();
-    for(AbstractRoute route : routes) {
-      BDD forward = reach.and(_ipSpaceToBDD.toBDD(route.getNetwork()));
-
-      fib.getNextHopInterfaces().get(route);
-    }
-  }
-  */
-  private void benchmark() {
-    long start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsSequential();
-    long sequential = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 1);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel1 = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 2);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel2 = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 4);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel4 = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 8);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel8 = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 16);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel16 = System.currentTimeMillis() - start;
-
-    _parallelIpSpaceToBDD = new ParallelIpSpaceToBDD(newBDDFactory(), 32);
-    start = System.currentTimeMillis();
-    computeNeighborUnreachableBDDsParallel();
-    long parallel32 = System.currentTimeMillis() - start;
-  }
-
-  private void benchmarkMemoizedIpSpaceToBDD() {
-    List<Long> memoized = new ArrayList<>();
-    List<Long> unMemoized = new ArrayList<>();
-    while (true) {
-      BDDFactory factory = newBDDFactory();
-      BDDInteger dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
-      _ipSpaceToBDD = new IpSpaceToBDD(factory, dstIp);
-
-      _aclBDDs = computeAclBDDs();
-      _vrfAcceptBDDs = computeVrfAcceptBDDs();
-      long start = System.currentTimeMillis();
-      computeBDDTransitions();
-      unMemoized.add(System.currentTimeMillis() - start);
-
-      factory = newBDDFactory();
-      dstIp = BDDInteger.makeFromIndex(factory, 32, 8, true);
-      MemoizedIpSpaceToBDD memoizedIpSpaceToBDD = new MemoizedIpSpaceToBDD(factory, dstIp);
-      _ipSpaceToBDD = memoizedIpSpaceToBDD;
-
-      _aclBDDs = computeAclBDDs();
-      _vrfAcceptBDDs = computeVrfAcceptBDDs();
-      start = System.currentTimeMillis();
-      computeBDDTransitions();
-      memoized.add(System.currentTimeMillis() - start);
-
-      System.out.println(
-          String.format(
-              "unMemoized=%d\nmemoized=%d\nhits=%d\n",
-              unMemoized.get(unMemoized.size() - 1),
-              memoized.get(memoized.size() - 1),
-              memoizedIpSpaceToBDD.getHits()));
-    }
-  }
-
-  public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsSequential() {
+    // freeze
     return toImmutableMap(
-        _forwardingAnalysis.getNeighborUnreachable(),
+        bddTransitions,
+        Entry::getKey,
+        preStateEntry -> toImmutableMap(preStateEntry.getValue(), Entry::getKey, Entry::getValue));
+  }
+
+  private static Map<String, Map<String, BDD>> computeRoutableBDDs(
+      ForwardingAnalysis forwardingAnalysis, IpSpaceToBDD ipSpaceToBDD) {
+    return toImmutableMap(
+        forwardingAnalysis.getRoutableIps(),
+        Entry::getKey,
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey,
+                vrfEntry -> vrfEntry.getValue().accept(ipSpaceToBDD)));
+  }
+
+  private static Map<String, Map<String, BDD>> computeVrfNotAcceptBDDs(
+      Map<String, Map<String, BDD>> vrfAcceptBDDs) {
+    return toImmutableMap(
+        vrfAcceptBDDs,
+        Entry::getKey,
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(), Entry::getKey, vrfEntry -> vrfEntry.getValue().not()));
+  }
+
+  List<BDD> getApBDDs() {
+    return _apBDDs;
+  }
+
+  Map<StateExpr, Map<StateExpr, BDD>> getBDDTransitions() {
+    return _bddTransitions;
+  }
+
+  IpSpaceToBDD getIpSpaceToBDD() {
+    return _ipSpaceToBDD;
+  }
+
+  Map<String, Map<String, BDD>> getVrfAcceptBDDs() {
+    return _vrfAcceptBDDs;
+  }
+
+  public Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> getApTransitions() {
+    return _apTransitions;
+  }
+
+  public BDDFactory getBDDFactory() {
+    return _bddFactory;
+  }
+
+  @VisibleForTesting
+  static class Edge {
+    final BDD _constraint;
+    final StateExpr _postState;
+    final StateExpr _preState;
+
+    Edge(StateExpr preState, StateExpr postState, BDD constraint) {
+      _constraint = constraint;
+      _postState = postState;
+      _preState = preState;
+    }
+  }
+
+  @VisibleForTesting
+  static Map<org.batfish.datamodel.Edge, BDD> computeArpTrueEdgeBDDs(
+      ForwardingAnalysis forwardingAnalysis, IpSpaceToBDD ipSpaceToBDD) {
+    return toImmutableMap(
+        forwardingAnalysis.getArpTrueEdge(),
+        Entry::getKey,
+        entry -> entry.getValue().accept(ipSpaceToBDD));
+  }
+
+  @VisibleForTesting
+  static Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDs(
+      ForwardingAnalysis forwardingAnalysis, IpSpaceToBDD ipSpaceToBDD) {
+    return toImmutableMap(
+        forwardingAnalysis.getNeighborUnreachable(),
         Entry::getKey,
         nodeEntry ->
             toImmutableMap(
@@ -308,33 +236,319 @@ public class ForwardingAnalysisNetworkGraphFactory {
                     toImmutableMap(
                         vrfEntry.getValue(),
                         Entry::getKey,
-                        ifaceEntry -> ifaceEntry.getValue().accept(_ipSpaceToBDD))));
+                        ifaceEntry -> ifaceEntry.getValue().accept(ipSpaceToBDD))));
   }
 
-  public Map<String, Map<String, Map<String, BDD>>> computeNeighborUnreachableBDDsParallel() {
-    class Tuple<T> {
-      String _node;
-      String _vrf;
-      String _iface;
-      T _ipSpace;
+  @VisibleForTesting
+  Stream<Edge> generateRules() {
+    return Streams.concat(
+        generateRules_NodeAccept_Accept(),
+        generateRules_NodeDropAclIn_NodeDrop(),
+        generateRules_NodeDropNullRoute_NodeDrop(),
+        generateRules_NodeDropAclOut_NodeDrop(),
+        generateRules_NodeDrop_Drop(),
+        generateRules_NodeInterfaceNeighborUnreachable_NeighborUnreachable(),
+        generateRules_OriginateInterface_PreInInterface(),
+        generateRules_OriginateVrf_PostInVrf(),
+        generateRules_PreInInterface_NodeDropAclIn(),
+        generateRules_PreInInterface_PostInVrf(),
+        generateRules_PostInVrf_NodeAccept(),
+        generateRules_PostInVrf_NodeDropNoRoute(),
+        generateRules_PostInVrf_PreOutVrf(),
+        generateRules_PreOutEdgePostNat_NodeDropAclOut(),
+        generateRules_PreOutEdgePostNat_PreInInterface(),
+        generateRules_PreOutVrf_NodeDropNullRoute(),
+        generateRules_PreOutVrf_NodeInterfaceNeighborUnreachable(),
+        generateRules_PreOutVrf_PreOutEdgePostNat());
+  }
 
-      Tuple(String node, String vrf, String iface, T ipSpace) {
-        _node = node;
-        _vrf = vrf;
-        _iface = iface;
-        _ipSpace = ipSpace;
-      }
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeAccept_Accept() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeAccept(node), Accept.INSTANCE, _bddFactory.one()));
+  }
 
-      private <U> Tuple<U> mapIpSpace(Function<T, U> mapper) {
-        return new Tuple<>(_node, _vrf, _iface, mapper.apply(_ipSpace));
-      }
-    }
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeDropAclIn_NodeDrop() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeDropAclIn(node), new NodeDrop(node), _bddFactory.one()));
+  }
 
-    Map<String, Map<String, Map<String, BDD>>> result = new HashMap<>();
-    _forwardingAnalysis
-        .getNeighborUnreachable()
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeDropAclOut_NodeDrop() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeDropAclOut(node), new NodeDrop(node), _bddFactory.one()));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeDropNullRoute_NodeDrop() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeDropNullRoute(node), new NodeDrop(node), _bddFactory.one()));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeDrop_Drop() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeDrop(node), Drop.INSTANCE, _bddFactory.one()));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_NodeInterfaceNeighborUnreachable_NeighborUnreachable() {
+    return _configs
+        .values()
+        .stream()
+        .flatMap(c -> c.getInterfaces().values().stream())
+        .map(
+            iface -> {
+              String nodeNode = iface.getOwner().getHostname();
+              String ifaceName = iface.getName();
+              return new Edge(
+                  new NodeInterfaceNeighborUnreachable(nodeNode, ifaceName),
+                  NeighborUnreachable.INSTANCE,
+                  _bddFactory.one());
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_OriginateInterface_PreInInterface() {
+    return _configs
+        .values()
+        .stream()
+        .map(Configuration::getInterfaces)
+        .map(Map::values)
+        .flatMap(Collection::stream)
+        .map(
+            iface -> {
+              String hostname = iface.getOwner().getHostname();
+              String name = iface.getName();
+              return new Edge(
+                  new OriginateInterfaceLink(hostname, name),
+                  new PreInInterface(hostname, name),
+                  _bddFactory.one());
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_OriginateVrf_PostInVrf() {
+    return _configs
+        .values()
+        .stream()
+        .flatMap(
+            config -> {
+              String hostname = config.getHostname();
+              return config
+                  .getVrfs()
+                  .values()
+                  .stream()
+                  .map(
+                      vrf -> {
+                        String vrfName = vrf.getName();
+                        return new Edge(
+                            new OriginateVrf(hostname, vrfName),
+                            new PostInVrf(hostname, vrfName),
+                            _bddFactory.one());
+                      });
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PostInVrf_NodeAccept() {
+    return _vrfAcceptBDDs
         .entrySet()
-        .parallelStream()
+        .stream()
+        .flatMap(
+            nodeEntry ->
+                nodeEntry
+                    .getValue()
+                    .entrySet()
+                    .stream()
+                    .map(
+                        vrfEntry -> {
+                          String node = nodeEntry.getKey();
+                          String vrf = vrfEntry.getKey();
+                          BDD acceptBDD = vrfEntry.getValue();
+                          return new Edge(
+                              new PostInVrf(node, vrf), new NodeAccept(node), acceptBDD);
+                        }));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PostInVrf_NodeDropNoRoute() {
+    return _vrfNotAcceptBDDs
+        .entrySet()
+        .stream()
+        .flatMap(
+            nodeEntry ->
+                nodeEntry
+                    .getValue()
+                    .entrySet()
+                    .stream()
+                    .map(
+                        vrfEntry -> {
+                          String node = nodeEntry.getKey();
+                          String vrf = vrfEntry.getKey();
+                          BDD notAcceptBDD = vrfEntry.getValue();
+                          BDD notRoutableBDD = _routableBDDs.get(node).get(vrf).not();
+                          return new Edge(
+                              new PostInVrf(node, vrf),
+                              new NodeDropNoRoute(node),
+                              notAcceptBDD.and(notRoutableBDD));
+                        }));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PostInVrf_PreOutVrf() {
+    return _vrfNotAcceptBDDs
+        .entrySet()
+        .stream()
+        .flatMap(
+            nodeEntry ->
+                nodeEntry
+                    .getValue()
+                    .entrySet()
+                    .stream()
+                    .map(
+                        vrfEntry -> {
+                          String node = nodeEntry.getKey();
+                          String vrf = vrfEntry.getKey();
+                          BDD notAcceptBDD = vrfEntry.getValue();
+                          BDD routableBDD = _routableBDDs.get(node).get(vrf);
+                          return new Edge(
+                              new PostInVrf(node, vrf),
+                              new PreOutVrf(node, vrf),
+                              notAcceptBDD.and(routableBDD));
+                        }));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreInInterface_NodeDropAclIn() {
+    return _configs
+        .values()
+        .stream()
+        .map(Configuration::getVrfs)
+        .map(Map::values)
+        .flatMap(Collection::stream)
+        .flatMap(vrf -> vrf.getInterfaces().values().stream())
+        .map(
+            iface -> {
+              String nodeName = iface.getOwner().getName();
+              String ifaceName = iface.getName();
+
+              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, _bddFactory.one());
+              return new Edge(
+                  new PreInInterface(nodeName, ifaceName),
+                  new NodeDropAclIn(nodeName),
+                  inAclBDD.not());
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreInInterface_PostInVrf() {
+    return _configs
+        .values()
+        .stream()
+        .map(Configuration::getVrfs)
+        .map(Map::values)
+        .flatMap(Collection::stream)
+        .flatMap(vrf -> vrf.getInterfaces().values().stream())
+        .map(
+            iface -> {
+              String nodeName = iface.getOwner().getName();
+              String vrfName = iface.getVrfName();
+              String ifaceName = iface.getName();
+
+              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, _bddFactory.one());
+              return new Edge(
+                  new PreInInterface(nodeName, ifaceName),
+                  new PostInVrf(nodeName, vrfName),
+                  inAclBDD);
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreOutEdgePostNat_NodeDropAclOut() {
+    return _forwardingAnalysis
+        .getArpTrueEdge()
+        .keySet()
+        .stream()
+        .flatMap(
+            edge -> {
+              String node1 = edge.getNode1();
+              String iface1 = edge.getInt1();
+              String node2 = edge.getNode2();
+              String iface2 = edge.getInt2();
+
+              BDD outAcl = _aclBDDs.get(node1).get(iface1);
+
+              return outAcl != null
+                  ? Stream.of(
+                      new Edge(
+                          new PreOutEdgePostNat(node1, iface1, node2, iface2),
+                          new NodeDropAclOut(node1),
+                          outAcl.not()))
+                  : Stream.of();
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreOutEdgePostNat_PreInInterface() {
+    return _forwardingAnalysis
+        .getArpTrueEdge()
+        .keySet()
+        .stream()
+        .map(
+            edge -> {
+              String node1 = edge.getNode1();
+              String iface1 = edge.getInt1();
+              String node2 = edge.getNode2();
+              String iface2 = edge.getInt2();
+
+              BDD outAcl = _aclBDDs.get(node1).getOrDefault(iface1, _bddFactory.one());
+
+              return new Edge(
+                  new PreOutEdgePostNat(node1, iface1, node2, iface2),
+                  new PreInInterface(node2, iface2),
+                  outAcl);
+            });
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreOutVrf_NodeDropNullRoute() {
+    return _forwardingAnalysis
+        .getNullRoutedIps()
+        .entrySet()
+        .stream()
+        .flatMap(
+            nodeEntry ->
+                nodeEntry
+                    .getValue()
+                    .entrySet()
+                    .stream()
+                    .map(
+                        vrfEntry -> {
+                          String node = nodeEntry.getKey();
+                          String vrf = vrfEntry.getKey();
+                          BDD nullRoutedBDD = vrfEntry.getValue().accept(_ipSpaceToBDD);
+                          return new Edge(
+                              new PreOutVrf(node, vrf), new NodeDropNullRoute(node), nullRoutedBDD);
+                        }));
+  }
+
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreOutVrf_NodeInterfaceNeighborUnreachable() {
+    return _neighborUnreachableBDDs
+        .entrySet()
+        .stream()
         .flatMap(
             nodeEntry -> {
               String node = nodeEntry.getKey();
@@ -352,146 +566,51 @@ public class ForwardingAnalysisNetworkGraphFactory {
                             .map(
                                 ifaceEntry -> {
                                   String iface = ifaceEntry.getKey();
-                                  IpSpace ipSpace = ifaceEntry.getValue();
-                                  return new Tuple<>(node, vrf, iface, ipSpace);
-                                });
-                      });
-            })
-        // creating extra work
-        .flatMap(t -> Stream.of(t, t, t, t, t))
-        .map(t -> t.mapIpSpace(_parallelIpSpaceToBDD::toBDD))
-        .forEachOrdered(
-            t ->
-                result
-                    .computeIfAbsent(t._node, k -> new HashMap<>())
-                    .computeIfAbsent(t._vrf, k -> new HashMap<>())
-                    .put(t._iface, t._ipSpace));
-    return result;
-  }
-
-  private static BDDFactory newBDDFactory() {
-    BDDFactory factory = JFactory.init(10000, 1000);
-    factory.disableReorder();
-    factory.setCacheRatio(64);
-    factory.setVarNum(40);
-    return factory;
-  }
-
-  private Map<StateExpr, Map<StateExpr, BDD>> computeBDDTransitions() {
-    Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = new HashMap<>();
-
-    BDD one = _bddOps.getBDDFactory().one();
-
-    /*
-     * PreInInterface --> PostInVrf
-     * PreInInterface --> Drop
-     */
-    _configs
-        .values()
-        .stream()
-        .map(Configuration::getVrfs)
-        .map(Map::values)
-        .flatMap(Collection::stream)
-        .flatMap(vrf -> vrf.getInterfaces().values().stream())
-        .forEach(
-            iface -> {
-              String nodeName = iface.getOwner().getName();
-              String vrfName = iface.getVrfName();
-              String ifaceName = iface.getName();
-
-              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, one);
-              bddTransitions.put(
-                  new PreInInterface(nodeName, ifaceName),
-                  ImmutableMap.of(
-                      new PostInVrf(nodeName, vrfName), inAclBDD, Drop.INSTANCE, inAclBDD.not()));
-            });
-
-    // PreOutVrf --> NeighborUnreachable
-
-    _forwardingAnalysis
-        .getNeighborUnreachable()
-        .forEach(
-            (node, vrfIpSpaces) ->
-                vrfIpSpaces.forEach(
-                    (vrf, ifaceIpSpaces) ->
-                        ifaceIpSpaces.forEach(
-                            (iface, ipSpace) -> {
-                              BDD ipSpaceBDD = ipSpace.accept(_ipSpaceToBDD);
-                              IpAccessList outAcl =
-                                  _configs.get(node).getInterfaces().get(iface).getOutgoingFilter();
-                              BDD outAclBDD =
-                                  outAcl == null ? one : _aclBDDs.get(node).get(outAcl.getName());
-                              bddTransitions
-                                  .computeIfAbsent(new PreOutVrf(node, vrf), k -> new HashMap<>())
-                                  .put(
+                                  BDD ipSpaceBDD = ifaceEntry.getValue();
+                                  IpAccessList outAcl =
+                                      _configs
+                                          .get(node)
+                                          .getInterfaces()
+                                          .get(iface)
+                                          .getOutgoingFilter();
+                                  BDD outAclBDD =
+                                      outAcl == null
+                                          ? _bddFactory.one()
+                                          : _aclBDDs.get(node).get(outAcl.getName());
+                                  return new Edge(
+                                      new PreOutVrf(node, vrf),
                                       new NodeInterfaceNeighborUnreachable(node, iface),
                                       ipSpaceBDD.and(outAclBDD));
+                                });
+                      });
+            });
+  }
 
-                              // add the single out-edge for this state
-                              bddTransitions.put(
-                                  new NodeInterfaceNeighborUnreachable(node, iface),
-                                  ImmutableMap.of(NeighborUnreachable.INSTANCE, one));
-                            })));
+  @VisibleForTesting
+  Stream<Edge> generateRules_PreOutVrf_PreOutEdgePostNat() {
+    return _arpTrueEdgeBDDs
+        .entrySet()
+        .stream()
+        .map(
+            entry -> {
+              org.batfish.datamodel.Edge edge = entry.getKey();
+              BDD arpTrue = entry.getValue();
 
-    _forwardingAnalysis
-        .getNullRoutedIps()
-        .forEach(
-            (node, vrfIpSpaces) ->
-                vrfIpSpaces.forEach(
-                    (vrf, ipSpace) -> {
-                      bddTransitions
-                          .computeIfAbsent(new PreOutVrf(node, vrf), k -> new HashMap<>())
-                          .put(Drop.INSTANCE, ipSpace.accept(_ipSpaceToBDD));
-                    }));
-
-    _forwardingAnalysis
-        .getArpTrueEdge()
-        .forEach(
-            (edge, arpTrue) -> {
               String node1 = edge.getNode1();
               String iface1 = edge.getInt1();
               String vrf1 = ifaceVrf(edge.getNode1(), edge.getInt1());
               String node2 = edge.getNode2();
               String iface2 = edge.getInt2();
 
-              BDD bdd = arpTrue.accept(_ipSpaceToBDD);
-
-              bddTransitions
-                  .computeIfAbsent(new PreOutVrf(node1, vrf1), k -> new HashMap<>())
-                  // not modelling NAT, so skip it.
-                  .put(new PreOutEdgePostNat(node1, iface1, node2, iface2), bdd);
-
-              BDD outAcl = _aclBDDs.get(node1).getOrDefault(iface1, one);
-              bddTransitions.put(
+              return new Edge(
+                  new PreOutVrf(node1, vrf1),
                   new PreOutEdgePostNat(node1, iface1, node2, iface2),
-                  ImmutableMap.of(
-                      new PreInInterface(node2, iface2), outAcl, Drop.INSTANCE, outAcl.not()));
+                  arpTrue);
             });
-
-    _vrfAcceptBDDs.forEach(
-        (node, vrfAcceptBDDs) ->
-            vrfAcceptBDDs.forEach(
-                (vrf, acceptBDD) -> {
-                  Map<StateExpr, BDD> vrfTransitions =
-                      bddTransitions.computeIfAbsent(
-                          new PostInVrf(node, vrf), k -> new HashMap<>());
-                  BDD routableBDD =
-                      _forwardingAnalysis.getRoutableIps().get(node).get(vrf).accept(_ipSpaceToBDD);
-                  BDD forwardBDD = acceptBDD.not();
-                  vrfTransitions.put(new NodeAccept(node), acceptBDD);
-                  vrfTransitions.put(new PreOutVrf(node, vrf), forwardBDD.and(routableBDD));
-                  vrfTransitions.put(Drop.INSTANCE, forwardBDD.and(routableBDD.not()));
-                }));
-
-    _configs
-        .keySet()
-        .forEach(
-            node ->
-                bddTransitions.put(new NodeAccept(node), ImmutableMap.of(Accept.INSTANCE, one)));
-    return bddTransitions;
   }
 
-  private Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> computeAPTransitions() {
+  @VisibleForTesting
+  Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> computeAPTransitions() {
     return toImmutableMap(
         _bddTransitions,
         Entry::getKey,
@@ -499,48 +618,78 @@ public class ForwardingAnalysisNetworkGraphFactory {
             toImmutableMap(
                 preStateEntry.getValue(),
                 Entry::getKey,
-                postStateEntry -> {
-                  BDD precondition = postStateEntry.getValue();
-
-                  ImmutableSortedSet.Builder<Integer> apPreconditions =
-                      new ImmutableSortedSet.Builder<>(Comparator.naturalOrder());
-                  int index = 0;
-                  for (BDD bdd : _apBDDs) {
-                    if (!bdd.and(precondition).isZero()) {
-                      apPreconditions.add(index);
-                      index++;
-                    }
-                  }
-                  return apPreconditions.build();
-                }));
+                postStateEntry -> computeAPs(postStateEntry.getValue())));
   }
 
-  public NetworkGraph networkGraph() {
-    // originate any traffic from every VRF
-    Set<StateExpr> roots =
-        _configs
-            .values()
+  public NetworkGraph networkGraph(IpSpaceAssignment assignment) {
+    LocationVisitor<StateExpr> toStateExpr =
+        new LocationVisitor<StateExpr>() {
+          @Override
+          public StateExpr visitInterfaceLinkLocation(InterfaceLinkLocation interfaceLinkLocation) {
+            return new OriginateInterfaceLink(
+                interfaceLinkLocation.getNodeName(), interfaceLinkLocation.getInterfaceName());
+          }
+
+          @Override
+          public StateExpr visitInterfaceLocation(InterfaceLocation interfaceLocation) {
+            String vrf =
+                _configs
+                    .get(interfaceLocation.getNodeName())
+                    .getInterfaces()
+                    .get(interfaceLocation.getInterfaceName())
+                    .getVrf()
+                    .getName();
+            return new OriginateVrf(interfaceLocation.getNodeName(), vrf);
+          }
+        };
+
+    Map<StateExpr, SortedSet<Integer>> roots =
+        assignment
+            .getEntries()
             .stream()
             .flatMap(
-                config ->
-                    config
-                        .getVrfs()
-                        .values()
-                        .stream()
-                        .map(v -> new PostInVrf(config.getHostname(), v.getName())))
-            .collect(ImmutableSet.toImmutableSet());
+                entry -> {
+                  SortedSet<Integer> ipSpaceAPs =
+                      computeAPs(entry.getIpSpace().accept(_ipSpaceToBDD));
+                  return entry
+                      .getLocations()
+                      .stream()
+                      .map(loc -> loc.accept(toStateExpr))
+                      .map(stateExpr -> Maps.immutableEntry(stateExpr, ipSpaceAPs));
+                })
+            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
 
-    return new NetworkGraph(_apBDDs, roots, _apTransitions);
+    return new NetworkGraph(roots, _apTransitions);
+  }
+
+  @VisibleForTesting
+  SortedSet<Integer> computeAPs(IpSpace ipSpace) {
+    return computeAPs(ipSpace.accept(_ipSpaceToBDD));
+  }
+
+  @VisibleForTesting
+  SortedSet<Integer> computeAPs(BDD pred) {
+    ImmutableSortedSet.Builder<Integer> apsBuilder =
+        new ImmutableSortedSet.Builder<>(Comparator.naturalOrder());
+    for (int i = 0; i < _apBDDs.size(); i++) {
+      if (!pred.and(_apBDDs.get(i)).isZero()) {
+        // there is a non-empty intersection
+        apsBuilder.add(i);
+      }
+    }
+    SortedSet<Integer> aps = apsBuilder.build();
+    return aps;
   }
 
   private String ifaceVrf(String node, String iface) {
     return _configs.get(node).getInterfaces().get(iface).getVrfName();
   }
 
-  private Map<String, Map<String, BDD>> computeVrfAcceptBDDs() {
+  private static Map<String, Map<String, BDD>> computeVrfAcceptBDDs(
+      Map<String, Configuration> configs, IpSpaceToBDD ipSpaceToBDD) {
     Map<String, Map<String, IpSpace>> vrfOwnedIpSpaces =
         CommonUtil.computeVrfOwnedIpSpaces(
-            CommonUtil.computeIpVrfOwners(false, CommonUtil.computeNodeInterfaces(_configs)));
+            CommonUtil.computeIpVrfOwners(false, CommonUtil.computeNodeInterfaces(configs)));
 
     return CommonUtil.toImmutableMap(
         vrfOwnedIpSpaces,
@@ -549,6 +698,6 @@ public class ForwardingAnalysisNetworkGraphFactory {
             CommonUtil.toImmutableMap(
                 nodeEntry.getValue(),
                 Entry::getKey,
-                vrfEntry -> vrfEntry.getValue().accept(_ipSpaceToBDD)));
+                vrfEntry -> vrfEntry.getValue().accept(ipSpaceToBDD)));
   }
 }

@@ -23,22 +23,8 @@ public final class IpSpaceRepresentativeImpl implements IpSpaceRepresentative {
   public Optional<Ip> getRepresentative(IpSpace ipSpace) {
     BDDFactory factory = BDDUtils.bddFactory(Prefix.MAX_PREFIX_LENGTH);
     BDDInteger ipAddrBdd = BDDInteger.makeFromIndex(factory, Prefix.MAX_PREFIX_LENGTH, 0, false);
-
-    BDD bdd = ipSpace.accept(new IpSpaceToBDD(factory, ipAddrBdd));
-
-    if (bdd.isZero()) {
-      // unsatisfiable
-      return Optional.empty();
-    }
-
-    BDD satAssignment = bdd.fullSatOne();
-    long ip = 0;
-    for (int i = 0; i < 32; i++) {
-      BDD bitBDD = ipAddrBdd.getBitvec()[31 - i];
-      if (!satAssignment.and(bitBDD).isZero()) {
-        ip += 1 << i;
-      }
-    }
-    return Optional.of(new Ip(ip));
+    IpSpaceToBDD ipSpaceToBDD = new IpSpaceToBDD(factory, ipAddrBdd);
+    BDD ipSpaceBDD = ipSpace.accept(ipSpaceToBDD);
+    return ipSpaceToBDD.getBDDInteger().getValueSatisfying(ipSpaceBDD).map(Ip::new);
   }
 }

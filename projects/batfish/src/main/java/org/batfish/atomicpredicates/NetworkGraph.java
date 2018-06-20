@@ -1,8 +1,11 @@
 package org.batfish.atomicpredicates;
 
+import static org.batfish.common.util.CommonUtil.toImmutableMap;
+
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
@@ -10,65 +13,56 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import net.sf.javabdd.BDD;
-import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.batfish.z3.expr.StateExpr;
 
 public final class NetworkGraph {
-  private final List<BDD> _atomicPredicates;
-
   // preState --> postState --> predicate
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _transitions;
 
-  private final Set<StateExpr> _graphRoots;
+  private final Map<StateExpr, SortedSet<Integer>> _graphRoots;
 
   private final Map<StateExpr, Multimap<Integer, StateExpr>> _reachableAps;
 
   private Set<StateExpr> _terminalStates;
 
   NetworkGraph(
-      List<BDD> atomicPredicates,
-      Set<StateExpr> graphRoots,
+      Map<StateExpr, SortedSet<Integer>> graphRoots,
       Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> transitions) {
-    _atomicPredicates = atomicPredicates;
-    _graphRoots = ImmutableSet.copyOf(graphRoots);
     _transitions = transitions;
+    _graphRoots =
+        toImmutableMap(
+            graphRoots, Entry::getKey, entry -> ImmutableSortedSet.copyOf(entry.getValue()));
     _reachableAps = new HashMap<>();
     _terminalStates = computeTerminalStates();
 
-    // computeReachability();
     initializeReachableAps();
-    allPairsReachability();
+    parallelReachability();
   }
 
   private void initializeReachableAps() {
     Streams.concat(
-            _graphRoots.stream(),
+            _graphRoots.keySet().stream(),
             _transitions.keySet().stream(),
             _transitions.values().stream().map(Map::keySet).flatMap(Set::stream))
         .forEach(state -> _reachableAps.put(state, HashMultimap.create()));
 
-    _graphRoots
-        .parallelStream()
-        .forEach(
-            root -> {
-              Multimap<Integer, StateExpr> allAps = _reachableAps.get(root);
-              for (int i = 0; i < _atomicPredicates.size(); i++) {
-                allAps.put(i, root);
-              }
-              _reachableAps.put(root, allAps);
-            });
+    _graphRoots.forEach(
+        (stateExpr, aps) -> {
+          Multimap<Integer, StateExpr> sources = _reachableAps.get(stateExpr);
+          aps.forEach(ap -> sources.put(ap, stateExpr));
+          _reachableAps.put(stateExpr, sources);
+        });
   }
 
-  private void allPairsReachability() {
-    Set<StateExpr> dirty = _graphRoots;
+  private void parallelReachability() {
+    Set<StateExpr> dirty = _graphRoots.keySet();
 
     while (!dirty.isEmpty()) {
       dirty =
@@ -96,15 +90,13 @@ public final class NetworkGraph {
                                  * the state names.
                                  * TODO make StateExpr comparable
                                  */
+                                assert preState.getClass() != postState.getClass();
                                 boolean preStateFirst =
-                                    preState.getClass() == postState.getClass()
-                                        ? CompareToBuilder.reflectionCompare(preState, postState)
-                                            < 0
-                                        : preState
-                                                .getClass()
-                                                .getSimpleName()
-                                                .compareTo(postState.getClass().getSimpleName())
-                                            < 0;
+                                    preState
+                                            .getClass()
+                                            .getSimpleName()
+                                            .compareTo(postState.getClass().getSimpleName())
+                                        < 0;
                                 Object lock1 = preStateFirst ? preStateAps : postStateAps;
                                 Object lock2 = preStateFirst ? postStateAps : preStateAps;
 
@@ -120,7 +112,10 @@ public final class NetworkGraph {
                                                 entry ->
                                                     postStateAps.putAll(
                                                         entry.getKey(), entry.getValue()))
-                                            // non-short-circuiting version of anyMatch
+                                            /*
+                                             * non-short-circuiting version of anyMatch.
+                                             * Needed to make sure we consume the entire stream.
+                                             */
                                             .reduce(false, (b1, b2) -> b1 || b2);
                                     return updated ? Stream.of(postState) : Stream.empty();
                                   }
@@ -132,7 +127,7 @@ public final class NetworkGraph {
 
   private void computeReachability() {
     // each iteration, only process nodes that we need to.
-    Set<StateExpr> dirty = _graphRoots;
+    Set<StateExpr> dirty = _graphRoots.keySet();
 
     while (!dirty.isEmpty()) {
       Set<StateExpr> newDirty = new HashSet<>();
