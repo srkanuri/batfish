@@ -27,12 +27,14 @@ class TwoNodeNetworkWithTwoLinks {
 
   final Batfish _batfish;
   final SortedMap<String, Configuration> _configs;
+  final Interface _dstIface1;
+  final Interface _dstIface2;
   final Configuration _dstNode;
   final Configuration _srcNode;
-  final Interface _srcInterface1;
-  final Interface _srcInterface2;
-  final Interface _dstInterface1;
-  final Interface _dstInterface2;
+  final Interface _link1Src;
+  final Interface _link2Src;
+  final Interface _link1Dst;
+  final Interface _link2Dst;
 
   TwoNodeNetworkWithTwoLinks() throws IOException {
     NetworkFactory nf = new NetworkFactory();
@@ -46,13 +48,13 @@ class TwoNodeNetworkWithTwoLinks {
     Vrf dstVrf = vb.setOwner(_dstNode).build();
 
     // first link
-    _srcInterface1 =
+    _link1Src =
         ib.setOwner(_srcNode)
             .setVrf(srcVrf)
             .setAddress(
                 new InterfaceAddress(LINK_1_NETWORK.getStartIp(), LINK_1_NETWORK.getPrefixLength()))
             .build();
-    _dstInterface1 =
+    _link1Dst =
         ib.setOwner(_dstNode)
             .setVrf(dstVrf)
             .setAddress(
@@ -61,13 +63,13 @@ class TwoNodeNetworkWithTwoLinks {
             .build();
 
     // second link
-    _srcInterface2 =
+    _link2Src =
         ib.setOwner(_srcNode)
             .setVrf(srcVrf)
             .setAddress(
                 new InterfaceAddress(LINK_2_NETWORK.getStartIp(), LINK_2_NETWORK.getPrefixLength()))
             .build();
-    _dstInterface2 =
+    _link2Dst =
         ib.setOwner(_dstNode)
             .setVrf(dstVrf)
             .setAddress(
@@ -76,16 +78,20 @@ class TwoNodeNetworkWithTwoLinks {
             .build();
 
     // destination for the first link
-    ib.setOwner(_dstNode)
-        .setVrf(dstVrf)
-        .setAddress(new InterfaceAddress(DST_PREFIX_1.getStartIp(), DST_PREFIX_1.getPrefixLength()))
-        .build();
+    _dstIface1 =
+        ib.setOwner(_dstNode)
+            .setVrf(dstVrf)
+            .setAddress(
+                new InterfaceAddress(DST_PREFIX_1.getStartIp(), DST_PREFIX_1.getPrefixLength()))
+            .build();
 
     // destination for the second link
-    ib.setOwner(_dstNode)
-        .setVrf(dstVrf)
-        .setAddress(new InterfaceAddress(DST_PREFIX_2.getStartIp(), DST_PREFIX_2.getPrefixLength()))
-        .build();
+    _dstIface2 =
+        ib.setOwner(_dstNode)
+            .setVrf(dstVrf)
+            .setAddress(
+                new InterfaceAddress(DST_PREFIX_2.getStartIp(), DST_PREFIX_2.getPrefixLength()))
+            .build();
 
     StaticRoute.Builder bld = StaticRoute.builder();
     srcVrf.setStaticRoutes(

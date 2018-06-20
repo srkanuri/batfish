@@ -77,48 +77,40 @@ public class NetworkGraphTest {
 
   @Test
   public void testBDDTransitions() {
-    String dstIface1 = _net._dstInterface1.getName();
-    String dstIface2 = _net._dstInterface2.getName();
+    String dstIface1 = _net._link1Dst.getName();
+    String dstIface2 = _net._link2Dst.getName();
     String dstNode = _net._dstNode.getHostname();
-    String srcIface1 = _net._srcInterface1.getName();
-    String srcIface2 = _net._srcInterface2.getName();
+    String srcIface1 = _net._link1Src.getName();
+    String srcIface2 = _net._link2Src.getName();
     String srcNode = _net._srcNode.getHostname();
 
-    IpSpace srcIface1IpSpace = _net._srcInterface1.getAddress().getIp().toIpSpace();
-    IpSpace srcIface2IpSpace = _net._srcInterface2.getAddress().getIp().toIpSpace();
+    IpSpace srcIface1IpSpace = _net._link1Src.getAddress().getIp().toIpSpace();
+    IpSpace srcIface2IpSpace = _net._link2Src.getAddress().getIp().toIpSpace();
     IpSpace unionIpSpace = AclIpSpace.union(srcIface1IpSpace, srcIface2IpSpace);
     BDD expectedAcceptBDD = unionIpSpace.accept(_graphFactory.getIpSpaceToBDD());
     BDD actualAcceptBDD = _graphFactory.getVrfAcceptBDDs().get(srcNode).get(DEFAULT_VRF_NAME);
     assertThat("expected = actual", expectedAcceptBDD.biimp(actualAcceptBDD).isOne());
 
     BDD dstIface1BDD =
-        _net._dstInterface1
-            .getAddress()
-            .getIp()
-            .toIpSpace()
-            .accept(_graphFactory.getIpSpaceToBDD());
+        _net._link1Dst.getAddress().getIp().toIpSpace().accept(_graphFactory.getIpSpaceToBDD());
     assertThat("", dstIface1BDD.and(actualAcceptBDD).isZero());
 
     BDD dstIface2BDD =
-        _net._dstInterface1
-            .getAddress()
-            .getIp()
-            .toIpSpace()
-            .accept(_graphFactory.getIpSpaceToBDD());
+        _net._link1Dst.getAddress().getIp().toIpSpace().accept(_graphFactory.getIpSpaceToBDD());
     assertThat("", dstIface2BDD.and(actualAcceptBDD).isZero());
   }
 
   @Test
   public void test1() {
-    String dstIface1 = _net._dstInterface1.getName();
-    String dstIface2 = _net._dstInterface2.getName();
+    String dstIface1 = _net._link1Dst.getName();
+    String dstIface2 = _net._link2Dst.getName();
     String dstNode = _net._dstNode.getHostname();
-    String srcIface1 = _net._srcInterface1.getName();
-    String srcIface2 = _net._srcInterface2.getName();
+    String srcIface1 = _net._link1Src.getName();
+    String srcIface2 = _net._link2Src.getName();
     String srcNode = _net._srcNode.getHostname();
 
-    IpSpace dstIface1IpSpace = _net._dstInterface1.getAddress().getIp().toIpSpace();
-    IpSpace dstIface2IpSpace = _net._dstInterface2.getAddress().getIp().toIpSpace();
+    IpSpace dstIface1IpSpace = _net._link1Dst.getAddress().getIp().toIpSpace();
+    IpSpace dstIface2IpSpace = _net._link2Dst.getAddress().getIp().toIpSpace();
     IpSpace unionIpSpace = AclIpSpace.union(dstIface1IpSpace, dstIface2IpSpace);
     SortedSet<Integer> dstIface1APs = _graphFactory.computeAPs(dstIface1IpSpace);
     SortedSet<Integer> dstIface2APs = _graphFactory.computeAPs(dstIface2IpSpace);
