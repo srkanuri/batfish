@@ -2,34 +2,23 @@ package org.batfish.atomicpredicates;
 
 import static org.batfish.common.util.CommonUtil.toImmutableMap;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.util.ArrayList;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.SortedSet;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
-import net.sf.javabdd.BDDException;
 import net.sf.javabdd.BDDFactory;
-import net.sf.javabdd.JFactory;
-import org.batfish.common.BatfishException;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ForwardingAnalysis;
@@ -42,16 +31,19 @@ import org.batfish.specifier.IpSpaceAssignment;
 import org.batfish.specifier.LocationVisitor;
 import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDAcl;
-import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.bdd.IpSpaceToBDD;
-import org.batfish.symbolic.bdd.MemoizedIpSpaceToBDD;
 import org.batfish.z3.expr.StateExpr;
 import org.batfish.z3.state.Accept;
 import org.batfish.z3.state.Drop;
 import org.batfish.z3.state.NeighborUnreachable;
 import org.batfish.z3.state.NodeAccept;
+import org.batfish.z3.state.NodeDrop;
+import org.batfish.z3.state.NodeDropAclIn;
+import org.batfish.z3.state.NodeDropAclOut;
+import org.batfish.z3.state.NodeDropNoRoute;
+import org.batfish.z3.state.NodeDropNullRoute;
 import org.batfish.z3.state.NodeInterfaceNeighborUnreachable;
 import org.batfish.z3.state.OriginateInterfaceLink;
 import org.batfish.z3.state.OriginateVrf;
@@ -62,6 +54,7 @@ import org.batfish.z3.state.PreOutVrf;
 
 public class ForwardingAnalysisNetworkGraphFactory {
   private Map<String, Map<String, BDD>> _aclBDDs;
+  private Map<org.batfish.datamodel.Edge, BDD> _arpTrueEdgeBDDs;
   private final List<BDD> _apBDDs;
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
   private final BDDFactory _bddFactory;
@@ -70,8 +63,10 @@ public class ForwardingAnalysisNetworkGraphFactory {
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
   private IpSpaceToBDD _ipSpaceToBDD;
-  private Map<String, Map<String, BDD>> _vrfAcceptBDDs;
-  private ParallelIpSpaceToBDD _parallelIpSpaceToBDD;
+  private final Map<String, Map<String, Map<String, BDD>>> _neighborUnreachableBDDs;
+  private final Map<String, Map<String, BDD>> _routableBDDs;
+  private final Map<String, Map<String, BDD>> _vrfAcceptBDDs;
+  private final Map<String, Map<String, BDD>> _vrfNotAcceptBDDs;
 
   public ForwardingAnalysisNetworkGraphFactory(
       Map<String, Configuration> configs, ForwardingAnalysis forwardingAnalysis) {
