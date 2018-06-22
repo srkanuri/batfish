@@ -8,6 +8,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.instanceOf;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.SortedMap;
 import org.batfish.datamodel.Configuration;
@@ -59,12 +60,8 @@ public class SmtReachabilityTwoLinkTest {
   }
 
   /**
-   * Negation of the above test, i.e. verify unreachability under 1 failure.
-   *
-   * <p>{@link Ignore Ignored} because the test is failing. It's unclear whether the intent is that
-   * failures constraint should be included in the negation. But that isn't working either
-   * (otherwise, failures=0 should return a {@link VerificationResult} with failures != 0. It does
-   * not).
+   * Negation of the above test, i.e. verify unreachability under at most 1 failure. False, because
+   * reachability holds under 0 failures.
    */
   @Ignore
   @Test
@@ -81,7 +78,7 @@ public class SmtReachabilityTwoLinkTest {
     final SmtReachabilityAnswerElement smtAnswer = (SmtReachabilityAnswerElement) answer;
     assertThat(
         smtAnswer,
-        hasVerificationResult(allOf(hasIsVerified(true), hasFailures(singleton(_failureDesc)))));
+        hasVerificationResult(allOf(hasIsVerified(false), hasFailures(ImmutableSet.of()))));
   }
 
   @Test
