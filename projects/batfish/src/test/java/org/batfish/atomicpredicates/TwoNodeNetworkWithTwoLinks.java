@@ -8,8 +8,11 @@ import java.util.SortedMap;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.Configuration.Builder;
 import org.batfish.datamodel.ConfigurationFormat;
+import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.InterfaceAddress;
+import org.batfish.datamodel.IpAccessList;
+import org.batfish.datamodel.IpAccessListLine;
 import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.StaticRoute;
@@ -20,10 +23,10 @@ import org.junit.rules.TemporaryFolder;
 
 /** A test network with two nodes and two static routes from one to the other. */
 class TwoNodeNetworkWithTwoLinks {
-  public static final Prefix DST_PREFIX_1 = Prefix.parse("1.1.0.0/32");
-  public static final Prefix DST_PREFIX_2 = Prefix.parse("2.1.0.0/32");
-  public static final Prefix LINK_1_NETWORK = Prefix.parse("1.0.0.0/31");
-  public static final Prefix LINK_2_NETWORK = Prefix.parse("2.0.0.0/31");
+  static final Prefix DST_PREFIX_1 = Prefix.parse("1.1.0.0/32");
+  static final Prefix DST_PREFIX_2 = Prefix.parse("2.1.0.0/32");
+  static final Prefix LINK_1_NETWORK = Prefix.parse("1.0.0.0/31");
+  static final Prefix LINK_2_NETWORK = Prefix.parse("2.0.0.0/31");
 
   final Batfish _batfish;
   final SortedMap<String, Configuration> _configs;
@@ -54,27 +57,39 @@ class TwoNodeNetworkWithTwoLinks {
             .setAddress(
                 new InterfaceAddress(LINK_1_NETWORK.getStartIp(), LINK_1_NETWORK.getPrefixLength()))
             .build();
-    _link1Dst =
-        ib.setOwner(_dstNode)
-            .setVrf(dstVrf)
-            .setAddress(
-                new InterfaceAddress(LINK_1_NETWORK.getEndIp(), LINK_1_NETWORK.getPrefixLength()))
-            .setSourceNats(ImmutableList.of())
+
+    IpAccessList link1DstIngressAcl =
+        nf.aclBuilder()
+            .setOwner(_dstNode)
+            .setLines(
+                ImmutableList.of(
+                    IpAccessListLine.rejectingHeaderSpace(
+                        HeaderSpace.builder().setDstIps(DST_PREFIX_2.toIpSpace()).build()),
+                    IpAccessListLine.ACCEPT_ALL))
             .build();
+    _link1Dst =
+        ib.setAddress(
+                new InterfaceAddress(LINK_1_NETWORK.getEndIp(), LINK_1_NETWORK.getPrefixLength()))
+            .setIncomingFilter(link1DstIngressAcl)
+            .setOwner(_dstNode)
+            .setVrf(dstVrf)
+            .build();
+
+    // unset incoming filter
+    ib.setIncomingFilter(null);
 
     // second link
     _link2Src =
-        ib.setOwner(_srcNode)
-            .setVrf(srcVrf)
-            .setAddress(
+        ib.setAddress(
                 new InterfaceAddress(LINK_2_NETWORK.getStartIp(), LINK_2_NETWORK.getPrefixLength()))
+            .setOwner(_srcNode)
+            .setVrf(srcVrf)
             .build();
     _link2Dst =
-        ib.setOwner(_dstNode)
-            .setVrf(dstVrf)
-            .setAddress(
+        ib.setAddress(
                 new InterfaceAddress(LINK_2_NETWORK.getEndIp(), LINK_2_NETWORK.getPrefixLength()))
-            .setSourceNats(ImmutableList.of())
+            .setOwner(_dstNode)
+            .setVrf(dstVrf)
             .build();
 
     // destination for the first link
@@ -97,6 +112,7 @@ class TwoNodeNetworkWithTwoLinks {
     srcVrf.setStaticRoutes(
         ImmutableSortedSet.of(
             bld.setNetwork(DST_PREFIX_1).setNextHopIp(LINK_1_NETWORK.getEndIp()).build(),
+            bld.setNetwork(DST_PREFIX_2).setNextHopIp(LINK_1_NETWORK.getEndIp()).build(),
             bld.setNetwork(DST_PREFIX_2).setNextHopIp(LINK_2_NETWORK.getEndIp()).build()));
 
     _configs = ImmutableSortedMap.of(_srcNode.getName(), _srcNode, _dstNode.getName(), _dstNode);

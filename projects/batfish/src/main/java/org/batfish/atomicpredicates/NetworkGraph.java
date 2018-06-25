@@ -3,6 +3,7 @@ package org.batfish.atomicpredicates;
 import static org.batfish.common.util.CommonUtil.toImmutableMap;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -13,6 +14,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -175,7 +177,20 @@ public final class NetworkGraph {
     return _terminalStates;
   }
 
-  public void detectMultipathInconsistency() {
+  public class MultipathConsistencyViolation {
+    public final StateExpr originateState;
+    public final Set<StateExpr> finalStates;
+    public final Integer predicate;
+
+    private MultipathConsistencyViolation(
+        StateExpr originateState, Set<StateExpr> finalStates, Integer predicate) {
+      this.originateState = originateState;
+      this.finalStates = ImmutableSet.copyOf(finalStates);
+      this.predicate = predicate;
+    }
+  }
+  /** @return Final state --> Originate state --> APs with multipath inconsistency */
+  public List<MultipathConsistencyViolation> detectMultipathInconsistency() {
     // root -> AP -> terminal State
     Map<StateExpr, Map<Integer, Set<StateExpr>>> apTerminalStates = new ConcurrentHashMap<>();
     _reachableAps
@@ -198,6 +213,8 @@ public final class NetworkGraph {
                         .add(terminalState);
                   });
             });
+
+    ImmutableList.Builder<MultipathConsistencyViolation> result = ImmutableList.builder();
     apTerminalStates.forEach(
         (root, rootApDispositions) ->
             rootApDispositions.forEach(
@@ -207,7 +224,9 @@ public final class NetworkGraph {
                         String.format(
                             "detected multipath inconsistency: %s -> %s -> %s",
                             root, ap, terminals));
+                    result.add(new MultipathConsistencyViolation(root, terminals, ap));
                   }
                 }));
+    return result.build();
   }
 }

@@ -434,12 +434,14 @@ public class ForwardingAnalysisNetworkGraphFactory {
         .map(Map::values)
         .flatMap(Collection::stream)
         .flatMap(vrf -> vrf.getInterfaces().values().stream())
+        .filter(iface -> iface.getIncomingFilter() != null)
         .map(
             iface -> {
+              String aclName = iface.getIncomingFilterName();
               String nodeName = iface.getOwner().getName();
               String ifaceName = iface.getName();
 
-              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, _bddFactory.one());
+              BDD inAclBDD = _aclBDDs.get(nodeName).get(aclName);
               return new Edge(
                   new PreInInterface(nodeName, ifaceName),
                   new NodeDropAclIn(nodeName),
