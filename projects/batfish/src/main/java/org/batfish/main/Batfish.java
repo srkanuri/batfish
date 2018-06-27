@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
@@ -55,10 +56,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import net.sf.javabdd.BDD;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
+import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
+import org.batfish.atomicpredicates.NetworkGraph;
+import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -112,6 +117,7 @@ import org.batfish.datamodel.RipProcess;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.SwitchportMode;
 import org.batfish.datamodel.Topology;
+import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.answers.AclLinesAnswerElementInterface;
 import org.batfish.datamodel.answers.AclLinesAnswerElementInterface.AclSpecs;
@@ -171,6 +177,7 @@ import org.batfish.representation.iptables.IptablesVendorConfiguration;
 import org.batfish.role.InferRoles;
 import org.batfish.role.NodeRoleDimension;
 import org.batfish.role.NodeRolesData;
+import org.batfish.specifier.InterfaceLinkLocation;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
 import org.batfish.specifier.Location;
@@ -178,6 +185,7 @@ import org.batfish.specifier.SpecifierContext;
 import org.batfish.specifier.SpecifierContextImpl;
 import org.batfish.symbolic.abstraction.BatfishCompressor;
 import org.batfish.symbolic.abstraction.Roles;
+import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.smt.PropertyChecker;
 import org.batfish.vendor.VendorConfiguration;
 import org.batfish.z3.AclLine;
@@ -200,6 +208,7 @@ import org.batfish.z3.Synthesizer;
 import org.batfish.z3.SynthesizerInputImpl;
 import org.batfish.z3.expr.BooleanExpr;
 import org.batfish.z3.expr.OrExpr;
+import org.batfish.z3.expr.StateExpr;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -4326,11 +4335,24 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   private void atomicPredicates(
       Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
-    /*
-    NetworkGraph graph =
-        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis)
-            .networkGraph();
-    graph.detectMultipathInconsistency();
+    Set<Location> allLocations =
+        configurations
+            .values()
+            .stream()
+            .flatMap(node -> node.getInterfaces().values().stream())
+            .flatMap(
+                iface -> {
+                  String node = iface.getOwner().getHostname();
+                  String name = iface.getName();
+                  return Stream.of(
+                      new InterfaceLocation(node, name), new InterfaceLinkLocation(node, name));
+                })
+            .collect(Collectors.toSet());
+    IpSpaceAssignment ipSpaceAssignment =
+        IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
+    ForwardingAnalysisNetworkGraphFactory graphFactory =
+        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis, true);
+    NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
     for (StateExpr terminalState : graph.getTerminalStates()) {
       reachableAps
@@ -4341,9 +4363,45 @@ public class Batfish extends PluginConsumer implements IBatfish {
                   System.out.println(
                       String.format("%s received %s from %s", terminalState, ap, sources)));
     }
+    BDDPacket pkt = new BDDPacket();
+    List<BDD> apBDDs = graphFactory.getApBDDs();
+    List<MultipathConsistencyViolation> violations = graph.detectMultipathInconsistency();
+    for (MultipathConsistencyViolation violation : violations) {
+      BDD pred = apBDDs.get(violation.predicate).fullSatOne();
+
+      Ip dstIp = new Ip(pkt.getDstIp().satAssignmentToLong(pred));
+      Ip srcIp = new Ip(pkt.getSrcIp().satAssignmentToLong(pred));
+      Long dstPort = pkt.getDstPort().satAssignmentToLong(pred);
+      Long srcPort = pkt.getSrcPort().satAssignmentToLong(pred);
+      Long ipProtocol = pkt.getIpProtocol().satAssignmentToLong(pred);
+      Long icmpCode = pkt.getIcmpCode().satAssignmentToLong(pred);
+      Long icmpType = pkt.getIcmpType().satAssignmentToLong(pred);
+
+      System.out.println(
+          String.format(
+              "Src=%s, Predicate=%s, dstIp=%s, dstPort=%s, srcIp=%s, srcPort=%s, ipProtocol=%s, icmpCode=%s, icmpType=%s, ack=%s, cwr=%s, ece=%s,"
+                  + " fin=%s, psh=%s, rst=%s, syn=%s, urg=%s, Terminal States=%s",
+              violation.originateState,
+              violation.predicate,
+              dstIp,
+              dstPort,
+              srcIp,
+              srcPort,
+              ipProtocol,
+              icmpCode,
+              icmpType,
+              pkt.getTcpAck().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpCwr().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpEce().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpFin().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpPsh().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpRst().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpSyn().and(pred).isZero() ? 0 : 1,
+              pkt.getTcpUrg().and(pred).isZero() ? 0 : 1,
+              violation.finalStates));
+    }
 
     throw new BatfishException("Done baby");
-    */
   }
 
   @Nonnull
@@ -4374,7 +4432,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     _logger.info("Synthesizing Z3 logic...");
 
-    // atomicPredicates(configurations, forwardingAnalysis);
+    atomicPredicates(configurations, dataPlane.getForwardingAnalysis());
 
     Synthesizer s =
         new Synthesizer(
