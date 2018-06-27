@@ -100,7 +100,8 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     NET._batfish.computeDataPlane(false);
     DataPlane dataPlane = NET._batfish.loadDataPlane();
     GRAPH_FACTORY =
-        new ForwardingAnalysisNetworkGraphFactory(NET._configs, dataPlane.getForwardingAnalysis());
+        new ForwardingAnalysisNetworkGraphFactory(
+            NET._configs, dataPlane.getForwardingAnalysis(), true);
 
     IpSpaceAssignment assignment =
         IpSpaceAssignment.builder()
@@ -217,6 +218,9 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     assertThat(
         bddTransition(_srcPostInVrf, new NodeAccept(_srcName)),
         isEquivalentTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
+    assertThat(
+        bddTransition(_dstPostInVrf, new NodeAccept(_dstName)),
+        isEquivalentTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
   }
 
   @Test

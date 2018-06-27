@@ -4,9 +4,7 @@ import static org.batfish.common.util.CommonUtil.toImmutableMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import java.util.Collection;
 import java.util.Comparator;
@@ -15,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
@@ -22,12 +21,12 @@ import net.sf.javabdd.BDDFactory;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ForwardingAnalysis;
-import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.IpSpace;
 import org.batfish.main.BDDUtils;
 import org.batfish.specifier.InterfaceLinkLocation;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
+import org.batfish.specifier.Location;
 import org.batfish.specifier.LocationVisitor;
 import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDAcl;
@@ -53,30 +52,58 @@ import org.batfish.z3.state.PreOutEdgePostNat;
 import org.batfish.z3.state.PreOutVrf;
 
 public class ForwardingAnalysisNetworkGraphFactory {
-  private Map<String, Map<String, BDD>> _aclBDDs;
+  private Map<String, Map<String, BDD>> _aclDenyBDDs;
+  private Map<String, Map<String, BDD>> _aclPermitBDDs;
   private Map<org.batfish.datamodel.Edge, BDD> _arpTrueEdgeBDDs;
   private final List<BDD> _apBDDs;
   private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
   private final BDDFactory _bddFactory;
+  private final BDDOps _bddOps;
   private final Map<StateExpr, Map<StateExpr, BDD>> _bddTransitions;
   private final BDDUtils _bddUtils;
   private final Map<String, Configuration> _configs;
   private final ForwardingAnalysis _forwardingAnalysis;
   private IpSpaceToBDD _ipSpaceToBDD;
   private final Map<String, Map<String, Map<String, BDD>>> _neighborUnreachableBDDs;
+  private final BDD _nonDstIpVars;
   private final Map<String, Map<String, BDD>> _routableBDDs;
   private final Map<String, Map<String, BDD>> _vrfAcceptBDDs;
   private final Map<String, Map<String, BDD>> _vrfNotAcceptBDDs;
 
   public ForwardingAnalysisNetworkGraphFactory(
-      Map<String, Configuration> configs, ForwardingAnalysis forwardingAnalysis) {
+      Map<String, Configuration> configs,
+      ForwardingAnalysis forwardingAnalysis,
+      boolean dstIpOnly) {
     _bddUtils = new BDDUtils(configs, forwardingAnalysis);
     _bddFactory = _bddUtils.getBDDFactory();
+    _bddOps = new BDDOps(_bddFactory);
     _configs = configs;
     _forwardingAnalysis = forwardingAnalysis;
     _ipSpaceToBDD = _bddUtils.getIpSpaceToBDD();
 
-    _aclBDDs = computeAclBDDs(configs, _bddFactory);
+    BDDPacket pkt = new BDDPacket();
+    _nonDstIpVars =
+        dstIpOnly
+            ? _bddOps.and(
+                pkt.getTcpAck(),
+                pkt.getTcpCwr(),
+                pkt.getTcpEce(),
+                pkt.getTcpFin(),
+                pkt.getTcpPsh(),
+                pkt.getTcpRst(),
+                pkt.getTcpSyn(),
+                _bddOps.and(pkt.getDstPort().getBitvec()),
+                _bddOps.and(pkt.getIcmpCode().getBitvec()),
+                _bddOps.and(pkt.getIcmpType().getBitvec()),
+                _bddOps.and(pkt.getIpProtocol().getBitvec()),
+                _bddOps.and(pkt.getSrcIp().getBitvec()),
+                _bddOps.and(pkt.getSrcPort().getBitvec()))
+            : null;
+
+    Map<String, Map<String, BDDAcl>> bddAcls = computeBDDAcls(configs);
+    _aclDenyBDDs = computeAclDenyBDDs(bddAcls, dstIpOnly);
+    _aclPermitBDDs = computeAclPermitBDDs(bddAcls, dstIpOnly);
+
     _arpTrueEdgeBDDs = computeArpTrueEdgeBDDs(forwardingAnalysis, _ipSpaceToBDD);
     _neighborUnreachableBDDs = computeNeighborUnreachableBDDs(forwardingAnalysis, _ipSpaceToBDD);
     _routableBDDs = computeRoutableBDDs(forwardingAnalysis, _ipSpaceToBDD);
@@ -89,9 +116,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     _apTransitions = computeAPTransitions();
   }
 
-  private static Map<String, Map<String, BDD>> computeAclBDDs(
-      Map<String, Configuration> configs, BDDFactory factory) {
-    BDDOps bddOps = new BDDOps(factory);
+  private Map<String, Map<String, BDDAcl>> computeBDDAcls(Map<String, Configuration> configs) {
     return toImmutableMap(
         configs,
         Entry::getKey,
@@ -99,25 +124,36 @@ public class ForwardingAnalysisNetworkGraphFactory {
             toImmutableMap(
                 nodeEntry.getValue().getIpAccessLists(),
                 Entry::getKey,
+                aclEntry -> BDDAcl.create(aclEntry.getValue())));
+  }
+
+  private Map<String, Map<String, BDD>> computeAclDenyBDDs(
+      Map<String, Map<String, BDDAcl>> aclBDDs, boolean dstIpOnly) {
+    return toImmutableMap(
+        aclBDDs,
+        Entry::getKey,
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey,
                 aclEntry -> {
-                  BDDAcl bddAcl = BDDAcl.create(aclEntry.getValue());
-                  BDDPacket pkt = bddAcl.getPkt();
-                  BDD nonIpVars =
-                      bddOps.and(
-                          pkt.getTcpAck(),
-                          pkt.getTcpCwr(),
-                          pkt.getTcpEce(),
-                          pkt.getTcpFin(),
-                          pkt.getTcpPsh(),
-                          pkt.getTcpRst(),
-                          pkt.getTcpSyn(),
-                          bddOps.and(pkt.getDstPort().getBitvec()),
-                          bddOps.and(pkt.getIcmpCode().getBitvec()),
-                          bddOps.and(pkt.getIcmpType().getBitvec()),
-                          bddOps.and(pkt.getIpProtocol().getBitvec()),
-                          bddOps.and(pkt.getSrcIp().getBitvec()),
-                          bddOps.and(pkt.getSrcPort().getBitvec()));
-                  return bddAcl.getBdd().exist(nonIpVars);
+                  BDD bdd = aclEntry.getValue().getBdd().not();
+                  return dstIpOnly ? bdd.exist(_nonDstIpVars) : bdd;
+                }));
+  }
+
+  private Map<String, Map<String, BDD>> computeAclPermitBDDs(
+      Map<String, Map<String, BDDAcl>> aclBDDs, boolean dstIpOnly) {
+    return toImmutableMap(
+        aclBDDs,
+        Entry::getKey,
+        nodeEntry ->
+            toImmutableMap(
+                nodeEntry.getValue(),
+                Entry::getKey,
+                aclEntry -> {
+                  BDD bdd = aclEntry.getValue().getBdd();
+                  return dstIpOnly ? bdd.exist(_nonDstIpVars) : bdd;
                 }));
   }
 
@@ -171,7 +207,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
                 nodeEntry.getValue(), Entry::getKey, vrfEntry -> vrfEntry.getValue().not()));
   }
 
-  List<BDD> getApBDDs() {
+  public List<BDD> getApBDDs() {
     return _apBDDs;
   }
 
@@ -179,7 +215,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     return _bddTransitions;
   }
 
-  IpSpaceToBDD getIpSpaceToBDD() {
+  public IpSpaceToBDD getIpSpaceToBDD() {
     return _ipSpaceToBDD;
   }
 
@@ -239,6 +275,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     return Streams.concat(
         generateRules_NodeAccept_Accept(),
         generateRules_NodeDropAclIn_NodeDrop(),
+        generateRules_NodeDropNoRoute_NodeDrop(),
         generateRules_NodeDropNullRoute_NodeDrop(),
         generateRules_NodeDropAclOut_NodeDrop(),
         generateRules_NodeDrop_Drop(),
@@ -279,6 +316,13 @@ public class ForwardingAnalysisNetworkGraphFactory {
         .keySet()
         .stream()
         .map(node -> new Edge(new NodeDropAclOut(node), new NodeDrop(node), _bddFactory.one()));
+  }
+
+  private Stream<Edge> generateRules_NodeDropNoRoute_NodeDrop() {
+    return _configs
+        .keySet()
+        .stream()
+        .map(node -> new Edge(new NodeDropNoRoute(node), new NodeDrop(node), _bddFactory.one()));
   }
 
   @VisibleForTesting
@@ -441,11 +485,9 @@ public class ForwardingAnalysisNetworkGraphFactory {
               String nodeName = iface.getOwner().getName();
               String ifaceName = iface.getName();
 
-              BDD inAclBDD = _aclBDDs.get(nodeName).get(aclName);
+              BDD aclDenyBDD = _aclDenyBDDs.get(nodeName).get(aclName);
               return new Edge(
-                  new PreInInterface(nodeName, ifaceName),
-                  new NodeDropAclIn(nodeName),
-                  inAclBDD.not());
+                  new PreInInterface(nodeName, ifaceName), new NodeDropAclIn(nodeName), aclDenyBDD);
             });
   }
 
@@ -465,7 +507,8 @@ public class ForwardingAnalysisNetworkGraphFactory {
               String vrfName = iface.getVrfName();
               String ifaceName = iface.getName();
 
-              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(aclName, _bddFactory.one());
+              BDD inAclBDD =
+                  aclName == null ? _bddFactory.one() : _aclPermitBDDs.get(nodeName).get(aclName);
               return new Edge(
                   new PreInInterface(nodeName, ifaceName),
                   new PostInVrf(nodeName, vrfName),
@@ -486,14 +529,16 @@ public class ForwardingAnalysisNetworkGraphFactory {
               String node2 = edge.getNode2();
               String iface2 = edge.getInt2();
 
-              BDD outAcl = _aclBDDs.get(node1).get(iface1);
+              String aclName =
+                  _configs.get(node1).getInterfaces().get(iface1).getOutgoingFilterName();
+              BDD aclDenyBDD = _aclDenyBDDs.get(node1).get(aclName);
 
-              return outAcl != null
+              return aclDenyBDD != null
                   ? Stream.of(
                       new Edge(
                           new PreOutEdgePostNat(node1, iface1, node2, iface2),
                           new NodeDropAclOut(node1),
-                          outAcl.not()))
+                          aclDenyBDD))
                   : Stream.of();
             });
   }
@@ -511,12 +556,15 @@ public class ForwardingAnalysisNetworkGraphFactory {
               String node2 = edge.getNode2();
               String iface2 = edge.getInt2();
 
-              BDD outAcl = _aclBDDs.get(node1).getOrDefault(iface1, _bddFactory.one());
+              String aclName =
+                  _configs.get(node1).getInterfaces().get(iface1).getOutgoingFilterName();
+              BDD aclPermitBDD =
+                  aclName == null ? _bddFactory.one() : _aclPermitBDDs.get(node1).get(aclName);
 
               return new Edge(
                   new PreOutEdgePostNat(node1, iface1, node2, iface2),
                   new PreInInterface(node2, iface2),
-                  outAcl);
+                  aclPermitBDD);
             });
   }
 
@@ -565,16 +613,16 @@ public class ForwardingAnalysisNetworkGraphFactory {
                                 ifaceEntry -> {
                                   String iface = ifaceEntry.getKey();
                                   BDD ipSpaceBDD = ifaceEntry.getValue();
-                                  IpAccessList outAcl =
+                                  String outAcl =
                                       _configs
                                           .get(node)
                                           .getInterfaces()
                                           .get(iface)
-                                          .getOutgoingFilter();
+                                          .getOutgoingFilterName();
                                   BDD outAclBDD =
                                       outAcl == null
                                           ? _bddFactory.one()
-                                          : _aclBDDs.get(node).get(outAcl.getName());
+                                          : _aclPermitBDDs.get(node).get(outAcl);
                                   return new Edge(
                                       new PreOutVrf(node, vrf),
                                       new NodeInterfaceNeighborUnreachable(node, iface),
@@ -641,21 +689,14 @@ public class ForwardingAnalysisNetworkGraphFactory {
           }
         };
 
-    Map<StateExpr, SortedSet<Integer>> roots =
-        assignment
-            .getEntries()
-            .stream()
-            .flatMap(
-                entry -> {
-                  SortedSet<Integer> ipSpaceAPs =
-                      computeAPs(entry.getIpSpace().accept(_ipSpaceToBDD));
-                  return entry
-                      .getLocations()
-                      .stream()
-                      .map(loc -> loc.accept(toStateExpr))
-                      .map(stateExpr -> Maps.immutableEntry(stateExpr, ipSpaceAPs));
-                })
-            .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+    Map<StateExpr, SortedSet<Integer>> roots = new HashMap<>();
+    for (IpSpaceAssignment.Entry entry : assignment.getEntries()) {
+      SortedSet<Integer> ipSpaceAPs = computeAPs(entry.getIpSpace().accept(_ipSpaceToBDD));
+      for (Location loc : entry.getLocations()) {
+        StateExpr root = loc.accept(toStateExpr);
+        roots.computeIfAbsent(root, k -> new TreeSet<>()).addAll(ipSpaceAPs);
+      }
+    }
 
     return new NetworkGraph(roots, _apTransitions);
   }

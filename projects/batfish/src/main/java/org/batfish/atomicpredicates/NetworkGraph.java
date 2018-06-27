@@ -48,6 +48,16 @@ public final class NetworkGraph {
     parallelReachability();
   }
 
+  /** Find all states an AP can reach from a given root. */
+  public Set<StateExpr> reach(StateExpr root, Integer ap) {
+    return _reachableAps
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getValue().containsEntry(ap, root))
+        .map(Entry::getKey)
+        .collect(ImmutableSet.toImmutableSet());
+  }
+
   private void initializeReachableAps() {
     Streams.concat(
             _graphRoots.keySet().stream(),
