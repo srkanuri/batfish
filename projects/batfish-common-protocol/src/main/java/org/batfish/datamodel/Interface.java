@@ -44,6 +44,8 @@ public final class Interface extends ComparableStructure<String> {
 
     private IpAccessList _incomingFilter;
 
+    private IsisInterfaceSettings _isis;
+
     private String _name;
 
     private OspfArea _ospfArea;
@@ -97,6 +99,7 @@ public final class Interface extends ComparableStructure<String> {
       iface.setBlacklisted(_blacklisted);
       iface.setDeclaredNames(_declaredNames);
       iface.setIncomingFilter(_incomingFilter);
+      iface.setIsis(_isis);
       iface.setOspfArea(_ospfArea);
       if (_ospfArea != null) {
         _ospfArea.getInterfaces().add(name);
@@ -154,11 +157,11 @@ public final class Interface extends ComparableStructure<String> {
      * Set the primary address and secondary addresses of the interface. <br>
      * The {@link Interface#getAllAddresses()} method of the built {@link Interface} will return a
      * set containing the primary address and secondary addresses.<br>
-     * The node will accept traffic whose destination IP belongs is among any of the addresses of
-     * any of the interfaces. The primary address is the one used by default as the source IP for
-     * traffic sent out the interface. A secondary address is another address potentially associated
-     * with a different subnet living on the interface. The interface will reply to ARP for the
-     * primary or any secondary IP.
+     * The node will accept traffic whose destination IP is among any of the addresses of any of the
+     * interfaces. The primary address is the one used by default as the source IP for traffic sent
+     * out the interface. A secondary address is another address potentially associated with a
+     * different subnet living on the interface. The interface will reply to ARP for the primary or
+     * any secondary IP.
      */
     public Builder setAddresses(
         InterfaceAddress primaryAddress, InterfaceAddress... secondaryAddresses) {
@@ -199,6 +202,11 @@ public final class Interface extends ComparableStructure<String> {
 
     public Builder setIncomingFilter(IpAccessList incomingFilter) {
       _incomingFilter = incomingFilter;
+      return this;
+    }
+
+    public Builder setIsis(IsisInterfaceSettings isis) {
+      _isis = isis;
       return this;
     }
 
@@ -301,6 +309,8 @@ public final class Interface extends ComparableStructure<String> {
   private static final String PROP_CHANNEL_GROUP = "channelGroup";
 
   private static final String PROP_CHANNEL_GROUP_MEMBERS = "channelGroupMembers";
+
+  private static final String PROP_CRYPTO_MAP = "cryptoMap";
 
   private static final String PROP_DECLARED_NAMES = "declaredNames";
 
@@ -552,6 +562,8 @@ public final class Interface extends ComparableStructure<String> {
 
   private SortedSet<String> _channelGroupMembers;
 
+  private String _cryptoMap;
+
   private SortedSet<String> _declaredNames;
 
   private String _description;
@@ -701,6 +713,9 @@ public final class Interface extends ComparableStructure<String> {
     if (!Objects.equals(_bandwidth, other._bandwidth)) {
       return false;
     }
+    if (_cryptoMap != other._cryptoMap) {
+      return false;
+    }
     // we check ACLs for name match only -- full ACL diff can be done
     // elsewhere.
     if (!IpAccessList.bothNullOrSameName(this.getInboundFilter(), other.getInboundFilter())) {
@@ -800,6 +815,11 @@ public final class Interface extends ComparableStructure<String> {
   @JsonProperty(PROP_CHANNEL_GROUP_MEMBERS)
   public SortedSet<String> getChannelGroupMembers() {
     return _channelGroupMembers;
+  }
+
+  @JsonProperty(PROP_CRYPTO_MAP)
+  public String getCryptoMap() {
+    return _cryptoMap;
   }
 
   @JsonProperty(PROP_DECLARED_NAMES)
@@ -1161,6 +1181,11 @@ public final class Interface extends ComparableStructure<String> {
   @JsonProperty(PROP_CHANNEL_GROUP_MEMBERS)
   public void setChannelGroupMembers(Iterable<String> channelGroupMembers) {
     _channelGroupMembers = ImmutableSortedSet.copyOf(channelGroupMembers);
+  }
+
+  @JsonProperty(PROP_CRYPTO_MAP)
+  public void setCryptoMap(String cryptoMap) {
+    _cryptoMap = cryptoMap;
   }
 
   @JsonProperty(PROP_DECLARED_NAMES)

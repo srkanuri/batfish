@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.common.util.ComparableStructure;
 import org.batfish.datamodel.ConfigurationFormat;
@@ -120,6 +121,8 @@ public class Interface extends ComparableStructure<String> {
 
   private String _channelGroup;
 
+  private String _cryptoMap;
+
   private String _description;
 
   private SortedSet<Ip> _dhcpRelayAddresses;
@@ -130,9 +133,9 @@ public class Interface extends ComparableStructure<String> {
 
   private int _incomingFilterLine;
 
-  private Integer _isisCost;
+  @Nullable private Long _isisCost;
 
-  private IsisInterfaceMode _isisInterfaceMode;
+  @Nullable private IsisInterfaceMode _isisInterfaceMode;
 
   private int _mtu;
 
@@ -151,6 +154,8 @@ public class Interface extends ComparableStructure<String> {
   private boolean _ospfPassive;
 
   private boolean _ospfPointToPoint;
+
+  private boolean _ospfShutdown;
 
   private String _outgoingFilter;
 
@@ -271,6 +276,10 @@ public class Interface extends ComparableStructure<String> {
     return _channelGroup;
   }
 
+  public String getCryptoMap() {
+    return _cryptoMap;
+  }
+
   public String getDescription() {
     return _description;
   }
@@ -291,7 +300,7 @@ public class Interface extends ComparableStructure<String> {
     return _incomingFilterLine;
   }
 
-  public Integer getIsisCost() {
+  public Long getIsisCost() {
     return _isisCost;
   }
 
@@ -333,6 +342,10 @@ public class Interface extends ComparableStructure<String> {
 
   public boolean getOspfPointToPoint() {
     return _ospfPointToPoint;
+  }
+
+  public boolean getOspfShutdown() {
+    return _ospfShutdown;
   }
 
   public String getOutgoingFilter() {
@@ -426,6 +439,10 @@ public class Interface extends ComparableStructure<String> {
     _channelGroup = channelGroup;
   }
 
+  public void setCryptoMap(String cryptoMap) {
+    _cryptoMap = cryptoMap;
+  }
+
   public void setDescription(String description) {
     _description = description;
   }
@@ -446,7 +463,7 @@ public class Interface extends ComparableStructure<String> {
     _incomingFilterLine = incomingFilterLine;
   }
 
-  public void setIsisCost(Integer isisCost) {
+  public void setIsisCost(Long isisCost) {
     _isisCost = isisCost;
   }
 
@@ -488,6 +505,10 @@ public class Interface extends ComparableStructure<String> {
 
   public void setOspfPointToPoint(boolean ospfPointToPoint) {
     _ospfPointToPoint = ospfPointToPoint;
+  }
+
+  public void setOspfShutdown(boolean ospfShutdown) {
+    _ospfShutdown = ospfShutdown;
   }
 
   public void setOutgoingFilter(String accessListName) {

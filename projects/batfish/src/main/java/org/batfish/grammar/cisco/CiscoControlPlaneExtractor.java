@@ -16,6 +16,8 @@ import static org.batfish.representation.cisco.CiscoStructureType.CLASS_MAP;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST_EXPANDED;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST_STANDARD;
+import static org.batfish.representation.cisco.CiscoStructureType.CRYPTO_DYNAMIC_MAP_SET;
+import static org.batfish.representation.cisco.CiscoStructureType.CRYPTO_MAP_SET;
 import static org.batfish.representation.cisco.CiscoStructureType.DEPI_CLASS;
 import static org.batfish.representation.cisco.CiscoStructureType.DEPI_TUNNEL;
 import static org.batfish.representation.cisco.CiscoStructureType.DOCSIS_POLICY;
@@ -94,7 +96,11 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.CLASS_MAP_SER
 import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROLLER_DEPI_TUNNEL;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_PLANE_ACCESS_GROUP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.COPS_LISTENER_ACCESS_LIST;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_DYNAMIC_MAP_ACL;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_DYNAMIC_MAP_ISAKMP_PROFILE;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_DYNAMIC_MAP_TRANSFORM_SET;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_MAP_IPSEC_ISAKMP_ACL;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_MAP_IPSEC_ISAKMP_CRYPTO_DYNAMIC_MAP_SET;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_MAP_IPSEC_ISAKMP_ISAKMP_PROFILE;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_MAP_IPSEC_ISAKMP_TRANSFORM_SET;
 import static org.batfish.representation.cisco.CiscoStructureUsage.DEPI_TUNNEL_DEPI_CLASS;
@@ -138,6 +144,7 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_AREA_FIL
 import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_DEFAULT_ORIGINATE_ROUTE_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_BGP_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_CONNECTED_MAP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_EIGRP_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.OSPF_REDISTRIBUTE_STATIC_MAP;
 import static org.batfish.representation.cisco.CiscoStructureUsage.PIM_ACCEPT_REGISTER_ACL;
 import static org.batfish.representation.cisco.CiscoStructureUsage.PIM_ACCEPT_REGISTER_ROUTE_MAP;
@@ -194,6 +201,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -212,6 +220,7 @@ import org.batfish.common.RedFlagBatfishException;
 import org.batfish.common.Warnings;
 import org.batfish.common.WellKnownCommunity;
 import org.batfish.common.util.CommonUtil;
+import org.batfish.datamodel.AuthenticationMethod;
 import org.batfish.datamodel.BgpTieBreaker;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
@@ -238,6 +247,7 @@ import org.batfish.datamodel.IsisLevel;
 import org.batfish.datamodel.IsisMetricType;
 import org.batfish.datamodel.IsoAddress;
 import org.batfish.datamodel.LineAction;
+import org.batfish.datamodel.LineType;
 import org.batfish.datamodel.NamedPort;
 import org.batfish.datamodel.OriginType;
 import org.batfish.datamodel.Prefix;
@@ -379,6 +389,11 @@ import org.batfish.grammar.cisco.CiscoParser.Boolean_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Boolean_simple_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Boolean_tag_is_rp_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Cadant_stdacl_nameContext;
+import org.batfish.grammar.cisco.CiscoParser.Cd_match_addressContext;
+import org.batfish.grammar.cisco.CiscoParser.Cd_set_isakmp_profileContext;
+import org.batfish.grammar.cisco.CiscoParser.Cd_set_peerContext;
+import org.batfish.grammar.cisco.CiscoParser.Cd_set_pfsContext;
+import org.batfish.grammar.cisco.CiscoParser.Cd_set_transform_setContext;
 import org.batfish.grammar.cisco.CiscoParser.Cip_profileContext;
 import org.batfish.grammar.cisco.CiscoParser.Cip_transform_setContext;
 import org.batfish.grammar.cisco.CiscoParser.Cipprf_set_isakmp_profileContext;
@@ -417,10 +432,15 @@ import org.batfish.grammar.cisco.CiscoParser.Continue_rm_stanzaContext;
 import org.batfish.grammar.cisco.CiscoParser.Copsl_access_listContext;
 import org.batfish.grammar.cisco.CiscoParser.Cp_ip_access_groupContext;
 import org.batfish.grammar.cisco.CiscoParser.Cqer_service_classContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_dynamic_mapContext;
 import org.batfish.grammar.cisco.CiscoParser.Crypto_keyringContext;
-import org.batfish.grammar.cisco.CiscoParser.Crypto_map_ii_match_addressContext;
-import org.batfish.grammar.cisco.CiscoParser.Crypto_map_ii_set_isakmp_profileContext;
-import org.batfish.grammar.cisco.CiscoParser.Crypto_map_ii_set_transform_setContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_mapContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ii_match_addressContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ii_set_isakmp_profileContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ii_set_peerContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ii_set_pfsContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ii_set_transform_setContext;
+import org.batfish.grammar.cisco.CiscoParser.Crypto_map_t_ipsec_isakmpContext;
 import org.batfish.grammar.cisco.CiscoParser.Cs_classContext;
 import org.batfish.grammar.cisco.CiscoParser.Csc_nameContext;
 import org.batfish.grammar.cisco.CiscoParser.Default_information_originate_rb_stanzaContext;
@@ -461,6 +481,7 @@ import org.batfish.grammar.cisco.CiscoParser.Hash_commentContext;
 import org.batfish.grammar.cisco.CiscoParser.If_autostateContext;
 import org.batfish.grammar.cisco.CiscoParser.If_bandwidthContext;
 import org.batfish.grammar.cisco.CiscoParser.If_channel_groupContext;
+import org.batfish.grammar.cisco.CiscoParser.If_crypto_mapContext;
 import org.batfish.grammar.cisco.CiscoParser.If_descriptionContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_access_groupContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_addressContext;
@@ -476,6 +497,7 @@ import org.batfish.grammar.cisco.CiscoParser.If_ip_ospf_dead_intervalContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_ospf_dead_interval_minimalContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_ospf_networkContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_ospf_passive_interfaceContext;
+import org.batfish.grammar.cisco.CiscoParser.If_ip_ospf_shutdownContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_pim_neighbor_filterContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_policyContext;
 import org.batfish.grammar.cisco.CiscoParser.If_ip_proxy_arpContext;
@@ -724,6 +746,7 @@ import org.batfish.grammar.cisco.CiscoParser.Ro_passive_interfaceContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_passive_interface_defaultContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_redistribute_bgpContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_redistribute_connectedContext;
+import org.batfish.grammar.cisco.CiscoParser.Ro_redistribute_eigrpContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_redistribute_ripContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_redistribute_staticContext;
 import org.batfish.grammar.cisco.CiscoParser.Ro_rfc1583_compatibilityContext;
@@ -757,6 +780,7 @@ import org.batfish.grammar.cisco.CiscoParser.Rr_passive_interface_defaultContext
 import org.batfish.grammar.cisco.CiscoParser.Rs_routeContext;
 import org.batfish.grammar.cisco.CiscoParser.Rs_vrfContext;
 import org.batfish.grammar.cisco.CiscoParser.S_aaaContext;
+import org.batfish.grammar.cisco.CiscoParser.S_access_lineContext;
 import org.batfish.grammar.cisco.CiscoParser.S_cableContext;
 import org.batfish.grammar.cisco.CiscoParser.S_class_mapContext;
 import org.batfish.grammar.cisco.CiscoParser.S_depi_classContext;
@@ -891,6 +915,8 @@ import org.batfish.representation.cisco.CiscoConfiguration;
 import org.batfish.representation.cisco.CiscoSourceNat;
 import org.batfish.representation.cisco.CiscoStructureType;
 import org.batfish.representation.cisco.CiscoStructureUsage;
+import org.batfish.representation.cisco.CryptoMapEntry;
+import org.batfish.representation.cisco.CryptoMapSet;
 import org.batfish.representation.cisco.DynamicIpBgpPeerGroup;
 import org.batfish.representation.cisco.DynamicIpv6BgpPeerGroup;
 import org.batfish.representation.cisco.ExpandedCommunityList;
@@ -1087,6 +1113,8 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
 
   private static final String F_OSPF_MAXIMUM_PATHS = "ospf - maximum-paths";
 
+  private static final String F_OSPF_REDISTRIBUTE_EIGRP = "ospf - redistribute eigrp";
+
   private static final String F_OSPF_REDISTRIBUTE_RIP = "ospf - redistribute rip";
 
   private static final String F_ROUTE_MAP_SET_METRIC_TYPE = "route-map - set metric-type";
@@ -1232,6 +1260,12 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   private CiscoNxBgpVrfNeighborAddressFamilyConfiguration _currentBgpNxVrfNeighborAddressFamily;
 
   private final Set<String> _currentBlockNeighborAddressFamilies;
+
+  private CryptoMapEntry _currentCryptoMapEntry;
+
+  private String _currentCryptoMapName;
+
+  private Integer _currentCryptoMapSequenceNum;
 
   private DynamicIpBgpPeerGroup _currentDynamicIpPeerGroup;
 
@@ -1460,21 +1494,27 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     if (_configuration.getCf().getAaa().getAuthentication().getLogin() == null) {
       _configuration.getCf().getAaa().getAuthentication().setLogin(new AaaAuthenticationLogin());
     }
-    ArrayList<String> methods = new ArrayList<>();
+    ArrayList<AuthenticationMethod> methods = new ArrayList<>();
     if (ctx.aaa_authentication_asa_console().group != null) {
-      methods.add(ctx.aaa_authentication_asa_console().group.getText());
+      methods.add(AuthenticationMethod.GROUP_USER_DEFINED);
     }
     if (ctx.aaa_authentication_asa_console().LOCAL_ASA() != null) {
-      methods.add(ctx.aaa_authentication_asa_console().LOCAL_ASA().getText());
+      methods.add(AuthenticationMethod.LOCAL_CASE);
     }
     if (!methods.isEmpty()) {
       AaaAuthenticationLogin login = _configuration.getCf().getAaa().getAuthentication().getLogin();
       String name = ctx.linetype.getText();
+      AaaAuthenticationLoginList authList = new AaaAuthenticationLoginList(methods);
+
+      _configuration
+          .getCf()
+          .getLines()
+          .computeIfAbsent(name, Line::new)
+          .setAaaAuthenticationLoginList(authList);
 
       // not allowed to specify multiple login lists for a given linetype so use computeIfAbsent
       // rather than put so we only accept the first login list
-      _currentAaaAuthenticationLoginList =
-          login.getLists().computeIfAbsent(name, k -> new AaaAuthenticationLoginList(methods));
+      _currentAaaAuthenticationLoginList = login.getLists().computeIfAbsent(name, k -> authList);
     }
   }
 
@@ -1489,13 +1529,32 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     } else {
       throw new BatfishException("Unsupported mode");
     }
-    List<String> methods =
-        ctx.aaa_authentication_list_method()
-            .stream()
-            .map(Aaa_authentication_list_methodContext::getText)
-            .collect(ImmutableList.toImmutableList());
+
+    List<AuthenticationMethod> methods = new ArrayList<>();
+
+    for (Aaa_authentication_list_methodContext method : ctx.aaa_authentication_list_method()) {
+      methods.add(AuthenticationMethod.toAuthenticationMethod(method.getText()));
+    }
+
     _currentAaaAuthenticationLoginList =
         login.getLists().computeIfAbsent(name, k -> new AaaAuthenticationLoginList(methods));
+
+    // apply the list to each line
+    SortedMap<String, Line> lines = _configuration.getCf().getLines();
+    for (Line line : lines.values()) {
+      if (name.equals(AaaAuthenticationLogin.DEFAULT_LIST_NAME)) {
+        // only apply default list if no other list applied
+        if (line.getAaaAuthenticationLoginList() == null) {
+          line.setAaaAuthenticationLoginList(_currentAaaAuthenticationLoginList);
+          line.setLoginAuthentication(name);
+        }
+      } else if (line.getLoginAuthentication() != null
+          && line.getLoginAuthentication().equals(name)) {
+        // if not the default list, apply it to lines that have specified this list as it's login
+        // list
+        line.setAaaAuthenticationLoginList(_currentAaaAuthenticationLoginList);
+      }
+    }
   }
 
   @Override
@@ -1804,6 +1863,68 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     }
     _currentKeyring = new Keyring(ctx.name.getText());
     defineStructure(KEYRING, ctx.name.getText(), ctx);
+  }
+
+  @Override
+  public void enterCrypto_map(Crypto_mapContext ctx) {
+    _currentCryptoMapName = ctx.name.getText();
+    if (ctx.seq_num != null) {
+      _currentCryptoMapSequenceNum = toInteger(ctx.seq_num);
+    }
+  }
+
+  @Override
+  public void enterCrypto_dynamic_map(Crypto_dynamic_mapContext ctx) {
+    String name = ctx.name.getText();
+
+    _currentCryptoMapEntry = new CryptoMapEntry(name, toInteger(ctx.seq_num));
+    _currentCryptoMapEntry.setDynamic(true);
+
+    CryptoMapSet cryptoMapSet = _configuration.getCryptoMapSets().get(name);
+    // if this is the first crypto map entry in the crypto map set
+    if (cryptoMapSet == null) {
+      cryptoMapSet = new CryptoMapSet(name);
+      cryptoMapSet.setDynamic(true);
+      _configuration.getCryptoMapSets().put(name, cryptoMapSet);
+      defineStructure(CRYPTO_DYNAMIC_MAP_SET, name, ctx);
+    } else if (!cryptoMapSet.getDynamic()) {
+      _w.redFlag(
+          String.format("Cannot add dynamic crypto map entry %s to a static crypto map set", name));
+      return;
+    }
+    cryptoMapSet.getCryptoMapEntries().add(_currentCryptoMapEntry);
+  }
+
+  @Override
+  public void enterCrypto_map_t_ipsec_isakmp(Crypto_map_t_ipsec_isakmpContext ctx) {
+    _currentCryptoMapEntry =
+        new CryptoMapEntry(_currentCryptoMapName, _currentCryptoMapSequenceNum);
+
+    CryptoMapSet cryptoMapSet = _configuration.getCryptoMapSets().get(_currentCryptoMapName);
+    // if this is the first crypto map entry in the crypto map set
+    if (cryptoMapSet == null) {
+      cryptoMapSet = new CryptoMapSet(_currentCryptoMapName);
+      _configuration.getCryptoMapSets().put(_currentCryptoMapName, cryptoMapSet);
+      defineStructure(CRYPTO_MAP_SET, _currentCryptoMapName, ctx);
+    } else if (cryptoMapSet.getDynamic()) {
+      _w.redFlag(
+          String.format(
+              "Cannot add static crypto map entry %s to a dynamic crypto map set",
+              _currentCryptoMapName));
+      return;
+    }
+
+    if (ctx.crypto_dynamic_map_name != null) {
+      String name = ctx.crypto_dynamic_map_name.getText();
+      _currentCryptoMapEntry.setReferredDynamicMapSet(name);
+      _configuration.referenceStructure(
+          CRYPTO_DYNAMIC_MAP_SET,
+          name,
+          CRYPTO_MAP_IPSEC_ISAKMP_CRYPTO_DYNAMIC_MAP_SET,
+          ctx.getStart().getLine());
+    }
+
+    cryptoMapSet.getCryptoMapEntries().add(_currentCryptoMapEntry);
   }
 
   @Override
@@ -3000,6 +3121,12 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void enterS_access_line(S_access_lineContext ctx) {
+    String name = ctx.linetype.getText();
+    _configuration.getCf().getLines().computeIfAbsent(name, Line::new);
+  }
+
+  @Override
   public void enterS_cable(S_cableContext ctx) {
     if (_configuration.getCf().getCable() == null) {
       _configuration.getCf().setCable(new Cable());
@@ -3158,10 +3285,33 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     } else {
       names.add(nameBase);
     }
+
+    // get the default list or null if Aaa, AaaAuthentication, or AaaAuthenticationLogin is null or
+    // default list is undefined
+    AaaAuthenticationLoginList defaultList =
+        Optional.ofNullable(_configuration.getCf().getAaa())
+            .map(Aaa::getAuthentication)
+            .map(AaaAuthentication::getLogin)
+            .map(AaaAuthenticationLogin::getLists)
+            .map(lists -> lists.get(AaaAuthenticationLogin.DEFAULT_LIST_NAME))
+            .orElse(null);
+
     for (String name : names) {
       if (_configuration.getCf().getLines().get(name) == null) {
         Line line = new Line(name);
-        line.setLoginAuthentication(AaaAuthenticationLogin.DEFAULT_LIST_NAME);
+        if (defaultList != null) {
+          // if default list defined, apply it to all lines
+          line.setAaaAuthenticationLoginList(defaultList);
+          line.setLoginAuthentication(AaaAuthenticationLogin.DEFAULT_LIST_NAME);
+        } else if (_configuration.getCf().getAaa() != null
+            && _configuration.getCf().getAaa().getNewModel()
+            && line.getLineType() != LineType.CON) {
+          // if default list not defined but aaa new-model, apply to all lines except con0
+          line.setAaaAuthenticationLoginList(
+              new AaaAuthenticationLoginList(
+                  Collections.singletonList(AuthenticationMethod.LOCAL)));
+          line.setLoginAuthentication(AaaAuthenticationLogin.DEFAULT_LIST_NAME);
+        }
         _configuration.getCf().getLines().put(name, line);
       }
     }
@@ -3799,6 +3949,44 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void exitCd_match_address(Cd_match_addressContext ctx) {
+    String name = ctx.name.getText();
+    int line = ctx.name.getStart().getLine();
+    _currentCryptoMapEntry.setAccessList(name);
+    _configuration.referenceStructure(IP_ACCESS_LIST, name, CRYPTO_DYNAMIC_MAP_ACL, line);
+  }
+
+  @Override
+  public void exitCd_set_isakmp_profile(Cd_set_isakmp_profileContext ctx) {
+    String name = ctx.name.getText();
+    int line = ctx.name.getStart().getLine();
+    _currentCryptoMapEntry.setIsakmpProfile(name);
+    _configuration.referenceStructure(
+        ISAKMP_PROFILE, name, CRYPTO_DYNAMIC_MAP_ISAKMP_PROFILE, line);
+  }
+
+  @Override
+  public void exitCd_set_peer(Cd_set_peerContext ctx) {
+    _currentCryptoMapEntry.setPeer(toIp(ctx.address));
+  }
+
+  @Override
+  public void exitCd_set_pfs(Cd_set_pfsContext ctx) {
+    _currentCryptoMapEntry.setPfsKeyGroup(toDhGroup(ctx.dh_group()));
+  }
+
+  @Override
+  public void exitCd_set_transform_set(Cd_set_transform_setContext ctx) {
+    for (VariableContext transform : ctx.transforms) {
+      int line = transform.getStart().getLine();
+      String name = transform.getText();
+      _currentCryptoMapEntry.getTransforms().add(name);
+      _configuration.referenceStructure(
+          IPSEC_TRANSFORM_SET, name, CRYPTO_DYNAMIC_MAP_TRANSFORM_SET, line);
+    }
+  }
+
+  @Override
   public void exitCm_ios_inspect(Cm_ios_inspectContext ctx) {
     _currentInspectClassMap = null;
   }
@@ -3939,28 +4127,48 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
-  public void exitCrypto_map_ii_match_address(Crypto_map_ii_match_addressContext ctx) {
+  public void exitCrypto_map_t_ii_match_address(Crypto_map_t_ii_match_addressContext ctx) {
     String name = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
+    _currentCryptoMapEntry.setAccessList(name);
     _configuration.referenceStructure(IP_ACCESS_LIST, name, CRYPTO_MAP_IPSEC_ISAKMP_ACL, line);
   }
 
   @Override
-  public void exitCrypto_map_ii_set_isakmp_profile(Crypto_map_ii_set_isakmp_profileContext ctx) {
+  public void exitCrypto_map_t_ii_set_isakmp_profile(
+      Crypto_map_t_ii_set_isakmp_profileContext ctx) {
     String name = ctx.name.getText();
     int line = ctx.name.getStart().getLine();
-    // TODO: go beyond reference counting
+    _currentCryptoMapEntry.setIsakmpProfile(name);
     _configuration.referenceStructure(
         ISAKMP_PROFILE, name, CRYPTO_MAP_IPSEC_ISAKMP_ISAKMP_PROFILE, line);
   }
 
   @Override
-  public void exitCrypto_map_ii_set_transform_set(Crypto_map_ii_set_transform_setContext ctx) {
-    String name = ctx.name.getText();
-    int line = ctx.name.getStart().getLine();
-    // TODO: go beyond reference counting
-    _configuration.referenceStructure(
-        IPSEC_TRANSFORM_SET, name, CRYPTO_MAP_IPSEC_ISAKMP_TRANSFORM_SET, line);
+  public void exitCrypto_map_t_ii_set_peer(Crypto_map_t_ii_set_peerContext ctx) {
+    _currentCryptoMapEntry.setPeer(toIp(ctx.address));
+  }
+
+  @Override
+  public void exitCrypto_map_t_ii_set_pfs(Crypto_map_t_ii_set_pfsContext ctx) {
+    _currentCryptoMapEntry.setPfsKeyGroup(toDhGroup(ctx.dh_group()));
+  }
+
+  @Override
+  public void exitCrypto_map_t_ii_set_transform_set(Crypto_map_t_ii_set_transform_setContext ctx) {
+    for (VariableContext transform : ctx.transforms) {
+      int line = transform.getStart().getLine();
+      String name = transform.getText();
+      _currentCryptoMapEntry.getTransforms().add(name);
+      _configuration.referenceStructure(
+          IPSEC_TRANSFORM_SET, name, CRYPTO_MAP_IPSEC_ISAKMP_TRANSFORM_SET, line);
+    }
+  }
+
+  @Override
+  public void exitCrypto_map_t_ipsec_isakmp(Crypto_map_t_ipsec_isakmpContext ctx) {
+    _currentCryptoMapName = null;
+    _currentCryptoMapSequenceNum = null;
   }
 
   @Override
@@ -4558,6 +4766,11 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     _currentInterfaces.forEach(i -> i.setChannelGroup(name));
   }
 
+  @Override
+  public void exitIf_crypto_map(If_crypto_mapContext ctx) {
+    _currentInterfaces.forEach(i -> i.setCryptoMap(ctx.name.getText()));
+  }
+
   private @Nullable String computeAggregatedInterfaceName(int num, ConfigurationFormat format) {
     switch (format) {
       case CISCO_ASA:
@@ -4740,6 +4953,13 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void exitIf_ip_ospf_shutdown(If_ip_ospf_shutdownContext ctx) {
+    for (Interface iface : _currentInterfaces) {
+      iface.setOspfShutdown(ctx.NO() == null);
+    }
+  }
+
+  @Override
   public void exitIf_ip_pim_neighbor_filter(If_ip_pim_neighbor_filterContext ctx) {
     String acl = ctx.acl.getText();
     int line = ctx.acl.getStart().getLine();
@@ -4813,7 +5033,7 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
 
   @Override
   public void exitIf_isis_metric(If_isis_metricContext ctx) {
-    int metric = toInteger(ctx.metric);
+    long metric = toLong(ctx.metric);
     for (Interface iface : _currentInterfaces) {
       iface.setIsisCost(metric);
     }
@@ -5446,7 +5666,24 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
     } else {
       throw new BatfishException("Invalid list name");
     }
+
+    // get the authentication list or null if Aaa, AaaAuthentication, or AaaAuthenticationLogin is
+    // null or the list is not defined
+    AaaAuthenticationLoginList authList =
+        Optional.ofNullable(_configuration.getCf().getAaa())
+            .map(Aaa::getAuthentication)
+            .map(AaaAuthentication::getLogin)
+            .map(AaaAuthenticationLogin::getLists)
+            .map(lists -> lists.get(list))
+            .orElse(null);
+
+    // if the authentication list has been defined, apply it to all lines in _currentLineNames
     for (String line : _currentLineNames) {
+      if (authList != null) {
+        _configuration.getCf().getLines().get(line).setAaaAuthenticationLoginList(authList);
+      }
+      // set the name of the login list even if the list hasn't been defined yet because it may be
+      // defined later
       _configuration.getCf().getLines().get(line).setLoginAuthentication(list);
     }
   }
@@ -6682,6 +6919,15 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       r.setTag(tag);
     }
     r.setOnlyClassfulRoutes(ctx.subnets == null && !ospfRedistributeSubnetsByDefault(_format));
+  }
+
+  @Override
+  public void exitRo_redistribute_eigrp(Ro_redistribute_eigrpContext ctx) {
+    if (ctx.map != null) {
+      _configuration.referenceStructure(
+          ROUTE_MAP, ctx.map.getText(), OSPF_REDISTRIBUTE_EIGRP_MAP, ctx.map.getStart().getLine());
+    }
+    todo(ctx, F_OSPF_REDISTRIBUTE_EIGRP);
   }
 
   @Override

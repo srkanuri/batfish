@@ -5699,6 +5699,11 @@ IPSEC_ISAKMP
    'ipsec-isakmp'
 ;
 
+IPSEC_MANUAL
+:
+   'ipsec-manual'
+;
+
 IPSEC_OVER_TCP
 :
    'ipsec-over-tcp'
@@ -5907,6 +5912,16 @@ KEYSTORE
 KLOGIN
 :
    'klogin'
+;
+
+KRB5
+:
+   'krb5'
+;
+
+KRB5_TELNET
+:
+   'krb5-telnet'
 ;
 
 KOD
@@ -6287,6 +6302,11 @@ LOCAL_AS
 LOCAL_ASA
 :
    'LOCAL'
+;
+
+LOCAL_CASE
+:
+   'local-case'
 ;
 
 LOCAL_INTERFACE
@@ -11841,6 +11861,11 @@ TRAFFIC_ENG
    'traffic-eng'
 ;
 
+TRAFFIC_EXPORT
+:
+   'traffic-export'
+;
+
 TRAFFIC_INDEX
 :
    'traffic-index'
@@ -14382,6 +14407,11 @@ M_Interface_DEFAULT
 M_Interface_DOLLAR
 :
    '$' -> type ( DOLLAR ) , popMode
+;
+
+M_Interface_EIGRP
+:
+   'eigrp' -> type ( EIGRP ) , popMode
 ;
 
 M_Interface_EQ

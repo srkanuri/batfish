@@ -5,7 +5,6 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
@@ -176,21 +175,11 @@ public class WorkMgr extends AbstractCoordinator {
       assert assignWorkSpan != null; // avoid unused warning
       // get the task and add other standard stuff
       JSONObject task = new JSONObject(work.getWorkItem().getRequestParams());
-      Path containerDir =
-          Main.getSettings().getContainersLocation().resolve(work.getWorkItem().getContainerName());
-      String testrigName = work.getWorkItem().getTestrigName();
-      Path testrigBaseDir =
-          containerDir
-              .resolve(Paths.get(BfConsts.RELPATH_TESTRIGS_DIR, testrigName))
-              .toAbsolutePath();
-      task.put(BfConsts.ARG_CONTAINER_DIR, containerDir.toAbsolutePath().toString());
-      task.put(BfConsts.ARG_TESTRIG, testrigName);
+      task.put(BfConsts.ARG_CONTAINER, work.getWorkItem().getContainerName());
       task.put(
-          BfConsts.ARG_LOG_FILE,
-          testrigBaseDir.resolve(work.getId() + BfConsts.SUFFIX_LOG_FILE).toString());
-      task.put(
-          BfConsts.ARG_ANSWER_JSON_PATH,
-          testrigBaseDir.resolve(work.getId() + BfConsts.SUFFIX_ANSWER_JSON_FILE).toString());
+          BfConsts.ARG_STORAGE_BASE,
+          Main.getSettings().getContainersLocation().toAbsolutePath().toString());
+      task.put(BfConsts.ARG_TESTRIG, work.getWorkItem().getTestrigName());
 
       client =
           CommonUtil.createHttpClientBuilder(
@@ -315,8 +304,7 @@ public class WorkMgr extends AbstractCoordinator {
       case NODE:
         {
           checkArgument(
-              !Strings.isNullOrEmpty(testrig),
-              "Testrig name should be supplied for 'NODE' autoCompletion");
+              !isNullOrEmpty(testrig), "Testrig name should be supplied for 'NODE' autoCompletion");
           List<AutocompleteSuggestion> suggestions =
               NodesSpecifier.autoComplete(
                   query, getNodes(container, testrig), getNodeRolesData(container));
@@ -507,7 +495,7 @@ public class WorkMgr extends AbstractCoordinator {
       List<String> questionsToDelete,
       @Nullable Boolean suggested) {
     Path containerDir = getdirContainer(containerName);
-    Path aDir = containerDir.resolve(Paths.get(BfConsts.RELPATH_ANALYSES_DIR, aName));
+    Path aDir = containerDir.resolve(BfConsts.RELPATH_ANALYSES_DIR).resolve(aName);
 
     this.configureAnalysisValidityCheck(
         containerName, newAnalysis, aName, questionsToAdd, questionsToDelete, aDir);

@@ -1775,6 +1775,14 @@
         "vendorFamily" : {
           "cisco" : {
             "hostname" : "asa_ssh",
+            "lines" : {
+              "ssh" : {
+                "name" : "ssh",
+                "execTimeoutMinutes" : 0,
+                "execTimeoutSeconds" : 0,
+                "lineType" : "SSH"
+              }
+            },
             "logging" : {
               "on" : true
             }
@@ -3985,7 +3993,9 @@
           "default" : {
             "name" : "default",
             "isisProcess" : {
-              "level" : "LEVEL_1",
+              "level1" : {
+                "wideMetricsOnly" : false
+              },
               "netAddress" : "12.3456.7890.1234.5678.90"
             }
           }
@@ -4303,6 +4313,32 @@
               "newModel" : false
             },
             "hostname" : "cisco_aaa",
+            "lines" : {
+              "http" : {
+                "name" : "http",
+                "aaaAuthenticationLoginList" : {
+                  "methods" : [
+                    "GROUP_USER_DEFINED",
+                    "LOCAL_CASE"
+                  ]
+                },
+                "execTimeoutMinutes" : 0,
+                "execTimeoutSeconds" : 0,
+                "lineType" : "HTTP"
+              },
+              "telnet" : {
+                "name" : "telnet",
+                "aaaAuthenticationLoginList" : {
+                  "methods" : [
+                    "GROUP_USER_DEFINED",
+                    "LOCAL_CASE"
+                  ]
+                },
+                "execTimeoutMinutes" : 0,
+                "execTimeoutSeconds" : 0,
+                "lineType" : "TELNET"
+              }
+            },
             "logging" : {
               "on" : true
             }
@@ -5741,6 +5777,16 @@
           }
         },
         "ipsecPolicies" : {
+          "VPN:5" : {
+            "name" : "VPN:5",
+            "pfsKeyGroup" : "GROUP14",
+            "pfsKeyGroupDynamicIke" : false
+          },
+          "VPNMAP:2" : {
+            "name" : "VPNMAP:2",
+            "pfsKeyGroup" : "GROUP2",
+            "pfsKeyGroupDynamicIke" : false
+          },
           "abcdefg" : {
             "name" : "abcdefg",
             "pfsKeyGroupDynamicIke" : false
@@ -7604,7 +7650,12 @@
               "Serial4/0"
             ],
             "isisProcess" : {
-              "level" : "LEVEL_1_2",
+              "level1" : {
+                "wideMetricsOnly" : false
+              },
+              "level2" : {
+                "wideMetricsOnly" : false
+              },
               "netAddress" : "12.1234.1234.1234.1234.12"
             }
           }
@@ -7650,6 +7701,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7665,6 +7717,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7680,6 +7733,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7695,6 +7749,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7710,6 +7765,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7725,6 +7781,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7740,6 +7797,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7755,6 +7813,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7770,6 +7829,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7785,6 +7845,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7800,6 +7861,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7815,6 +7877,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7830,6 +7893,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7845,6 +7909,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7860,6 +7925,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7875,6 +7941,7 @@
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "40",
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "telnet"
                 ],
@@ -7889,6 +7956,7 @@
                 "name" : "<UNNAMED>2",
                 "execTimeoutMinutes" : 1,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "ssh",
                   "telnet"
@@ -7898,6 +7966,7 @@
                 "name" : "<UNNAMED>35",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7906,6 +7975,7 @@
                 "name" : "<UNNAMED>36",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7914,6 +7984,7 @@
                 "name" : "<UNNAMED>37",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7922,6 +7993,7 @@
                 "name" : "<UNNAMED>38",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7930,6 +8002,7 @@
                 "name" : "<UNNAMED>39",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7938,6 +8011,7 @@
                 "name" : "<UNNAMED>40",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7946,6 +8020,7 @@
                 "name" : "<UNNAMED>41",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7954,6 +8029,7 @@
                 "name" : "<UNNAMED>42",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7962,6 +8038,7 @@
                 "name" : "<UNNAMED>43",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7970,6 +8047,7 @@
                 "name" : "<UNNAMED>44",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7978,6 +8056,7 @@
                 "name" : "<UNNAMED>45",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7986,6 +8065,7 @@
                 "name" : "<UNNAMED>46",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -7994,6 +8074,7 @@
                 "name" : "<UNNAMED>47",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -8002,6 +8083,7 @@
                 "name" : "<UNNAMED>48",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
+                "lineType" : "UNKNOWN",
                 "transportInput" : [
                   "all"
                 ]
@@ -8009,13 +8091,15 @@
               "console" : {
                 "name" : "console",
                 "execTimeoutMinutes" : 15,
-                "execTimeoutSeconds" : 0
+                "execTimeoutSeconds" : 0,
+                "lineType" : "CON"
               },
               "vty" : {
                 "name" : "vty",
                 "execTimeoutMinutes" : 0,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "vty-acl"
+                "inputAccessList" : "vty-acl",
+                "lineType" : "VTY"
               },
               "vty0" : {
                 "name" : "vty0",
@@ -8023,6 +8107,7 @@
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "99",
                 "inputIpv6AccessList" : "ipv6-vty-acl",
+                "lineType" : "VTY",
                 "transportPreferred" : [
                   "none"
                 ]
@@ -8033,6 +8118,7 @@
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "99",
                 "inputIpv6AccessList" : "ipv6-vty-acl",
+                "lineType" : "VTY",
                 "transportPreferred" : [
                   "none"
                 ]
@@ -8041,37 +8127,43 @@
                 "name" : "vty10",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty11" : {
                 "name" : "vty11",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty12" : {
                 "name" : "vty12",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty13" : {
                 "name" : "vty13",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty14" : {
                 "name" : "vty14",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty15" : {
                 "name" : "vty15",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty2" : {
                 "name" : "vty2",
@@ -8079,6 +8171,7 @@
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "99",
                 "inputIpv6AccessList" : "ipv6-vty-acl",
+                "lineType" : "VTY",
                 "transportPreferred" : [
                   "none"
                 ]
@@ -8089,6 +8182,7 @@
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "99",
                 "inputIpv6AccessList" : "ipv6-vty-acl",
+                "lineType" : "VTY",
                 "transportPreferred" : [
                   "none"
                 ]
@@ -8099,6 +8193,7 @@
                 "execTimeoutSeconds" : 0,
                 "inputAccessList" : "99",
                 "inputIpv6AccessList" : "ipv6-vty-acl",
+                "lineType" : "VTY",
                 "transportPreferred" : [
                   "none"
                 ]
@@ -8107,31 +8202,36 @@
                 "name" : "vty5",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty6" : {
                 "name" : "vty6",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty7" : {
                 "name" : "vty7",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty8" : {
                 "name" : "vty8",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               },
               "vty9" : {
                 "name" : "vty9",
                 "execTimeoutMinutes" : 15,
                 "execTimeoutSeconds" : 0,
-                "inputAccessList" : "40"
+                "inputAccessList" : "40",
+                "lineType" : "VTY"
               }
             },
             "logging" : {
@@ -8652,10 +8752,8 @@
             ],
             "mtu" : 1500,
             "nativeVlan" : 1,
-            "ospfArea" : 0,
-            "ospfCost" : 4000,
             "ospfDeadInterval" : 0,
-            "ospfEnabled" : true,
+            "ospfEnabled" : false,
             "ospfHelloMultiplier" : 0,
             "ospfPassive" : false,
             "ospfPointToPoint" : false,
@@ -8806,14 +8904,7 @@
               "areas" : {
                 "0" : {
                   "name" : 0,
-                  "interfaces" : [
-                    "Ethernet0/0"
-                  ],
-                  "nssa" : {
-                    "defaultOriginateType" : "INTER_AREA",
-                    "suppressType3" : true
-                  },
-                  "stubType" : "NSSA",
+                  "stubType" : "NONE",
                   "summaries" : {
                     "1.2.3.0/24" : {
                       "advertise" : true,
@@ -12061,10 +12152,7 @@
             "name" : "default",
             "interfaces" : [
               "GigabitEthernet0/2/1/6"
-            ],
-            "isisProcess" : {
-              "level" : "LEVEL_1_2"
-            }
+            ]
           }
         }
       },
