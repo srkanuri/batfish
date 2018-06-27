@@ -132,6 +132,7 @@
             <compilerArgs>
               <arg>-Werror</arg>
               <arg>-Xlint:all</arg>
+              <arg>-Xlint:-cast</arg>
               <arg>-Xlint:-processing</arg>
               <arg>-XDignore.symbol.file</arg>
             </compilerArgs>
