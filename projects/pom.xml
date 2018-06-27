@@ -82,6 +82,7 @@
     <protobuf.version>3.5.1</protobuf.version>
     <protoc-jar-maven-plugin.version>3.5.1.1</protoc-jar-maven-plugin.version>
     <puppycrawl.version>8.0</puppycrawl.version>
+    <replacer.version>1.5.3</replacer.version>
     <slf4j.version>1.7.25</slf4j.version>
     <sqlite-jdbc.version>3.21.0</sqlite-jdbc.version>
     <xstream.version>1.4.7</xstream.version>
@@ -132,7 +133,6 @@
             <compilerArgs>
               <arg>-Werror</arg>
               <arg>-Xlint:all</arg>
-              <arg>-Xlint:-cast</arg>
               <arg>-Xlint:-processing</arg>
               <arg>-XDignore.symbol.file</arg>
             </compilerArgs>
@@ -166,6 +166,31 @@
               </configuration>
             </execution>
           </executions>
+        </plugin>
+
+        <plugin>
+          <groupId>com.google.code.maven-replacer-plugin</groupId>
+          <artifactId>replacer</artifactId>
+          <version>${replacer.version}</version>
+          <executions>
+            <execution>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>replace</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <includes>
+              <include>${basedir}/target/generated-sources/**/*OuterClass.java</include>
+            </includes>
+            <replacements>
+              <replacement>
+                <token>\npublic final class</token>
+                <value>@SuppressWarnings({"all","cast","unchecked","unused"}) public final class</value>
+              </replacement>
+            </replacements>
+          </configuration>
         </plugin>
 
         <plugin>
@@ -335,6 +360,32 @@
               </licenseMerge>
               <licenseMerge>MIT License|MIT|MIT license</licenseMerge>
             </licenseMerges>
+          </configuration>
+        </plugin>
+
+        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>com.google.code.maven-replacer-plugin</groupId>
+                    <artifactId>replacer</artifactId>
+                    <versionRange>[${replacer.version},)</versionRange>
+                    <goals>
+                      <goal>replace</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <execute></execute>
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
           </configuration>
         </plugin>
 
