@@ -64,7 +64,7 @@ public class BDDInteger {
   }
 
   /** @param satAssignment a satisfying assignment (i.e. produced by fullSat, allSat, etc) */
-  private Long satAssignmentToLong(BDD satAssignment) {
+  public Long satAssignmentToLong(BDD satAssignment) {
     if (_bitvec.length > Long.SIZE) {
       throw new IllegalArgumentException(
           "Can't get a representative of a BDDInteger with more than Long.SIZE bits");
