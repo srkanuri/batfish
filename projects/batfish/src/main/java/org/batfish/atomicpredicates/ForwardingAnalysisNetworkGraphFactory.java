@@ -460,11 +460,12 @@ public class ForwardingAnalysisNetworkGraphFactory {
         .flatMap(vrf -> vrf.getInterfaces().values().stream())
         .map(
             iface -> {
+              String aclName = iface.getIncomingFilterName();
               String nodeName = iface.getOwner().getName();
               String vrfName = iface.getVrfName();
               String ifaceName = iface.getName();
 
-              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(ifaceName, _bddFactory.one());
+              BDD inAclBDD = _aclBDDs.get(nodeName).getOrDefault(aclName, _bddFactory.one());
               return new Edge(
                   new PreInInterface(nodeName, ifaceName),
                   new PostInVrf(nodeName, vrfName),
