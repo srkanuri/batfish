@@ -101,7 +101,7 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     DataPlane dataPlane = NET._batfish.loadDataPlane();
     GRAPH_FACTORY =
         new ForwardingAnalysisNetworkGraphFactory(
-            NET._configs, dataPlane.getForwardingAnalysis(), true);
+            NET._configs, dataPlane.getForwardingAnalysis(), false);
 
     IpSpaceAssignment assignment =
         IpSpaceAssignment.builder()
@@ -346,13 +346,7 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     Set<StateExpr> terminalStates = GRAPH.getTerminalStates();
     assertThat(
         terminalStates,
-        equalTo(
-            ImmutableSet.of(
-                Accept.INSTANCE,
-                Drop.INSTANCE,
-                NeighborUnreachable.INSTANCE,
-                new NodeDropNoRoute(_dstName),
-                new NodeDropNoRoute(_srcName))));
+        equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE, NeighborUnreachable.INSTANCE)));
   }
 
   @Test
