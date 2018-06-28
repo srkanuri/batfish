@@ -3,6 +3,6 @@ syntax = "proto3";
 package org.batfish.datamodel;
 
 message DataPlane {
-  string my_data = 1;
+  string plugin_id = 1;
 }
 
