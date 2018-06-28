@@ -46,7 +46,8 @@ public class NetworkGraphTest {
     _net._batfish.computeDataPlane(false);
     DataPlane dataPlane = _net._batfish.loadDataPlane();
     _graphFactory =
-        new ForwardingAnalysisNetworkGraphFactory(_net._configs, dataPlane.getForwardingAnalysis());
+        new ForwardingAnalysisNetworkGraphFactory(
+            _net._configs, dataPlane.getForwardingAnalysis(), true);
   }
 
   @Test
