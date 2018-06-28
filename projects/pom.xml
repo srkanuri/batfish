@@ -79,7 +79,7 @@
     <opentracing-jaxrs2.version>0.0.9</opentracing-jaxrs2.version>
     <opentracing.version>0.30.0</opentracing.version>
     <pmd.version>6.4.0</pmd.version>
-    <protobuf.version>3.5.1</protobuf.version>
+    <protobuf.version>3.6.0</protobuf.version>
     <protoc-jar-maven-plugin.version>3.5.1.1</protoc-jar-maven-plugin.version>
     <puppycrawl.version>8.0</puppycrawl.version>
     <replacer.version>1.5.3</replacer.version>
@@ -696,6 +696,12 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
         <version>${protobuf.version}</version>
       </dependency>
 

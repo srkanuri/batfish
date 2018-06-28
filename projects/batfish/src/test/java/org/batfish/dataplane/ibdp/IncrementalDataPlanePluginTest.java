@@ -19,6 +19,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.graph.Network;
+import com.google.protobuf.util.JsonFormat;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,6 +47,7 @@ import org.batfish.datamodel.BgpTieBreaker;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.DataPlane;
+import org.batfish.datamodel.DataPlaneOuterClass;
 import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.GeneratedRoute.Builder;
 import org.batfish.datamodel.Interface;
@@ -100,6 +103,21 @@ public class IncrementalDataPlanePluginTest {
     _pb = _nf.bgpProcessBuilder();
     _vb = _nf.vrfBuilder();
     _epb = _nf.routingPolicyBuilder();
+  }
+
+  @Test
+  public void testProto() throws IOException {
+    DataPlaneOuterClass.DataPlane newdp =
+        DataPlaneOuterClass.DataPlane.newBuilder().setMyData("hello").build();
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    newdp.writeTo(baos);
+    System.out.println("output:");
+    System.out.println(baos.toString());
+
+    StringBuilder sb = new StringBuilder();
+    JsonFormat.printer().appendTo(newdp, sb);
+    System.out.println("outputjson:");
+    System.out.println(sb.toString());
   }
 
   @Test(timeout = 5000)
