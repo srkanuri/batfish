@@ -47,6 +47,24 @@
                 </ignoredUnusedDeclaredDependencies>
               </configuration>
             </execution>
+            <execution>
+              <id>unpack-proto-base></id>
+              <phase>generate-resources</phase>
+              <goals>
+                <goal>unpack</goal>
+              </goals>
+              <configuration>
+                <artifactItems>
+                  <artifactItem>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                    <version>${protobuf.version}</version>
+                    <outputDirectory>target/generated-resources/protobuf</outputDirectory>                                                                                                                        
+                    <includes>google/protobuf/*.proto</includes>
+                  </artifactItem>
+                </artifactItems>
+              </configuration>
+            </execution>
           </executions>
         </plugin>
 
