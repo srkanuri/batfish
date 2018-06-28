@@ -153,15 +153,12 @@
               </goals>
               <configuration>
                 <addProtoSources>all</addProtoSources>
+                <cleanOutputFolder>true</cleanOutputFolder>
                 <includeStdTypes>true</includeStdTypes>
                 <inputDirectories>
                   <include>src/main/protobuf</include>
                 </inputDirectories>
-                <outputTargets>
-                  <outputTarget>
-                    <type>java</type>
-                  </outputTarget>
-                </outputTargets>
+                <type>java</type>
                 <protocArtifact>com.google.protobuf:protoc:${protobuf.version}</protocArtifact>
               </configuration>
             </execution>
