@@ -49,7 +49,7 @@
             </execution>
             <execution>
               <id>unpack-proto-base></id>
-              <phase>generate-resources</phase>
+              <phase>initialize</phase>
               <goals>
                 <goal>unpack</goal>
               </goals>
@@ -59,7 +59,7 @@
                     <groupId>com.google.protobuf</groupId>
                     <artifactId>protobuf-java</artifactId>
                     <version>${protobuf.version}</version>
-                    <outputDirectory>target/generated-resources/protobuf</outputDirectory>                                                                                                                        
+                    <outputDirectory>target/generated-resources/protobuf</outputDirectory>
                     <includes>google/protobuf/*.proto</includes>
                   </artifactItem>
                 </artifactItems>

@@ -157,7 +157,7 @@
                 <cleanOutputFolder>true</cleanOutputFolder>
                 <!--<includeStdTypes>true</includeStdTypes>-->
                 <includeDirectories>
-                  <include>target/protobuf</include>
+                  <include>target/generated-resources/protobuf</include>
                 </includeDirectories>
                 <inputDirectories>
                   <include>src/main/protobuf</include>

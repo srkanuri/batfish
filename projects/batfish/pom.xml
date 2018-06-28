@@ -39,7 +39,7 @@
             </execution>
             <execution>
               <id>unpack-proto-base></id>
-              <phase>generate-resources</phase>
+              <phase>initialize</phase>
               <goals>
                 <goal>unpack</goal>
               </goals>
