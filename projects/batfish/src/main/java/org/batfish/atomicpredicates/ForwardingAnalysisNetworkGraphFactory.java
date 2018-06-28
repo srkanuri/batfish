@@ -211,7 +211,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
     return _apBDDs;
   }
 
-  Map<StateExpr, Map<StateExpr, BDD>> getBDDTransitions() {
+  public Map<StateExpr, Map<StateExpr, BDD>> getBDDTransitions() {
     return _bddTransitions;
   }
 

@@ -22,7 +22,7 @@ public class AtomicPredicates {
   public List<BDD> atomize(Collection<BDD> inputPreds) {
     List<BDD> preds = ImmutableList.of(_bddFactory.one());
 
-    long totalTime = 0;
+    long totalTime = System.currentTimeMillis();
     long[] times = new long[inputPreds.size()];
     int[] sizes = new int[inputPreds.size()];
     int round = 0;
@@ -37,10 +37,10 @@ public class AtomicPredicates {
               .collect(ImmutableList.toImmutableList());
       preds = newPreds;
       times[round] = System.currentTimeMillis() - times[round];
-      totalTime += times[round];
       sizes[round] = preds.size();
       round++;
     }
+    totalTime = System.currentTimeMillis() - totalTime;
 
     return preds;
   }

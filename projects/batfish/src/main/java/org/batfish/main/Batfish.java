@@ -61,6 +61,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
+import org.batfish.atomicpredicates.BDDDDNF;
+import org.batfish.atomicpredicates.BDDDDNF.BDDDDNFException;
 import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
 import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
@@ -4352,6 +4354,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
     ForwardingAnalysisNetworkGraphFactory graphFactory =
         new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis, false);
+    benchmarkAtomicPredicates(graphFactory);
     NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
     for (StateExpr terminalState : graph.getTerminalStates()) {
@@ -4402,6 +4405,30 @@ public class Batfish extends PluginConsumer implements IBatfish {
     }
 
     throw new BatfishException("Done baby");
+  }
+
+  private void benchmarkAtomicPredicates(ForwardingAnalysisNetworkGraphFactory graphFactory) {
+    List<BDD> graphBDDs =
+        graphFactory
+            .getBDDTransitions()
+            .values()
+            .stream()
+            .flatMap(m -> m.values().stream())
+            .collect(Collectors.toList());
+    long time = System.currentTimeMillis();
+    BDDDDNF bddddnf = new BDDDDNF(graphBDDs);
+    time = System.currentTimeMillis() - time;
+    try {
+      bddddnf.checkInvariants();
+    } catch (BDDDDNFException e) {
+      throw new BatfishException("BDDDDNF Exception", e);
+    }
+    List<BDD> aps1 = bddddnf.atomicPredicates();
+    List<BDD> aps2 = graphFactory.getApBDDs();
+    assert (aps1.size() == aps2.size());
+    for (BDD ap1 : aps1) {
+      assert aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());
+    }
   }
 
   @Nonnull

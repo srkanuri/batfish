@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
+import org.batfish.atomicpredicates.BDDDDNF.BDDDDNFException;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
 import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.Ip;
@@ -185,6 +186,26 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
 
   private static BDD vrfAcceptBDD(String node) {
     return GRAPH_FACTORY.getVrfAcceptBDDs().get(node).get(DEFAULT_VRF_NAME);
+  }
+
+  @Test
+  public void testBDDDDNF() throws BDDDDNFException {
+    BDDDDNF bddddnf =
+        new BDDDDNF(
+            GRAPH_FACTORY
+                .getBDDTransitions()
+                .values()
+                .stream()
+                .flatMap(m -> m.values().stream())
+                .collect(Collectors.toList()));
+    bddddnf.checkInvariants();
+    List<BDD> aps1 = bddddnf.atomicPredicates();
+    List<BDD> aps2 = GRAPH_FACTORY.getApBDDs();
+    assertThat(aps1.size(), is(aps2.size()));
+    for (BDD ap1 : aps1) {
+      assertThat(
+          "atomic predicates don't match", aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne()));
+    }
   }
 
   @Test
