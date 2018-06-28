@@ -40,6 +40,7 @@
     <maven-license-plugin.version>1.13</maven-license-plugin.version>
     <maven-pmd-plugin.version>3.10.0</maven-pmd-plugin.version>
     <maven-project-info-reports-plugin.version>2.9</maven-project-info-reports-plugin.version>
+    <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.0.0</maven-shade-plugin.version>
 
     <!-- The versions of Java libraries used. Please keep alphabetical. -->
@@ -163,7 +164,6 @@
               <configuration>
                 <addProtoSources>all</addProtoSources>
                 <cleanOutputFolder>true</cleanOutputFolder>
-                <!--<includeStdTypes>true</includeStdTypes>-->
                 <includeDirectories>
                   <include>target/generated-resources/protobuf</include>
                 </includeDirectories>

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+message Route {
+  string hostname = 1;
+  string vrf_name = 2;
+}

@@ -1,8 +1,9 @@
 syntax = "proto3";
 
+import "org/batfish/datamodel/Route.proto";
+
 package org.batfish.dataplane.ibdp;
 
 message IncrementalDataPlane {
-  DataPlane data_plane = 1;
-  string my_data = 2;
+  repeated org.batfish.datamodel.Route routes = 1;
 }
