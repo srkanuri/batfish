@@ -81,8 +81,8 @@
     <opentracing.version>0.30.0</opentracing.version>
     <pmd.version>6.4.0</pmd.version>
     <protobuf.version>3.6.0</protobuf.version>
-    <protoc-jar.version>3.6.0-SNAPSHOT</protoc-jar.version>
-    <protoc-jar-maven-plugin.version>3.5.1.2-SNAPSHOT</protoc-jar-maven-plugin.version>
+    <protoc-jar.version>3.6.0-batfish-internal</protoc-jar.version>
+    <protoc-jar-maven-plugin.version>3.5.1.2-batfish-internal</protoc-jar-maven-plugin.version>
     <puppycrawl.version>8.0</puppycrawl.version>
     <replacer.version>1.5.3</replacer.version>
     <slf4j.version>1.7.25</slf4j.version>
