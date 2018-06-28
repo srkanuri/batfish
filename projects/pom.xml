@@ -162,6 +162,7 @@
                 <inputDirectories>
                   <include>src/main/protobuf</include>
                 </inputDirectories>
+                <outputDirectorySuffix>protobuf</outputDirectorySuffix>
                 <type>java</type>
                 <protocArtifact>com.google.protobuf:protoc:${protobuf.version}</protocArtifact>
               </configuration>
@@ -326,6 +327,18 @@
           <artifactId>build-helper-maven-plugin</artifactId>
           <version>${build-helper-maven-plugin.version}</version>
           <executions>
+            <execution>
+              <id>add-protobuf-sources</id>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>add-source</goal>
+              </goals>
+              <configuration>
+                <sources>
+                  <source>${project.build.directory}/generated-sources/protobuf</source>
+                </sources>
+              </configuration>
+            </execution>
             <execution>
               <id>add-test-sources</id>
               <phase>generate-test-sources</phase>
