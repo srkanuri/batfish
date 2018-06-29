@@ -85,46 +85,47 @@ public class BDDDDNF {
 
     void insert(BDD bdd) {
       // invariant: bdd is a subset of _headerspace
-      assert bdd.imp(_headerspace).isOne();
+      assert !bdd.isZero() && bdd.imp(_headerspace).isOne();
 
-      if (_headerspace.imp(bdd).isOne()) {
-        // bdd is equal to _headerspace.
+      if (_headerspace.equals(bdd)) {
         return;
       }
 
-      List<Node> bddChildren = new ArrayList<>();
+      // initialize lazily
+      List<Node> bddChildren = null;
 
       for (Node child : _children) {
-        if (child._headerspace.imp(bdd).isOne()) {
-          // child._headerspace is a subset of bdd
-          if (bdd.imp(child._headerspace).isOne()) {
-            // bdd is equal to child._headerspace. do nothing.
-            return;
-          }
-
-          /* We want to insert a new node between this and child, but bdd might not be the right
+        if (bdd.equals(child._headerspace)) {
+          return;
+        }
+        BDD intersection = bdd.and(child._headerspace);
+        if (intersection.isZero()) {
+          continue;
+        } else if (intersection.equals(child._headerspace)) {
+          /*
+           * child._headerspace is a subset of bdd.
+           * We want to insert a new node between this and child, but bdd might not be the right
            * headerspace (it may intersect other _children). So we have to wait until we've checked
            * all the other children.
            */
+          if (bddChildren == null) {
+            bddChildren = new ArrayList<>();
+          }
           bddChildren.add(child);
           continue;
-        }
-        if (bdd.imp(child._headerspace).isOne()) {
-          // bdd is a subset of child._headerspace
-          if (child._headerspace.imp(bdd).isOne()) {
-            // bdd is equal to child._headerspace
-            return;
-          } else {
-            // bdd is a strict subset of child._headerspace
-            child.insert(bdd);
-            return;
-          }
-        }
+        } else if (intersection.equals(bdd)) {
+          /*
+           * bdd is a subset of child._headerspace.
+           * since children headerspaces are disjoint, bddChildren must be empty;
+           */
+          assert bddChildren == null;
 
-        BDD intersection = bdd.and(child._headerspace);
-        if (!intersection.isZero()) {
+          // bdd is a strict subset of child._headerspace
+          child.insert(bdd);
+          return;
+        } else {
           // bdd intersects child. split.
-          BDD nonIntersection = bdd.and(child._notHeaderspace.get());
+          BDD bddMinusIntersection = bdd.and(child._notHeaderspace.get());
 
           /*
            * We know the intersection only intersects this child (because the children are
@@ -136,13 +137,26 @@ public class BDDDDNF {
            * The nonIntersection can only intersect children we haven't looked at yet, so continue
            * this scan with the nonIntersection instead of bdd.
            */
-          bdd = nonIntersection;
+          bdd = bddMinusIntersection;
+
+          /*
+           * Either bddChildren is empty (i.e. bdd is not a superset of any previous children), or
+           * every previous child that is a subset of bdd is also a subset of nonIntersection.
+           */
+          assert bddChildren == null
+              || bddChildren
+                  .stream()
+                  .allMatch(bddChild -> bddChild._headerspace.imp(bddMinusIntersection).isOne());
         }
       }
 
       // bdd does not intersect any child headerspace. add a new child for it.
-      _children.removeAll(bddChildren);
-      _children.add(new Node(bdd, bddChildren));
+      if (bddChildren != null) {
+        _children.removeAll(bddChildren);
+        _children.add(new Node(bdd, bddChildren));
+      } else {
+        _children.add(new Node(bdd));
+      }
     }
   }
 
@@ -150,7 +164,11 @@ public class BDDDDNF {
 
   public BDDDDNF(List<BDD> bdds) {
     _root = new Node(bdds.get(0).getFactory().one());
-    bdds.forEach(_root::insert);
+    for (BDD bdd : bdds) {
+      if (!bdd.isZero()) {
+        _root.insert(bdd);
+      }
+    }
   }
 
   public List<BDD> atomicPredicates() {

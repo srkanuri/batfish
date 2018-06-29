@@ -158,6 +158,19 @@ public class ForwardingAnalysisNetworkGraphFactory {
   }
 
   private List<BDD> computeAPBDDs() {
+    List<BDD> preds =
+        _bddTransitions
+            .values()
+            .stream()
+            .flatMap(m -> m.values().stream())
+            .collect(Collectors.toList());
+    long time = System.currentTimeMillis();
+    List<BDD> aps = new BDDDDNF(preds).atomicPredicates();
+    time = System.currentTimeMillis() - time;
+    return aps;
+  }
+
+  private List<BDD> computeAPBDDs_old() {
     AtomicPredicates atomicPredicates = new AtomicPredicates(_bddUtils.getBDDFactory());
     return ImmutableList.copyOf(
         atomicPredicates.atomize(

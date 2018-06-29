@@ -4353,7 +4353,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     IpSpaceAssignment ipSpaceAssignment =
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
     ForwardingAnalysisNetworkGraphFactory graphFactory =
-        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis, false);
+        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis, true);
     benchmarkAtomicPredicates(graphFactory);
     NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
