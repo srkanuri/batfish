@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.graph.Network;
+import com.google.protobuf.Any;
 import com.google.protobuf.util.JsonFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -107,8 +108,10 @@ public class IncrementalDataPlanePluginTest {
 
   @Test
   public void testProto() throws IOException {
+    IncrementalDataPlaneOuterClass.IncrementalDataPlane newidp =
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder().addRoutes(value).build();
     DataPlaneOuterClass.DataPlane newdp =
-        DataPlaneOuterClass.DataPlane.newBuilder().setMyData("hello").build();
+        DataPlaneOuterClass.DataPlane.newBuilder().setImpl(Any.pack(newidp)).build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     newdp.writeTo(baos);
     System.out.println("output:");

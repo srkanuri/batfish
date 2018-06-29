@@ -157,6 +157,7 @@
           </dependencies>
           <executions>
             <execution>
+              <id>run-protoc</id>
               <phase>generate-sources</phase>
               <goals>
                 <goal>run</goal>
@@ -165,6 +166,7 @@
                 <addProtoSources>all</addProtoSources>
                 <cleanOutputFolder>true</cleanOutputFolder>
                 <includeDirectories>
+                  <include>src/main/protobuf</include>
                   <include>target/generated-resources/protobuf</include>
                 </includeDirectories>
                 <inputDirectories>

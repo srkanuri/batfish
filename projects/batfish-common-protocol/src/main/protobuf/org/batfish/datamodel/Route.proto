@@ -1,8 +1,18 @@
 syntax = "proto3";
 
+import "org/batfish/datamodel/ConnectedRoute.proto";
+import "org/batfish/datamodel/StaticRoute.proto";
+
 package org.batfish.datamodel;
 
 message Route {
+
   string hostname = 1;
+  
   string vrf_name = 2;
+  
+  oneof protocol_specific_attributes {
+    org.batfish.datamodel.ConnectedRoute connected_route = 3;
+    org.batfish.datamodel.StaticRoute static_route = 4;
+  }
 }

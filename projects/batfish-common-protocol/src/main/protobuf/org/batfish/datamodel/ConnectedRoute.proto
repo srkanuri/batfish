@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+message ConnectedRoute {
+  string a = 1;
+}
