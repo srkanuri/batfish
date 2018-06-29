@@ -58,27 +58,22 @@
           </executions>
         </plugin>
 
-        <plugin>
-          <artifactId>maven-resources-plugin</artifactId>
-          <version>${maven-resources-plugin.version}</version>
+				<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-remote-resources-plugin</artifactId>
+					<version>${maven-remote-resources-plugin.version}</version>
           <executions>
             <execution>
-              <id>copy-batfish-common-protocol-protobuf</id>
+              <id>attach-batfish-common-protocol-protobuf</id>
               <phase>initialize</phase>
               <goals>
-                <goal>copy-resources</goal>
+                <goal>process</goal>
               </goals>
               <configuration>
                 <outputDirectory>${project.build.directory}/generated-resources/protobuf</outputDirectory>
-                <overwrite>true</overwrite>
-                <resources>
-                  <resource>
-                    <directory>../batfish-common-protocol/src/main/protobuf</directory>
-                    <includes>
-                      <include>**/*.proto</include>
-                    </includes>
-                  </resource>
-                </resources>
+                <resourceBundles>
+                  <resourceBundle>org.batfish:batfish-common-protocol:${project.version}</resourceBundle>
+                </resourceBundles>
               </configuration>
             </execution>
           </executions>
@@ -125,7 +120,8 @@
 
     <plugins>
       <plugin>
-        <artifactId>maven-resources-plugin</artifactId>
+				<groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
 
       <plugin>
