@@ -63,9 +63,10 @@ import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
 import org.batfish.atomicpredicates.BDDTrie;
 import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
-import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
+import org.batfish.atomicpredicates.BDDTrieAtomizer;
 import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
+import org.batfish.atomicpredicates.NetworkGraphFactory;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishException.BatfishStackTrace;
@@ -187,6 +188,7 @@ import org.batfish.specifier.SpecifierContext;
 import org.batfish.specifier.SpecifierContextImpl;
 import org.batfish.symbolic.abstraction.BatfishCompressor;
 import org.batfish.symbolic.abstraction.Roles;
+import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.symbolic.smt.PropertyChecker;
 import org.batfish.vendor.VendorConfiguration;
@@ -4352,8 +4354,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
             .collect(Collectors.toSet());
     IpSpaceAssignment ipSpaceAssignment =
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
-    ForwardingAnalysisNetworkGraphFactory graphFactory =
-        new ForwardingAnalysisNetworkGraphFactory(configurations, forwardingAnalysis, true);
+    NetworkGraphFactory graphFactory =
+        new NetworkGraphFactory(configurations, forwardingAnalysis, BDDTrieAtomizer::new, true);
     benchmarkAtomicPredicates(graphFactory);
     NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
@@ -4407,7 +4409,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     throw new BatfishException("Done baby");
   }
 
-  private void benchmarkAtomicPredicates(ForwardingAnalysisNetworkGraphFactory graphFactory) {
+  private void benchmarkAtomicPredicates(NetworkGraphFactory graphFactory) {
     List<BDD> graphBDDs =
         graphFactory
             .getBDDTransitions()
@@ -4423,8 +4425,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
     } catch (BDDTrieException e) {
       throw new BatfishException("BDDDDNF Exception", e);
     }
-    List<BDD> aps1 = bddTrie.atomicPredicates();
-    List<BDD> aps2 = graphFactory.getApBDDs();
+    List<BDD> aps1 = new BDDTrieAtomizer(graphBDDs).atoms();
+    List<BDD> aps2 = new AtomicPredicates(graphBDDs).atoms();
     assert (aps1.size() == aps2.size());
     for (BDD ap1 : aps1) {
       assert aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());

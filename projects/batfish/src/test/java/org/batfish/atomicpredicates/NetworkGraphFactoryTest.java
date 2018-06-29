@@ -8,7 +8,6 @@ import static org.batfish.datamodel.Configuration.DEFAULT_VRF_NAME;
 import static org.batfish.symbolic.bdd.BDDMatchers.intersects;
 import static org.batfish.symbolic.bdd.BDDMatchers.isEquivalentTo;
 import static org.batfish.symbolic.bdd.BDDMatchers.isOne;
-import static org.batfish.symbolic.bdd.BDDMatchers.isZero;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -30,6 +29,7 @@ import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
+import org.batfish.symbolic.bdd.AtomicPredicates;
 import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.z3.expr.StateExpr;
@@ -50,9 +50,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class ForwardingAnalysisNetworkGraphFactoryTest {
+public class NetworkGraphFactoryTest {
   private static NetworkGraph GRAPH;
-  private static ForwardingAnalysisNetworkGraphFactory GRAPH_FACTORY;
+  private static NetworkGraphFactory GRAPH_FACTORY;
   private static TwoNodeNetworkWithTwoLinks NET;
 
   private BDDOps _bddOps;
@@ -101,8 +101,8 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     NET._batfish.computeDataPlane(false);
     DataPlane dataPlane = NET._batfish.loadDataPlane();
     GRAPH_FACTORY =
-        new ForwardingAnalysisNetworkGraphFactory(
-            NET._configs, dataPlane.getForwardingAnalysis(), false);
+        new NetworkGraphFactory(
+            NET._configs, dataPlane.getForwardingAnalysis(), BDDTrieAtomizer::new, false);
 
     IpSpaceAssignment assignment =
         IpSpaceAssignment.builder()
@@ -189,18 +189,18 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
   }
 
   @Test
-  public void testBDDDDNF() throws BDDTrieException {
-    BDDTrie bddTrie =
-        new BDDTrie(
-            GRAPH_FACTORY
-                .getBDDTransitions()
-                .values()
-                .stream()
-                .flatMap(m -> m.values().stream())
-                .collect(Collectors.toList()));
+  public void testBDDTrie() throws BDDTrieException {
+    List<BDD> bdds =
+        GRAPH_FACTORY
+            .getBDDTransitions()
+            .values()
+            .stream()
+            .flatMap(m -> m.values().stream())
+            .collect(Collectors.toList());
+    BDDTrie bddTrie = new BDDTrie(bdds);
     bddTrie.checkInvariants();
-    List<BDD> aps1 = bddTrie.atomicPredicates();
-    List<BDD> aps2 = GRAPH_FACTORY.getApBDDs();
+    List<BDD> aps1 = bddTrie.atomicPredicates().collect(Collectors.toList());
+    List<BDD> aps2 = new AtomicPredicates(bdds).atoms();
     assertThat(aps1.size(), is(aps2.size()));
     for (BDD ap1 : aps1) {
       assertThat(
@@ -289,7 +289,7 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     BDD preOutEdgePostNat1 = bddTransition(_srcPreOutVrf, link1PreOutEdgePostNat);
     BDD preOutEdgePostNat2 = bddTransition(_srcPreOutVrf, link2PreOutEdgePostNat);
 
-    assertThat(nodeDropNullRoute.isZero(), is(true));
+    assertThat(nodeDropNullRoute, nullValue());
 
     assertThat(nodeInterfaceNeighborUnreachable1, isEquivalentTo(_link1SrcIpBDD));
     assertThat(nodeInterfaceNeighborUnreachable2, isEquivalentTo(_link2SrcIpBDD));
@@ -300,10 +300,6 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
     assertThat(
         bddIps(preOutEdgePostNat2),
         containsInAnyOrder(_dstIface2Ip, NET._link2Dst.getAddress().getIp()));
-
-    assertThat(nodeDropNullRoute.and(nodeInterfaceNeighborUnreachable1), isZero());
-    assertThat(nodeDropNullRoute.and(nodeInterfaceNeighborUnreachable2), isZero());
-    assertThat(nodeDropNullRoute.and(preOutEdgePostNat1), isZero());
 
     // ECMP: _dstIface1Ip is routed out both edges
     assertThat(preOutEdgePostNat1.and(preOutEdgePostNat2), isEquivalentTo(ipBDD(_dstIface2Ip)));

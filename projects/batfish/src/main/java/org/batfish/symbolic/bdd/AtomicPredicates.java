@@ -1,47 +1,59 @@
 package org.batfish.symbolic.bdd;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Collection;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.ImmutableSortedSet.Builder;
+import java.util.Comparator;
 import java.util.List;
+import java.util.SortedSet;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
-import net.sf.javabdd.BDDFactory;
+import org.batfish.atomicpredicates.BDDAtomizer;
 
-public class AtomicPredicates {
+public class AtomicPredicates implements BDDAtomizer {
+  private final List<BDD> _atoms;
+  private final int[] _roundSizes;
+  private final long[] _roundTimes;
+  private final long _totalTime;
 
-  private final BDDFactory _bddFactory;
-
-  public AtomicPredicates(BDDFactory bddFactory) {
-    _bddFactory = bddFactory;
-  }
-
-  public List<BDD> atomize(BDD... inputPreds) {
-    return atomize(ImmutableList.copyOf(inputPreds));
-  }
-
-  public List<BDD> atomize(Collection<BDD> inputPreds) {
-    List<BDD> preds = ImmutableList.of(_bddFactory.one());
+  public AtomicPredicates(List<BDD> bdds) {
+    List<BDD> atoms = ImmutableList.of(bdds.get(0).getFactory().one());
 
     long totalTime = System.currentTimeMillis();
-    long[] times = new long[inputPreds.size()];
-    int[] sizes = new int[inputPreds.size()];
+    _roundTimes = new long[bdds.size()];
+    _roundSizes = new int[bdds.size()];
     int round = 0;
 
-    for (BDD pred1 : inputPreds) {
-      times[round] = System.currentTimeMillis();
+    for (BDD pred1 : bdds) {
+      _roundTimes[round] = System.currentTimeMillis();
       List<BDD> newPreds =
-          preds
+          atoms
               .stream()
               .flatMap(pred2 -> Stream.of(pred1.and(pred2), pred1.not().and(pred2)))
               .filter(bdd -> !bdd.isZero())
               .collect(ImmutableList.toImmutableList());
-      preds = newPreds;
-      times[round] = System.currentTimeMillis() - times[round];
-      sizes[round] = preds.size();
+      atoms = newPreds;
+      _roundTimes[round] = System.currentTimeMillis() - _roundTimes[round];
+      _roundSizes[round] = atoms.size();
       round++;
     }
-    totalTime = System.currentTimeMillis() - totalTime;
+    _totalTime = System.currentTimeMillis() - totalTime;
+    _atoms = atoms;
+  }
 
-    return preds;
+  @Override
+  public List<BDD> atoms() {
+    return _atoms;
+  }
+
+  @Override
+  public SortedSet<Integer> atoms(BDD bdd) {
+    ImmutableSortedSet.Builder<Integer> indices = new Builder<>(Comparator.naturalOrder());
+    for (int i = 0; i < _atoms.size(); i++) {
+      if (!_atoms.get(i).and(bdd).isZero()) {
+        indices.add(i);
+      }
+    }
+    return indices.build();
   }
 }

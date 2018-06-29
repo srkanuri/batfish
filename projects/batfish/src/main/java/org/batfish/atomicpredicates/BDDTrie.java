@@ -37,6 +37,7 @@ public class BDDTrie {
 
   private static class Node {
     final BDD _headerspace;
+    // the negation of the original headerspace
     final Supplier<BDD> _notHeaderspace;
 
     /** Invariant: For all i, _children[i]._headerspace is a strict subset of _headerspace. */
@@ -124,14 +125,16 @@ public class BDDTrie {
           child.insert(bdd);
           return;
         } else {
-          // bdd intersects child. split.
-          BDD bddMinusIntersection = bdd.and(child._notHeaderspace.get());
-
           /*
            * We know the intersection only intersects this child (because the children are
            * disjoint), so insert directly to it.
            */
           child.insert(intersection);
+
+          // bdd intersects child. split.
+          BDD bddMinusIntersection = bdd.and(child._notHeaderspace.get());
+
+          assert !bddMinusIntersection.isZero();
 
           /*
            * The nonIntersection can only intersect children we haven't looked at yet, so continue
@@ -158,9 +161,37 @@ public class BDDTrie {
         _children.add(new Node(bdd));
       }
     }
+
+    public Stream<Integer> atomicPredicates(BDD bdd) {
+      assert bdd.imp(this._headerspace).isOne();
+
+      if (bdd.equals(this._headerspace)) {
+        return ids();
+      }
+
+      Stream.Builder<Integer> ids = Stream.builder();
+      for (Node child : _children) {
+        BDD intersection = child._headerspace.and(bdd);
+        if (!intersection.isZero()) {
+          child.atomicPredicates(intersection).forEach(ids);
+          if (intersection.equals(bdd)) {
+            // nothing left
+            break;
+          } else {
+            bdd = bdd.and(child._notHeaderspace.get());
+          }
+        }
+      }
+
+      if (!bdd.isZero()) {
+        // part of the input bdd is disjoint from the children. so it overlaps this
+        ids.add(_id);
+      }
+      return ids.build();
+    }
   }
 
-  private Node _root;
+  private List<Node> _allNodes;
 
   public BDDTrie(List<BDD> bdds) {
     _root = new Node(bdds.get(0).getFactory().one());
@@ -171,8 +202,8 @@ public class BDDTrie {
     }
   }
 
-  public List<BDD> atomicPredicates() {
-    return _root.atomicPredicates().collect(ImmutableList.toImmutableList());
+  public Stream<BDD> atomicPredicates() {
+    return _root.atomicPredicates();
   }
 
   public void checkInvariants() throws BDDTrieException {

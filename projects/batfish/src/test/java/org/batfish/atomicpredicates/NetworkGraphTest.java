@@ -38,7 +38,7 @@ import org.junit.Test;
 
 public class NetworkGraphTest {
   private TwoNodeNetworkWithTwoLinks _net;
-  private ForwardingAnalysisNetworkGraphFactory _graphFactory;
+  private NetworkGraphFactory _graphFactory;
 
   @Before
   public void setup() throws IOException {
@@ -46,8 +46,8 @@ public class NetworkGraphTest {
     _net._batfish.computeDataPlane(false);
     DataPlane dataPlane = _net._batfish.loadDataPlane();
     _graphFactory =
-        new ForwardingAnalysisNetworkGraphFactory(
-            _net._configs, dataPlane.getForwardingAnalysis(), true);
+        new NetworkGraphFactory(
+            _net._configs, dataPlane.getForwardingAnalysis(), BDDTrieAtomizer::new, true);
   }
 
   @Test
