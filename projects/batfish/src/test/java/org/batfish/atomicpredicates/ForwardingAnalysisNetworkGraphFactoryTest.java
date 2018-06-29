@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
-import org.batfish.atomicpredicates.BDDDDNF.BDDDDNFException;
+import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
 import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.Ip;
@@ -189,17 +189,17 @@ public class ForwardingAnalysisNetworkGraphFactoryTest {
   }
 
   @Test
-  public void testBDDDDNF() throws BDDDDNFException {
-    BDDDDNF bddddnf =
-        new BDDDDNF(
+  public void testBDDDDNF() throws BDDTrieException {
+    BDDTrie bddTrie =
+        new BDDTrie(
             GRAPH_FACTORY
                 .getBDDTransitions()
                 .values()
                 .stream()
                 .flatMap(m -> m.values().stream())
                 .collect(Collectors.toList()));
-    bddddnf.checkInvariants();
-    List<BDD> aps1 = bddddnf.atomicPredicates();
+    bddTrie.checkInvariants();
+    List<BDD> aps1 = bddTrie.atomicPredicates();
     List<BDD> aps2 = GRAPH_FACTORY.getApBDDs();
     assertThat(aps1.size(), is(aps2.size()));
     for (BDD ap1 : aps1) {

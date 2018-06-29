@@ -10,10 +10,10 @@ import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
 
 /**
- * An adaptation if DDNF using BDDs to represent headerspaces rather than ternary bitvectors. The
- * DDNF is a DAG where each node has an associated headerspace, and an edge between two nodes exists
- * when the target's headerspace is a subset of the source's headerspace (and no intermediate
- * headerspace exist in the DAG.
+ * A trie of BDDs, representing disjoint sets of headerspaces (atomic predicates). It is inspired by
+ * DDNF, with two key differences: it stores BDDs instead of ternary bitvectors, and the children
+ * of each node are disjoint subsets of the parent (rather than possibly overlapping subsets as in
+ * DDNF). The latter property makes this a tree, while DDNFs are DAGs.
  *
  * <p>The DDNF as a whole represents a set of atomic predicates -- a partition of the full
  * headerspace into headerspaces such that for each one, the network does not distinguish between
@@ -22,13 +22,13 @@ import net.sf.javabdd.BDD;
  * <p>Each node represents the headerspace described by its BDD minus the headerspaces of its
  * children.
  */
-public class BDDDDNF {
-  public static class BDDDDNFException extends Exception {
+public class BDDTrie {
+  public static class BDDTrieException extends Exception {
     private String _message;
     private List<Integer> _parentPath;
     private Integer _childIndex;
 
-    BDDDDNFException(String message, List<Integer> parentPath, Integer childIndex) {
+    BDDTrieException(String message, List<Integer> parentPath, Integer childIndex) {
       _message = message;
       _parentPath = ImmutableList.copyOf(parentPath);
       _childIndex = childIndex;
@@ -64,19 +64,19 @@ public class BDDDDNF {
       return Streams.concat(atomicPredicate(), _children.stream().flatMap(Node::atomicPredicates));
     }
 
-    void checkInvariants(List<Integer> path) throws BDDDDNFException {
+    void checkInvariants(List<Integer> path) throws BDDTrieException {
       BDD childrenHeaderspaces = _headerspace.getFactory().zero();
       for (int i = 0; i < _children.size(); i++) {
         BDD childHeaderspace = _children.get(i)._headerspace;
         if (!childHeaderspace.imp(_headerspace).isOne()) {
-          throw new BDDDDNFException(
+          throw new BDDTrieException(
               "child headerspace is not a subset of parent headerspace", path, i);
         }
         if (_headerspace.imp(childHeaderspace).isOne()) {
-          throw new BDDDDNFException("child headerspace is equal to parent headerspace", path, i);
+          throw new BDDTrieException("child headerspace is equal to parent headerspace", path, i);
         }
         if (!childHeaderspace.and(childrenHeaderspaces).isZero()) {
-          throw new BDDDDNFException(
+          throw new BDDTrieException(
               "child headerspace intersects with a sibling's headerspace", path, i);
         }
         childrenHeaderspaces = childrenHeaderspaces.or(childHeaderspace);
@@ -162,7 +162,7 @@ public class BDDDDNF {
 
   private Node _root;
 
-  public BDDDDNF(List<BDD> bdds) {
+  public BDDTrie(List<BDD> bdds) {
     _root = new Node(bdds.get(0).getFactory().one());
     for (BDD bdd : bdds) {
       if (!bdd.isZero()) {
@@ -175,7 +175,7 @@ public class BDDDDNF {
     return _root.atomicPredicates().collect(ImmutableList.toImmutableList());
   }
 
-  public void checkInvariants() throws BDDDDNFException {
+  public void checkInvariants() throws BDDTrieException {
     _root.checkInvariants(new ArrayList<>());
   }
 }

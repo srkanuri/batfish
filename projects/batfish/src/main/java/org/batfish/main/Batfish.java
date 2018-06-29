@@ -61,8 +61,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
-import org.batfish.atomicpredicates.BDDDDNF;
-import org.batfish.atomicpredicates.BDDDDNF.BDDDDNFException;
+import org.batfish.atomicpredicates.BDDTrie;
+import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
 import org.batfish.atomicpredicates.ForwardingAnalysisNetworkGraphFactory;
 import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
@@ -4416,14 +4416,14 @@ public class Batfish extends PluginConsumer implements IBatfish {
             .flatMap(m -> m.values().stream())
             .collect(Collectors.toList());
     long time = System.currentTimeMillis();
-    BDDDDNF bddddnf = new BDDDDNF(graphBDDs);
+    BDDTrie bddTrie = new BDDTrie(graphBDDs);
     time = System.currentTimeMillis() - time;
     try {
-      bddddnf.checkInvariants();
-    } catch (BDDDDNFException e) {
+      bddTrie.checkInvariants();
+    } catch (BDDTrieException e) {
       throw new BatfishException("BDDDDNF Exception", e);
     }
-    List<BDD> aps1 = bddddnf.atomicPredicates();
+    List<BDD> aps1 = bddTrie.atomicPredicates();
     List<BDD> aps2 = graphFactory.getApBDDs();
     assert (aps1.size() == aps2.size());
     for (BDD ap1 : aps1) {

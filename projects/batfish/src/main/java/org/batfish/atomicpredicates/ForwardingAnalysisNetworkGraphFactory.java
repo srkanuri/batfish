@@ -165,7 +165,7 @@ public class ForwardingAnalysisNetworkGraphFactory {
             .flatMap(m -> m.values().stream())
             .collect(Collectors.toList());
     long time = System.currentTimeMillis();
-    List<BDD> aps = new BDDDDNF(preds).atomicPredicates();
+    List<BDD> aps = new BDDTrie(preds).atomicPredicates();
     time = System.currentTimeMillis() - time;
     return aps;
   }
