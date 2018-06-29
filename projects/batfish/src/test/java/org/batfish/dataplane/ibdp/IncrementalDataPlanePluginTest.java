@@ -47,6 +47,7 @@ import org.batfish.datamodel.BgpSession;
 import org.batfish.datamodel.BgpTieBreaker;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
+import org.batfish.datamodel.ConnectedRouteOuterClass;
 import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.DataPlaneOuterClass;
 import org.batfish.datamodel.GeneratedRoute;
@@ -59,6 +60,7 @@ import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.OriginType;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.Route;
+import org.batfish.datamodel.RouteOuterClass;
 import org.batfish.datamodel.RoutingProtocol;
 import org.batfish.datamodel.StaticRoute;
 import org.batfish.datamodel.Topology;
@@ -109,7 +111,14 @@ public class IncrementalDataPlanePluginTest {
   @Test
   public void testProto() throws IOException {
     IncrementalDataPlaneOuterClass.IncrementalDataPlane newidp =
-        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder().addRoutes(value).build();
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder()
+            .addRoutes(
+                RouteOuterClass.Route.newBuilder()
+                    .setHostname("abc")
+                    .setVrfName("def")
+                    .setConnectedRoute(
+                        ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build()))
+            .build();
     DataPlaneOuterClass.DataPlane newdp =
         DataPlaneOuterClass.DataPlane.newBuilder().setImpl(Any.pack(newidp)).build();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -118,7 +127,11 @@ public class IncrementalDataPlanePluginTest {
     System.out.println(baos.toString());
 
     StringBuilder sb = new StringBuilder();
-    JsonFormat.printer().appendTo(newdp, sb);
+    JsonFormat.TypeRegistry registry =
+        JsonFormat.TypeRegistry.newBuilder()
+            .add(IncrementalDataPlaneOuterClass.IncrementalDataPlane.getDescriptor())
+            .build();
+    JsonFormat.printer().usingTypeRegistry(registry).appendTo(newdp, sb);
     System.out.println("outputjson:");
     System.out.println(sb.toString());
   }
