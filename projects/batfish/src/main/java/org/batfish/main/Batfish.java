@@ -4354,10 +4354,20 @@ public class Batfish extends PluginConsumer implements IBatfish {
             .collect(Collectors.toSet());
     IpSpaceAssignment ipSpaceAssignment =
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
-    NetworkGraphFactory graphFactory =
+    long time = System.currentTimeMillis();
+    NetworkGraphFactory bddTrieGraphFactory =
         new NetworkGraphFactory(configurations, forwardingAnalysis, BDDTrieAtomizer::new, true);
-    benchmarkAtomicPredicates(graphFactory);
-    NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
+    long bddTrieGraphFactoryTime = System.currentTimeMillis() - time;
+    time = System.currentTimeMillis();
+    NetworkGraphFactory atomicPredicatesGraphFactory =
+        new NetworkGraphFactory(configurations, forwardingAnalysis, AtomicPredicates::new, true);
+    long atomicPredicatesGraphFactoryTime = System.currentTimeMillis() - time;
+    System.out.println(
+        String.format(
+            "bddTrie: %s, naive: %s", bddTrieGraphFactoryTime, atomicPredicatesGraphFactoryTime));
+
+    benchmarkAtomicPredicates(bddTrieGraphFactory);
+    NetworkGraph graph = bddTrieGraphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
     for (StateExpr terminalState : graph.getTerminalStates()) {
       reachableAps
@@ -4369,7 +4379,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                       String.format("%s received %s from %s", terminalState, ap, sources)));
     }
     BDDPacket pkt = new BDDPacket();
-    List<BDD> apBDDs = graphFactory.getApBDDs();
+    Map<Integer, BDD> apBDDs = bddTrieGraphFactory.getApBDDs();
     List<MultipathConsistencyViolation> violations = graph.detectMultipathInconsistency();
     for (MultipathConsistencyViolation violation : violations) {
       BDD pred = apBDDs.get(violation.predicate).fullSatOne();
@@ -4425,11 +4435,11 @@ public class Batfish extends PluginConsumer implements IBatfish {
     } catch (BDDTrieException e) {
       throw new BatfishException("BDDDDNF Exception", e);
     }
-    List<BDD> aps1 = new BDDTrieAtomizer(graphBDDs).atoms();
-    List<BDD> aps2 = new AtomicPredicates(graphBDDs).atoms();
+    SortedMap<Integer, BDD> aps1 = new BDDTrieAtomizer(graphBDDs).atoms();
+    SortedMap<Integer, BDD> aps2 = new AtomicPredicates(graphBDDs).atoms();
     assert (aps1.size() == aps2.size());
-    for (BDD ap1 : aps1) {
-      assert aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());
+    for (BDD ap1 : aps1.values()) {
+      assert aps2.values().stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());
     }
   }
 

@@ -7,10 +7,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -217,7 +217,7 @@ public class NetworkGraphFactory {
                 nodeEntry.getValue(), Entry::getKey, vrfEntry -> vrfEntry.getValue().not()));
   }
 
-  public List<BDD> getApBDDs() {
+  public SortedMap<Integer, BDD> getApBDDs() {
     return _atomizer.atoms();
   }
 

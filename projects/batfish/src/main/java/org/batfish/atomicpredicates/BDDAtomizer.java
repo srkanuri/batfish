@@ -1,11 +1,11 @@
 package org.batfish.atomicpredicates;
 
-import java.util.List;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import net.sf.javabdd.BDD;
 
 public interface BDDAtomizer {
-  List<BDD> atoms();
+  SortedMap<Integer, BDD> atoms();
 
   SortedSet<Integer> atoms(BDD bdd);
 }

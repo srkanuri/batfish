@@ -52,8 +52,8 @@ public class NetworkGraphTest {
 
   @Test
   public void testAPsDisjoint() {
-    for (BDD ap1 : _graphFactory.getApBDDs()) {
-      for (BDD ap2 : _graphFactory.getApBDDs()) {
+    for (BDD ap1 : _graphFactory.getApBDDs().values()) {
+      for (BDD ap2 : _graphFactory.getApBDDs().values()) {
         assert (ap1 == ap2 || ap1.and(ap2).isZero());
       }
     }
@@ -62,7 +62,7 @@ public class NetworkGraphTest {
   @Test
   public void testAPsCoverBDDs() {
     BDDOps ops = new BDDOps(_graphFactory.getBDDFactory());
-    List<BDD> apBDDs = _graphFactory.getApBDDs();
+    Map<Integer, BDD> apBDDs = _graphFactory.getApBDDs();
     Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = _graphFactory.getBDDTransitions();
     Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> apTransitions =
         _graphFactory.getApTransitions();
