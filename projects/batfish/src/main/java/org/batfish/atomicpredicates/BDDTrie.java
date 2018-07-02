@@ -89,6 +89,8 @@ public class BDDTrie {
   }
 
   public static class BDDTrieException extends Exception {
+    private static final long serialVersionUID = 0;
+
     private String _message;
     private List<Integer> _parentPath;
     private Integer _childIndex;
