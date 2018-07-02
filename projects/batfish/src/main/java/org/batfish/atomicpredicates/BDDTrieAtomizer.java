@@ -24,6 +24,7 @@ public class BDDTrieAtomizer implements BDDAtomizer {
   public SortedSet<Integer> atoms(BDD bdd) {
     return _bddTrie
         .atomicPredicates(bdd)
+        .stream()
         .map(AtomicPredicate::getId)
         .collect(ImmutableSortedSet.toImmutableSortedSet(Comparator.naturalOrder()));
   }

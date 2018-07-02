@@ -18,10 +18,12 @@ import static org.hamcrest.Matchers.nullValue;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
+import org.batfish.atomicpredicates.BDDTrie.AtomicPredicate;
 import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
 import org.batfish.datamodel.DataPlane;
@@ -201,14 +203,30 @@ public class NetworkGraphFactoryTest {
     bddTrie.checkInvariants();
     List<BDD> aps1 = bddTrie.atomicPredicates();
     List<BDD> aps2 = new AtomicPredicates(bdds).atoms();
-    assertThat(aps1.size(), is(aps2.size()));
-    for (BDD ap1 : aps1) {
-      assertThat(
-          "atomic predicates don't match", aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne()));
+    assertEqualBDDCollections(aps1, aps2);
+
+    for (BDD bdd : bdds) {
+      assertEqualBDDCollections(
+          bddTrie
+              .atomicPredicates(bdd)
+              .stream()
+              .map(AtomicPredicate::getBDD)
+              .collect(Collectors.toList()),
+          bddTrie
+              .slowAtomicPredicates(bdd)
+              .stream()
+              .map(AtomicPredicate::getBDD)
+              .collect(Collectors.toList()));
     }
-    for (BDD ap2 : aps2) {
-      assertThat(
-          "atomic predicates don't match", aps1.stream().anyMatch(ap1 -> ap2.biimp(ap1).isOne()));
+  }
+
+  private static void assertEqualBDDCollections(Collection<BDD> bdds1, Collection<BDD> bdds2) {
+    assertThat(bdds1.size(), is(bdds2.size()));
+    for (BDD bdd1 : bdds1) {
+      assertThat("bdds don't match", bdds2.stream().anyMatch(bdd2 -> bdd1.biimp(bdd2).isOne()));
+    }
+    for (BDD bdd2 : bdds2) {
+      assertThat("bdds don't match", bdds1.stream().anyMatch(bdd1 -> bdd2.biimp(bdd1).isOne()));
     }
   }
 

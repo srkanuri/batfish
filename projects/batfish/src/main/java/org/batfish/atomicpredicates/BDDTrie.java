@@ -9,8 +9,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import net.sf.javabdd.BDD;
@@ -113,7 +113,8 @@ public class BDDTrie {
     /** Invariant: For all i, _children[i]._headerspace is a strict subset of _headerspace. */
     final List<Node> _children;
 
-    int _inserts = 0;
+    /* how many nodes are in this subtree */
+    int _size;
 
     Node(BDD headerspace) {
       this(headerspace, new ArrayList<>());
@@ -125,7 +126,7 @@ public class BDDTrie {
       _headerspaceMinusChildren = Suppliers.memoize(this::computeHeaderspaceMinusChildren);
       _notHeaderspace = Suppliers.memoize(_headerspace::not);
       _id = Suppliers.memoize(this::computeAtomicPredicateId);
-      _inserts = 0;
+      _size = 1 + children.stream().map(c -> c._size).reduce(0, (x, y) -> x + y);
     }
 
     private void computeIds() {
@@ -181,24 +182,42 @@ public class BDDTrie {
         }
         childrenHeaderspaces = childrenHeaderspaces.or(childHeaderspace);
       }
+
+      // recursively check child invariants
+      for (int i = 0; i < _children.size(); i++) {
+        path.add(i);
+        _children.get(i).checkInvariants(path);
+        path.remove(path.size() - 1);
+      }
     }
 
-    Stream<Node> insert(BDD bdd) {
+    /*
+     * return how many nodes were created.
+     */
+    int insert(BDD bdd, List<Node> bddNodes) {
       // invariant: bdd is a subset of _headerspace
       assert !bdd.isZero() && bdd.imp(_headerspace).isOne();
-      _inserts++;
 
       if (_headerspace.equals(bdd)) {
-        return Stream.of(this);
+        bddNodes.add(this);
+        return 0;
       }
 
+      int newNodes = insertIntoChildren(bdd, bddNodes);
+      _size += newNodes;
+
+      return newNodes;
+    }
+
+    int insertIntoChildren(BDD bdd, List<Node> bddNodes) {
       List<Node> bddChildren = new LinkedList<>();
-      List<Stream<Node>> nodeStreams = new LinkedList<>();
+
+      int newNodes = 0;
 
       for (Node child : _children) {
         if (bdd.equals(child._headerspace)) {
-          nodeStreams.add(Stream.of(child));
-          return nodeStreams.stream().flatMap(Function.identity());
+          bddNodes.add(child);
+          return newNodes;
         }
         BDD intersection = bdd.and(child._headerspace);
         if (intersection.isZero()) {
@@ -220,14 +239,13 @@ public class BDDTrie {
           assert bddChildren.isEmpty();
 
           // bdd is a strict subset of child._headerspace
-          nodeStreams.add(child.insert(bdd));
-          return nodeStreams.stream().flatMap(Function.identity());
+          return newNodes + child.insert(bdd, bddNodes);
         } else {
           /*
            * We know the intersection only intersects this child (because the children are
            * disjoint), so insert directly to it.
            */
-          nodeStreams.add(child.insert(intersection));
+          newNodes += child.insert(intersection, bddNodes);
 
           // bdd intersects child. split.
           BDD bddMinusIntersection = bdd.and(child._notHeaderspace.get());
@@ -251,41 +269,44 @@ public class BDDTrie {
       }
 
       // bdd does not intersect any child headerspace. add a new child for it.
-      Node node;
       _children.removeAll(bddChildren);
-      node = new Node(bdd, bddChildren);
+      Node node = new Node(bdd, bddChildren);
       _children.add(node);
-      nodeStreams.add(Stream.of(node));
-      return nodeStreams.stream().flatMap(Function.identity());
+      bddNodes.add(node);
+      return newNodes + 1;
     }
 
-    public Stream<AtomicPredicate> atomicPredicates(BDD bdd) {
-      assert bdd.imp(this._headerspace).isOne();
+    public void atomicPredicates(BDD bdd, List<AtomicPredicate> atomicPredicates) {
+      // bdd should be a strict non-empty subset of _headerspace
+      assert !bdd.isZero();
+      assert bdd.and(this._headerspace).equals(bdd);
 
       if (bdd.equals(this._headerspace)) {
-        return atomicPredicates();
+        atomicPredicates.addAll(atomicPredicates().collect(Collectors.toList()));
+        return;
       }
 
       Stream<AtomicPredicate> result = Stream.empty();
       for (Node child : _children) {
-        BDD intersection = child._headerspace.and(bdd);
-        if (!intersection.isZero()) {
-          result = Streams.concat(result, child.atomicPredicates(intersection));
-          if (intersection.equals(bdd)) {
-            // nothing left
-            break;
-          } else {
-            bdd = bdd.and(child._notHeaderspace.get());
-          }
+        BDD intersection = bdd.and(child._headerspace);
+        if (intersection.isZero()) {
+          continue;
+        }
+        child.atomicPredicates(intersection, atomicPredicates);
+        if (intersection.equals(bdd)) {
+          // nothing left
+          return;
+        } else {
+          bdd = bdd.and(child._notHeaderspace.get());
         }
       }
 
       if (!bdd.isZero()) {
         // part of the input bdd is disjoint from the children. so it overlaps this
         assert !_headerspaceMinusChildren.get().isZero();
-        result = Streams.concat(result, atomicPredicate());
+        atomicPredicates.addAll(atomicPredicate().collect(Collectors.toList()));
       }
-      return result;
+      return;
     }
   }
 
@@ -302,7 +323,9 @@ public class BDDTrie {
     _root = new Node(bdds.iterator().next().getFactory().one());
     for (BDD bdd : bdds) {
       if (!bdd.isZero()) {
-        _bddNodes.put(bdd, _root.insert(bdd).collect(ImmutableList.toImmutableList()));
+        List<Node> bddNodes = new LinkedList<>();
+        _root.insert(bdd, bddNodes);
+        _bddNodes.put(bdd, bddNodes);
       }
     }
   }
@@ -313,13 +336,23 @@ public class BDDTrie {
     return ImmutableList.copyOf(_atomicPredicates);
   }
 
-  public Stream<AtomicPredicate> atomicPredicates(BDD bdd) {
-    if (_bddNodes.containsKey(bdd)) {
+  public List<AtomicPredicate> atomicPredicates(BDD bdd) {
+    if (false && _bddNodes.containsKey(bdd)) {
       // bdd is one of the input BDDs.
-      return _bddNodes.get(bdd).stream().flatMap(Node::atomicPredicates);
+      return _bddNodes
+          .get(bdd)
+          .stream()
+          .flatMap(Node::atomicPredicates)
+          .collect(Collectors.toList());
+    } else {
+      return slowAtomicPredicates(bdd);
     }
+  }
 
-    return _root.atomicPredicates(bdd);
+  List<AtomicPredicate> slowAtomicPredicates(BDD bdd) {
+    List<AtomicPredicate> predicates = new LinkedList<>();
+    _root.atomicPredicates(bdd, predicates);
+    return predicates;
   }
 
   public void checkInvariants() throws BDDTrieException {
