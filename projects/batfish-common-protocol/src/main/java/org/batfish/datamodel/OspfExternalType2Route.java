@@ -65,4 +65,11 @@ public class OspfExternalType2Route extends OspfExternalRoute {
     int ret = Long.compare(getCostToAdvertiser(), castRhs.getCostToAdvertiser());
     return ret;
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
+        .build();
+  }
 }

@@ -43,6 +43,7 @@ import org.batfish.datamodel.AsPath;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpProcess;
 import org.batfish.datamodel.BgpRoute;
+import org.batfish.datamodel.BgpRouteOuterClass;
 import org.batfish.datamodel.BgpSession;
 import org.batfish.datamodel.BgpTieBreaker;
 import org.batfish.datamodel.Configuration;
@@ -52,17 +53,23 @@ import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.DataPlaneOuterClass;
 import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.GeneratedRoute.Builder;
+import org.batfish.datamodel.GeneratedRouteOuterClass;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.IsisRouteOuterClass;
+import org.batfish.datamodel.LocalRouteOuterClass;
 import org.batfish.datamodel.MultipathEquivalentAsPathMatchMode;
 import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.OriginType;
+import org.batfish.datamodel.OspfRouteOuterClass;
 import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.RipRouteOuterClass;
 import org.batfish.datamodel.Route;
 import org.batfish.datamodel.RouteOuterClass;
 import org.batfish.datamodel.RoutingProtocol;
 import org.batfish.datamodel.StaticRoute;
+import org.batfish.datamodel.StaticRouteOuterClass;
 import org.batfish.datamodel.Topology;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.collections.RoutesByVrf;
@@ -112,12 +119,50 @@ public class IncrementalDataPlanePluginTest {
   public void testProto() throws IOException {
     IncrementalDataPlaneOuterClass.IncrementalDataPlane newidp =
         IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder()
-            .addRoutes(
-                RouteOuterClass.Route.newBuilder()
-                    .setHostname("abc")
-                    .setVrfName("def")
-                    .setConnectedRoute(
-                        ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build()))
+            .addAllRoutes(
+                ImmutableList.of(
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setConnectedRoute(
+                            ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setGeneratedRoute(
+                            GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setRipRoute(RipRouteOuterClass.RipRoute.newBuilder().build())
+                        .build(),
+                    RouteOuterClass.Route.newBuilder()
+                        .setHostname("host1")
+                        .setVrfName("vrf1")
+                        .setStaticRoute(StaticRouteOuterClass.StaticRoute.newBuilder().build())
+                        .build()))
             .build();
     DataPlaneOuterClass.DataPlane newdp =
         DataPlaneOuterClass.DataPlane.newBuilder().setImpl(Any.pack(newidp)).build();

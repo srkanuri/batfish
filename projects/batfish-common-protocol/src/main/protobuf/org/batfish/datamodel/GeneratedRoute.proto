@@ -2,5 +2,5 @@ syntax = "proto3";
 
 package org.batfish.datamodel;
 
-message ConnectedRoute {
+message GeneratedRoute {
 }

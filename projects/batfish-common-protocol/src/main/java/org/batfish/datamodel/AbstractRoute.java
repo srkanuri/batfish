@@ -13,10 +13,15 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import org.batfish.common.BatfishException;
+import org.batfish.common.SerializableAsMessage;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "class")
 @ParametersAreNonnullByDefault
-public abstract class AbstractRoute implements Serializable, Comparable<AbstractRoute> {
+public abstract class AbstractRoute
+    implements Serializable,
+        Comparable<AbstractRoute>,
+        SerializableAsMessage<RouteOuterClass.Route> {
 
   private static final long serialVersionUID = 1L;
 
@@ -211,5 +216,43 @@ public abstract class AbstractRoute implements Serializable, Comparable<Abstract
     rb.setTag(getTag());
     rb.setVrf(vrfName);
     return rb.build();
+  }
+
+  public static AbstractRoute fromMessage(RouteOuterClass.Route message) {
+    String hostname = message.getHostname();
+    String vrfName = message.getVrfName();
+    AbstractRouteBuilder<?, ?> builder;
+    switch (message.getProtocolSpecificAttributesCase()) {
+      case BGP_ROUTE:
+        builder = BgpRoute.fromBgpRoute(message);
+        break;
+
+      case CONNECTED_ROUTE:
+
+      case GENERATED_ROUTE:
+
+      case ISIS_ROUTE:
+
+      case LOCAL_ROUTE:
+
+      case OSPF_ROUTE:
+
+      case RIP_ROUTE:
+
+      case STATIC_ROUTE:
+
+      default:
+        throw new BatfishException(
+            String.format(
+                "Unsupported protocol-specific route attributes: %s",
+                message.getProtocolSpecificAttributesCase()));
+      case PROTOCOLSPECIFICATTRIBUTES_NOT_SET:
+        throw new BatfishException("Missing protocol-specific route attributes");
+    }
+    builder.setNetwork(Prefix.parse(message.getNetwork()));
+    AbstractRoute route = builder.build();
+    route.setNode(hostname);
+    route.setVrf(vrfName);
+    return route;
   }
 }

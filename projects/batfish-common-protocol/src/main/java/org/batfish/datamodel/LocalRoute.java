@@ -104,4 +104,11 @@ public class LocalRoute extends AbstractRoute {
     }
     return Integer.compare(_sourcePrefixLength, ((LocalRoute) rhs)._sourcePrefixLength);
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build())
+        .build();
+  }
 }

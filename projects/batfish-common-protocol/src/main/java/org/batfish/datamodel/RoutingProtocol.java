@@ -661,4 +661,9 @@ public enum RoutingProtocol {
   public String protocolName() {
     return _protocolName;
   }
+
+  public static RoutingProtocol fromMessage(RoutingProtocolOuterClass.RoutingProtocol protocol) {
+    throw new UnsupportedOperationException(
+        "no implementation for generated method"); // TODO Auto-generated method stub
+  }
 }

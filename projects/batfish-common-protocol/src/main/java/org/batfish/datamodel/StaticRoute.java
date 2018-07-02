@@ -167,4 +167,11 @@ public class StaticRoute extends AbstractRoute {
       return this;
     }
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setStaticRoute(StaticRouteOuterClass.StaticRoute.newBuilder().build())
+        .build();
+  }
 }

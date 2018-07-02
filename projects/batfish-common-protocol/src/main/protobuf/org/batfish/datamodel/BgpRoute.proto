@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+import "org/batfish/datamodel/AsSet.proto";
+import "org/batfish/datamodel/OriginType.proto";
+import "org/batfish/datamodel/RoutingProtocol.proto";
+
+package org.batfish.datamodel;
+
+message BgpRoute {
+  int32 administrative_distance = 1;
+  repeated AsSet as_path = 2;
+  repeated int64 cluster_list = 3;
+  repeated int64 communities = 4;
+  int32 local_preference = 5;
+  int64 med = 6;
+  string next_hop_ip = 7;
+  string originator_ip = 8;
+  org.batfish.datamodel.OriginType origin_type = 9;
+  org.batfish.datamodel.RoutingProtocol protocol = 10;
+  string received_from_ip = 11;
+  bool received_from_route_reflector_client = 12;
+  org.batfish.datamodel.RoutingProtocol src_protocol = 13;
+  int32 weight = 14;
+}

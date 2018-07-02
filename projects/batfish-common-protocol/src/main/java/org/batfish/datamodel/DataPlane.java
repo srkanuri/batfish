@@ -6,8 +6,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
+import org.batfish.common.SerializableAsMessage;
 
-public interface DataPlane extends Serializable {
+public interface DataPlane
+    extends Serializable, SerializableAsMessage<DataPlaneOuterClass.DataPlane> {
 
   Network<BgpPeerConfig, BgpSession> getBgpTopology();
 

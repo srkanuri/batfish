@@ -7,7 +7,9 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.graph.Network;
+import com.google.protobuf.Any;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -18,6 +20,7 @@ import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpSession;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.DataPlane;
+import org.batfish.datamodel.DataPlaneOuterClass;
 import org.batfish.datamodel.Edge;
 import org.batfish.datamodel.Fib;
 import org.batfish.datamodel.ForwardingAnalysis;
@@ -272,5 +275,23 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
   @Override
   public SortedSet<Edge> getTopologyEdges() {
     return _topology.getEdges();
+  }
+
+  @Override
+  public DataPlaneOuterClass.DataPlane toMessage() {
+    IncrementalDataPlaneOuterClass.IncrementalDataPlane.Builder implBuilder =
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder();
+    _ribs
+        .values()
+        .stream()
+        .map(Map::values)
+        .flatMap(Collection::stream)
+        .map(GenericRib::getRoutes)
+        .flatMap(Collection::stream)
+        .map(AbstractRoute::toMessage)
+        .forEach(implBuilder::addRoutes);
+    return DataPlaneOuterClass.DataPlane.newBuilder()
+        .setImpl(Any.pack(implBuilder.build()))
+        .build();
   }
 }

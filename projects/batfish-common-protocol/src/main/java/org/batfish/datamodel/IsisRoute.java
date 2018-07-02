@@ -286,4 +286,11 @@ public class IsisRoute extends AbstractRoute {
         .thenComparing(IsisRoute::getSystemId)
         .compare(this, castRhs);
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build())
+        .build();
+  }
 }

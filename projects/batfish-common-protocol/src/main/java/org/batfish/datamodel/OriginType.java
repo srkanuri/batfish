@@ -48,4 +48,9 @@ public enum OriginType {
   public int getPreference() {
     return _preference;
   }
+
+  public static OriginType fromMessage(OriginTypeOuterClass.OriginType originType) {
+    throw new UnsupportedOperationException(
+        "no implementation for generated method"); // TODO Auto-generated method stub
+  }
 }

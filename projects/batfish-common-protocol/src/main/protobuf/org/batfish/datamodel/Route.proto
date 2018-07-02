@@ -1,6 +1,12 @@
 syntax = "proto3";
 
+import "org/batfish/datamodel/BgpRoute.proto";
 import "org/batfish/datamodel/ConnectedRoute.proto";
+import "org/batfish/datamodel/GeneratedRoute.proto";
+import "org/batfish/datamodel/IsisRoute.proto";
+import "org/batfish/datamodel/LocalRoute.proto";
+import "org/batfish/datamodel/OspfRoute.proto";
+import "org/batfish/datamodel/RipRoute.proto";
 import "org/batfish/datamodel/StaticRoute.proto";
 
 package org.batfish.datamodel;
@@ -9,10 +15,18 @@ message Route {
 
   string hostname = 1;
   
-  string vrf_name = 2;
+  string network = 2;
   
+  string vrf_name = 3;
+
   oneof protocol_specific_attributes {
-    org.batfish.datamodel.ConnectedRoute connected_route = 3;
-    org.batfish.datamodel.StaticRoute static_route = 4;
+    org.batfish.datamodel.BgpRoute bgp_route = 4;
+    org.batfish.datamodel.ConnectedRoute connected_route = 5;
+    org.batfish.datamodel.GeneratedRoute generated_route = 6;
+    org.batfish.datamodel.IsisRoute isis_route = 7;
+    org.batfish.datamodel.LocalRoute local_route = 8;
+    org.batfish.datamodel.OspfRoute ospf_route = 9;
+    org.batfish.datamodel.RipRoute rip_route = 10;
+    org.batfish.datamodel.StaticRoute static_route = 11;
   }
 }

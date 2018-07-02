@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+enum RoutingProtocol {
+  RoutingProtocol_AGGREGATE = 0;
+  RoutingProtocol_BGP = 1;
+  RoutingProtocol_CONNECTED = 2;
+  RoutingProtocol_EGP = 3;
+  RoutingProtocol_EIGRP = 4;
+  RoutingProtocol_IBGP = 5;
+  RoutingProtocol_IGP = 6;
+  RoutingProtocol_ISIS = 7;
+  RoutingProtocol_ISIS_EL1 = 8;
+  RoutingProtocol_ISIS_EL2 = 9;
+  RoutingProtocol_ISIS_L1 = 10;
+  RoutingProtocol_ISIS_L2 = 11;
+  RoutingProtocol_LDP = 12;
+  RoutingProtocol_LISP = 13;
+  RoutingProtocol_LOCAL = 14;
+  RoutingProtocol_MSDP = 15;
+  RoutingProtocol_OSPF = 16;
+  RoutingProtocol_OSPF_E1 = 17;
+  RoutingProtocol_OSPF_E2 = 18;
+  RoutingProtocol_OSPF_IA = 19;
+  RoutingProtocol_OSPF3 = 20;
+  RoutingProtocol_RIP = 21;
+  RoutingProtocol_RSVP = 22;
+  RoutingProtocol_STATIC = 23;
+}

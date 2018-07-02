@@ -314,4 +314,11 @@ public final class GeneratedRoute extends AbstractRoute {
   public void setGenerationPolicySources(SortedSet<String> generationPolicySources) {
     _generationPolicySources = generationPolicySources;
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setGeneratedRoute(GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
+        .build();
+  }
 }

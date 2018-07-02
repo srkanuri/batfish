@@ -24,4 +24,19 @@ public class IsisRouteTest {
 
     assertThat(updated, equalTo(original));
   }
+
+  @Test
+  public void testProto() {
+    IsisRoute route1 =
+        new IsisRoute.Builder()
+            .setNetwork(Prefix.parse("1.1.1.1/32"))
+            .setLevel(IsisLevel.LEVEL_1)
+            .setArea("0")
+            .setNextHopIp(new Ip("2.2.2.2"))
+            .setProtocol(RoutingProtocol.ISIS_L1)
+            .setSystemId("id")
+            .build();
+
+    assertThat(route1, equalTo(AbstractRoute.fromMessage(route1.toMessage())));
+  }
 }

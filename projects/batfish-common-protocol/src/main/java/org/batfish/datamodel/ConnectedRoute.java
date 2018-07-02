@@ -85,4 +85,11 @@ public class ConnectedRoute extends AbstractRoute {
   public int routeCompare(@Nonnull AbstractRoute rhs) {
     return 0;
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setConnectedRoute(ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
+        .build();
+  }
 }

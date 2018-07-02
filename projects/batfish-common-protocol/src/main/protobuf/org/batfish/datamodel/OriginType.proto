@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+enum OriginType {
+  OriginType_EGP = 0;
+  OriginType_IGP = 1;
+  OriginType_INCOMPLETE = 2;
+}

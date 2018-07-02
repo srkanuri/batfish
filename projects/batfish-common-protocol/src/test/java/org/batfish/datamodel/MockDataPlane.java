@@ -23,15 +23,15 @@ public class MockDataPlane implements DataPlane {
 
     private ForwardingAnalysis _forwardingAnalysis;
 
+    Map<Ip, Set<String>> _ipOwners;
+
+    Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
+
     private SortedMap<String, SortedMap<String, GenericRib<AbstractRoute>>> _ribs;
 
     @Nullable private Topology _topology;
 
     private SortedSet<Edge> _topologyEdges;
-
-    Map<Ip, Set<String>> _ipOwners;
-
-    Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
 
     private Builder() {
       _bgpTopology = NetworkBuilder.directed().build();
@@ -51,13 +51,13 @@ public class MockDataPlane implements DataPlane {
       return this;
     }
 
-    public Builder setIpOwners(Map<Ip, Set<String>> owners) {
-      _ipOwners = owners;
+    public Builder setForwardingAnalysis(ForwardingAnalysis forwardingAnalysis) {
+      _forwardingAnalysis = forwardingAnalysis;
       return this;
     }
 
-    public Builder setForwardingAnalysis(ForwardingAnalysis forwardingAnalysis) {
-      _forwardingAnalysis = forwardingAnalysis;
+    public Builder setIpOwners(Map<Ip, Set<String>> owners) {
+      _ipOwners = owners;
       return this;
     }
 
@@ -114,6 +114,16 @@ public class MockDataPlane implements DataPlane {
   }
 
   @Override
+  public Network<BgpPeerConfig, BgpSession> getBgpTopology() {
+    return _bgpTopology;
+  }
+
+  @Override
+  public Map<String, Configuration> getConfigurations() {
+    return _configurations;
+  }
+
+  @Override
   public Map<String, Map<String, Fib>> getFibs() {
     return _fibs;
   }
@@ -134,6 +144,12 @@ public class MockDataPlane implements DataPlane {
   }
 
   @Override
+  public SortedMap<String, SortedMap<String, Map<Prefix, Map<String, Set<String>>>>>
+      getPrefixTracingInfoSummary() {
+    return ImmutableSortedMap.of();
+  }
+
+  @Override
   public SortedMap<String, SortedMap<String, GenericRib<AbstractRoute>>> getRibs() {
     return _ribs;
   }
@@ -150,18 +166,8 @@ public class MockDataPlane implements DataPlane {
   }
 
   @Override
-  public Network<BgpPeerConfig, BgpSession> getBgpTopology() {
-    return _bgpTopology;
-  }
-
-  @Override
-  public Map<String, Configuration> getConfigurations() {
-    return _configurations;
-  }
-
-  @Override
-  public SortedMap<String, SortedMap<String, Map<Prefix, Map<String, Set<String>>>>>
-      getPrefixTracingInfoSummary() {
-    return ImmutableSortedMap.of();
+  public DataPlaneOuterClass.DataPlane toMessage() {
+    throw new UnsupportedOperationException(
+        "no implementation for generated method"); // TODO Auto-generated method stub
   }
 }

@@ -59,4 +59,11 @@ public class OspfInterAreaRoute extends OspfInternalRoute {
     int ret = Long.compare(_area, castRhs._area);
     return ret;
   }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
+        .build();
+  }
 }

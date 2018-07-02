@@ -5,6 +5,7 @@ import static com.google.common.base.MoreObjects.firstNonNull;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -482,5 +483,36 @@ public class BgpRoute extends AbstractRoute {
     }
     ret = Integer.compare(_weight, castRhs._weight);
     return ret;
+  }
+
+  @Override
+  public RouteOuterClass.Route toMessage() {
+    return RouteOuterClass.Route.newBuilder()
+        .setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build())
+        .build();
+  }
+
+  public static Builder fromBgpRoute(RouteOuterClass.Route route) {
+    BgpRouteOuterClass.BgpRoute bgpRoute = route.getBgpRoute();
+    return new BgpRoute.Builder()
+        .setAdmin(bgpRoute.getAdministrativeDistance())
+        .setAsPath(
+            bgpRoute
+                .getAsPathList()
+                .stream()
+                .map(asSet -> ImmutableSortedSet.copyOf(asSet.getMembersList()))
+                .collect(ImmutableList.toImmutableList()))
+        .setClusterList(ImmutableSortedSet.copyOf(bgpRoute.getClusterListList()))
+        .setCommunities(ImmutableSortedSet.copyOf(bgpRoute.getCommunitiesList()))
+        .setLocalPreference(bgpRoute.getLocalPreference())
+        .setMetric(bgpRoute.getMed())
+        .setNextHopIp(new Ip(bgpRoute.getNextHopIp()))
+        .setOriginatorIp(new Ip(bgpRoute.getOriginatorIp()))
+        .setOriginType(OriginType.fromMessage(bgpRoute.getOriginType()))
+        .setProtocol(RoutingProtocol.fromMessage(bgpRoute.getProtocol()))
+        .setReceivedFromIp(new Ip(bgpRoute.getReceivedFromIp()))
+        .setReceivedFromRouteReflectorClient(bgpRoute.getReceivedFromRouteReflectorClient())
+        .setSrcProtocol(RoutingProtocol.fromMessage(bgpRoute.getSrcProtocol()))
+        .setWeight(bgpRoute.getWeight());
   }
 }
