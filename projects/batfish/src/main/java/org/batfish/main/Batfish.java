@@ -4358,6 +4358,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     NetworkGraphFactory bddTrieGraphFactory =
         new NetworkGraphFactory(configurations, forwardingAnalysis, BDDTrieAtomizer::new, true);
     long bddTrieGraphFactoryTime = System.currentTimeMillis() - time;
+    BDDPacket.factory.reset(); // just for benchmarking. not a good idea in general.
     time = System.currentTimeMillis();
     NetworkGraphFactory atomicPredicatesGraphFactory =
         new NetworkGraphFactory(configurations, forwardingAnalysis, AtomicPredicates::new, true);
