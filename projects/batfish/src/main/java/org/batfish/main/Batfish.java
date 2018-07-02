@@ -4399,7 +4399,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                       String.format("%s received %s from %s", terminalState, ap, sources)));
     }
     BDDPacket pkt = new BDDPacket();
-    Map<Integer, BDD> apBDDs = graphFactory.getApBDDs();
+    List<BDD> apBDDs = graphFactory.getApBDDs();
     List<MultipathConsistencyViolation> violations = graph.detectMultipathInconsistency();
     for (MultipathConsistencyViolation violation : violations) {
       BDD pred = apBDDs.get(violation.predicate).fullSatOne();
@@ -4453,11 +4453,11 @@ public class Batfish extends PluginConsumer implements IBatfish {
     } catch (BDDTrieException e) {
       throw new BatfishException("BDDDDNF Exception", e);
     }
-    SortedMap<Integer, BDD> aps1 = new BDDTrieAtomizer(graphBDDs).atoms();
-    SortedMap<Integer, BDD> aps2 = new AtomicPredicates(graphBDDs).atoms();
+    List<BDD> aps1 = new BDDTrieAtomizer(graphBDDs).atoms();
+    List<BDD> aps2 = new AtomicPredicates(graphBDDs).atoms();
     assert (aps1.size() == aps2.size());
-    for (BDD ap1 : aps1.values()) {
-      assert aps2.values().stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());
+    for (BDD ap1 : aps1) {
+      assert aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne());
     }
   }
 

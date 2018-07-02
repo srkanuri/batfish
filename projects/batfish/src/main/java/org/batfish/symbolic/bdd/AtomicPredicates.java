@@ -1,20 +1,18 @@
 package org.batfish.symbolic.bdd;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.ImmutableSortedSet.Builder;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
 import org.batfish.atomicpredicates.BDDAtomizer;
 
 public class AtomicPredicates implements BDDAtomizer {
-  private final SortedMap<Integer, BDD> _atoms;
+  private final List<BDD> _atoms;
   private final int[] _roundSizes;
   private final long[] _roundTimes;
   private final long _totalTime;
@@ -41,18 +39,11 @@ public class AtomicPredicates implements BDDAtomizer {
       round++;
     }
     _totalTime = System.currentTimeMillis() - totalTime;
-
-    ImmutableSortedMap.Builder<Integer, BDD> atomsBuilder =
-        ImmutableSortedMap.orderedBy(Comparator.<Integer>naturalOrder());
-    int i = 0;
-    for (BDD atom : atoms) {
-      atomsBuilder.put(i++, atom);
-    }
-    _atoms = atomsBuilder.build();
+    _atoms = ImmutableList.copyOf(atoms);
   }
 
   @Override
-  public SortedMap<Integer, BDD> atoms() {
+  public List<BDD> atoms() {
     return _atoms;
   }
 

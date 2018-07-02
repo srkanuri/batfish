@@ -2,19 +2,17 @@ package org.batfish.atomicpredicates;
 
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Streams;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import net.sf.javabdd.BDD;
 
 /**
@@ -110,7 +108,7 @@ public class BDDTrie {
     // headerspace minus children headerspaces
     final Supplier<BDD> _headerspaceMinusChildren;
 
-    final int _id;
+    final Supplier<Integer> _id;
 
     /** Invariant: For all i, _children[i]._headerspace is a strict subset of _headerspace. */
     final List<Node> _children;
@@ -120,12 +118,29 @@ public class BDDTrie {
     }
 
     Node(BDD headerspace, List<Node> children) {
-      _id = _allNodes.size();
-      _allNodes.add(this);
       _children = children;
       _headerspace = headerspace;
       _headerspaceMinusChildren = Suppliers.memoize(this::computeHeaderspaceMinusChildren);
       _notHeaderspace = Suppliers.memoize(_headerspace::not);
+      _id = Suppliers.memoize(this::computeAtomicPredicateId);
+    }
+
+    private void computeIds() {
+      _id.get();
+      for (Node child : _children) {
+        child.computeIds();
+      }
+    }
+
+    private @Nullable Integer computeAtomicPredicateId() {
+      BDD atomicPredicate = _headerspaceMinusChildren.get();
+      if (atomicPredicate.isZero()) {
+        return null;
+      }
+
+      Integer id = _atomicPredicates.size();
+      _atomicPredicates.add(atomicPredicate);
+      return id;
     }
 
     BDD computeHeaderspaceMinusChildren() {
@@ -137,8 +152,9 @@ public class BDDTrie {
     }
 
     Stream<AtomicPredicate> atomicPredicate() {
-      BDD bdd = _headerspaceMinusChildren.get();
-      return bdd.isZero() ? Stream.empty() : Stream.of(new AtomicPredicate(_id, bdd));
+      Integer id = _id.get();
+      BDD atomicPredicate = _headerspaceMinusChildren.get();
+      return id == null ? Stream.empty() : Stream.of(new AtomicPredicate(id, atomicPredicate));
     }
 
     Stream<AtomicPredicate> atomicPredicates() {
@@ -269,7 +285,7 @@ public class BDDTrie {
     }
   }
 
-  private List<Node> _allNodes;
+  private List<BDD> _atomicPredicates;
 
   /** Remember the nodes that correspond to a BDD that has been inserted into the trie. */
   private Map<BDD, List<Node>> _bddNodes;
@@ -277,10 +293,9 @@ public class BDDTrie {
   private Node _root;
 
   public BDDTrie(Collection<BDD> bdds) {
-    _allNodes = new ArrayList<>();
+    _atomicPredicates = new LinkedList<>();
     _bddNodes = new HashMap<>();
     _root = new Node(bdds.iterator().next().getFactory().one());
-    _allNodes.add(_root);
     for (BDD bdd : bdds) {
       if (!bdd.isZero()) {
         _bddNodes.put(bdd, _root.insert(bdd).collect(ImmutableList.toImmutableList()));
@@ -288,12 +303,10 @@ public class BDDTrie {
     }
   }
 
-  public SortedMap<Integer, BDD> atomicPredicates() {
-    return _root
-        .atomicPredicates()
-        .collect(
-            ImmutableSortedMap.toImmutableSortedMap(
-                Comparator.naturalOrder(), AtomicPredicate::getId, AtomicPredicate::getBDD));
+  public List<BDD> atomicPredicates() {
+    // force computation of tree of atomic predicates
+    _root.computeIds();
+    return ImmutableList.copyOf(_atomicPredicates);
   }
 
   public Stream<AtomicPredicate> atomicPredicates(BDD bdd) {

@@ -19,7 +19,6 @@ import static org.hamcrest.Matchers.nullValue;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
@@ -200,13 +199,16 @@ public class NetworkGraphFactoryTest {
             .collect(Collectors.toList());
     BDDTrie bddTrie = new BDDTrie(bdds);
     bddTrie.checkInvariants();
-    Map<Integer, BDD> aps1 = bddTrie.atomicPredicates();
-    Map<Integer, BDD> aps2 = new AtomicPredicates(bdds).atoms();
+    List<BDD> aps1 = bddTrie.atomicPredicates();
+    List<BDD> aps2 = new AtomicPredicates(bdds).atoms();
     assertThat(aps1.size(), is(aps2.size()));
-    for (BDD ap1 : aps1.values()) {
+    for (BDD ap1 : aps1) {
       assertThat(
-          "atomic predicates don't match",
-          aps2.values().stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne()));
+          "atomic predicates don't match", aps2.stream().anyMatch(ap2 -> ap1.biimp(ap2).isOne()));
+    }
+    for (BDD ap2 : aps2) {
+      assertThat(
+          "atomic predicates don't match", aps1.stream().anyMatch(ap1 -> ap2.biimp(ap1).isOne()));
     }
   }
 
