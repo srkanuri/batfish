@@ -16,7 +16,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import org.batfish.common.BatfishException;
 import org.batfish.common.SerializableAsMessage;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "class")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "class")
 @ParametersAreNonnullByDefault
 public abstract class AbstractRoute
     implements Serializable,

@@ -50,6 +50,7 @@ import org.batfish.datamodel.GeneratedRoute6;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.IkeGateway;
 import org.batfish.datamodel.IkePolicy;
+import org.batfish.datamodel.IkeProposal;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Ip6AccessList;
@@ -386,6 +387,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   private final Map<String, NetworkObjectGroup> _networkObjectGroups;
 
+  private final Map<String, NetworkObject> _networkObjects;
+
   private String _ntpSourceInterface;
 
   private CiscoNxBgpGlobalConfiguration _nxBgpGlobalConfiguration;
@@ -462,6 +465,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _macAccessLists = new TreeMap<>();
     _natPools = new TreeMap<>();
     _networkObjectGroups = new TreeMap<>();
+    _networkObjects = new TreeMap<>();
     _nxBgpGlobalConfiguration = new CiscoNxBgpGlobalConfiguration();
     _objectGroups = new TreeMap<>();
     _prefixLists = new TreeMap<>();
@@ -2159,6 +2163,16 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return iface.getMtu();
   }
 
+  private static IkeProposal toIkeProposal(IsakmpPolicy isakmpPolicy) {
+    IkeProposal ikeProposal = new IkeProposal(isakmpPolicy.getName());
+    ikeProposal.setDiffieHellmanGroup(isakmpPolicy.getDiffieHellmanGroup());
+    ikeProposal.setAuthenticationMethod(isakmpPolicy.getAuthenticationMethod());
+    ikeProposal.setEncryptionAlgorithm(isakmpPolicy.getEncryptionAlgorithm());
+    ikeProposal.setLifetimeSeconds(isakmpPolicy.getLifetimeSeconds());
+    ikeProposal.setAuthenticationAlgorithm(isakmpPolicy.getHashAlgorithm());
+    return ikeProposal;
+  }
+
   private org.batfish.datamodel.Interface toInterface(
       Interface iface, Map<String, IpAccessList> ipAccessLists, Configuration c) {
     String name = iface.getName();
@@ -3107,10 +3121,12 @@ public final class CiscoConfiguration extends VendorConfiguration {
       c.getIpAccessLists().put(ipaList.getName(), ipaList);
     }
 
-    // convert each NetworkObjectGroup to IpSpace
+    // convert each NetworkObject and NetworkObjectGroup to IpSpace
     _networkObjectGroups.forEach(
         (name, networkObjectGroup) ->
             c.getIpSpaces().put(name, CiscoConversions.toIpSpace(networkObjectGroup)));
+    _networkObjects.forEach(
+        (name, networkObject) -> c.getIpSpaces().put(name, networkObject.getIpSpace()));
 
     // convert each ProtocolObjectGroup to IpAccessList
     _protocolObjectGroups.forEach(
@@ -3165,10 +3181,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     createInspectPolicyMapAcls(c);
 
     // create zones
-    _securityZones.forEach(
-        (name, securityZone) -> {
-          c.getZones().put(name, new Zone(name));
-        });
+    _securityZones.forEach((name, securityZone) -> c.getZones().put(name, new Zone(name)));
 
     // populate zone interfaces
     _interfaces.forEach(
@@ -3204,9 +3217,9 @@ public final class CiscoConfiguration extends VendorConfiguration {
     // apply vrrp settings to interfaces
     applyVrrp(c);
 
-    // get IKE proposals
+    // ISAKMP policies to IKE proposals
     for (Entry<String, IsakmpPolicy> e : _isakmpPolicies.entrySet()) {
-      c.getIkeProposals().put(e.getKey(), e.getValue().getProposal());
+      c.getIkeProposals().put(e.getKey(), toIkeProposal(e.getValue()));
     }
     resolveKeyringIsakmpProfileAddresses();
     resolveTunnelSourceInterfaces();
@@ -3506,13 +3519,16 @@ public final class CiscoConfiguration extends VendorConfiguration {
     markConcreteStructure(
         CiscoStructureType.NETWORK_OBJECT_GROUP,
         CiscoStructureUsage.EXTENDED_ACCESS_LIST_NETWORK_OBJECT_GROUP,
-        CiscoStructureUsage.NETWORK_OBJECT_GROUP_GROUP_OBJECT,
-        CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT);
+        CiscoStructureUsage.NETWORK_OBJECT_GROUP_GROUP_OBJECT);
     markAbstractStructure(
         CiscoStructureType.PROTOCOL_OR_SERVICE_OBJECT_GROUP,
         CiscoStructureUsage.EXTENDED_ACCESS_LIST_PROTOCOL_OR_SERVICE_OBJECT_GROUP,
         ImmutableList.of(
             CiscoStructureType.PROTOCOL_OBJECT_GROUP, CiscoStructureType.SERVICE_OBJECT_GROUP));
+
+    // objects
+    markConcreteStructure(
+        CiscoStructureType.NETWORK_OBJECT, CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT);
 
     // service template
     markConcreteStructure(
@@ -4052,21 +4068,20 @@ public final class CiscoConfiguration extends VendorConfiguration {
         .stream()
         .filter(keyring -> keyring.getLocalInterfaceName() != null)
         .forEach(
-            keyring -> {
-              keyring.setLocalAddress(
-                  firstNonNull(ifaceNameToPrimaryIp.get(keyring.getLocalInterfaceName()), Ip.AUTO));
-            });
+            keyring ->
+                keyring.setLocalAddress(
+                    firstNonNull(
+                        ifaceNameToPrimaryIp.get(keyring.getLocalInterfaceName()), Ip.AUTO)));
 
     _isakmpProfiles
         .values()
         .stream()
         .filter(isakmpProfile -> isakmpProfile.getLocalInterfaceName() != null)
         .forEach(
-            isakmpProfile -> {
-              isakmpProfile.setLocalAddress(
-                  firstNonNull(
-                      ifaceNameToPrimaryIp.get(isakmpProfile.getLocalInterfaceName()), Ip.AUTO));
-            });
+            isakmpProfile ->
+                isakmpProfile.setLocalAddress(
+                    firstNonNull(
+                        ifaceNameToPrimaryIp.get(isakmpProfile.getLocalInterfaceName()), Ip.AUTO)));
   }
 
   /** Resolves the addresses of the interfaces used in sourceInterfaceName of Tunnel interfaces */
@@ -4083,6 +4098,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   public Map<String, NetworkObjectGroup> getNetworkObjectGroups() {
     return _networkObjectGroups;
+  }
+
+  public Map<String, NetworkObject> getNetworkObjects() {
+    return _networkObjects;
   }
 
   public Map<String, ObjectGroup> getObjectGroups() {

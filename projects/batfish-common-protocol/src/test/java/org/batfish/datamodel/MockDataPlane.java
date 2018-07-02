@@ -3,6 +3,7 @@ package org.batfish.datamodel;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Table;
 import com.google.common.graph.Network;
 import com.google.common.graph.NetworkBuilder;
 import java.util.Map;
@@ -15,6 +16,8 @@ public class MockDataPlane implements DataPlane {
 
   public static class Builder {
 
+    private Table<String, String, Set<BgpRoute>> _bgpRoutes;
+
     private Network<BgpPeerConfig, BgpSession> _bgpTopology;
 
     private Map<String, Configuration> _configurations;
@@ -23,15 +26,15 @@ public class MockDataPlane implements DataPlane {
 
     private ForwardingAnalysis _forwardingAnalysis;
 
-    Map<Ip, Set<String>> _ipOwners;
-
-    Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
-
     private SortedMap<String, SortedMap<String, GenericRib<AbstractRoute>>> _ribs;
 
     @Nullable private Topology _topology;
 
     private SortedSet<Edge> _topologyEdges;
+
+    Map<Ip, Set<String>> _ipOwners;
+
+    Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
 
     private Builder() {
       _bgpTopology = NetworkBuilder.directed().build();
@@ -46,18 +49,22 @@ public class MockDataPlane implements DataPlane {
       return new MockDataPlane(this);
     }
 
+    public void setBgpRoutes(Table<String, String, Set<BgpRoute>> bgpRoutes) {
+      this._bgpRoutes = bgpRoutes;
+    }
+
     public Builder setBgpTopology(Network<BgpPeerConfig, BgpSession> bgpTopology) {
       _bgpTopology = bgpTopology;
       return this;
     }
 
-    public Builder setForwardingAnalysis(ForwardingAnalysis forwardingAnalysis) {
-      _forwardingAnalysis = forwardingAnalysis;
+    public Builder setIpOwners(Map<Ip, Set<String>> owners) {
+      _ipOwners = owners;
       return this;
     }
 
-    public Builder setIpOwners(Map<Ip, Set<String>> owners) {
-      _ipOwners = owners;
+    public Builder setForwardingAnalysis(ForwardingAnalysis forwardingAnalysis) {
+      _forwardingAnalysis = forwardingAnalysis;
       return this;
     }
 
@@ -82,6 +89,8 @@ public class MockDataPlane implements DataPlane {
   public static Builder builder() {
     return new Builder();
   }
+
+  private Table<String, String, Set<BgpRoute>> _bgpRoutes;
 
   private final Network<BgpPeerConfig, BgpSession> _bgpTopology;
 
@@ -114,13 +123,13 @@ public class MockDataPlane implements DataPlane {
   }
 
   @Override
-  public Network<BgpPeerConfig, BgpSession> getBgpTopology() {
-    return _bgpTopology;
+  public Table<String, String, Set<BgpRoute>> getBgpRoutes(boolean multipath) {
+    return _bgpRoutes;
   }
 
   @Override
-  public Map<String, Configuration> getConfigurations() {
-    return _configurations;
+  public Network<BgpPeerConfig, BgpSession> getBgpTopology() {
+    return _bgpTopology;
   }
 
   @Override
@@ -144,12 +153,6 @@ public class MockDataPlane implements DataPlane {
   }
 
   @Override
-  public SortedMap<String, SortedMap<String, Map<Prefix, Map<String, Set<String>>>>>
-      getPrefixTracingInfoSummary() {
-    return ImmutableSortedMap.of();
-  }
-
-  @Override
   public SortedMap<String, SortedMap<String, GenericRib<AbstractRoute>>> getRibs() {
     return _ribs;
   }
@@ -163,6 +166,17 @@ public class MockDataPlane implements DataPlane {
   @Override
   public SortedSet<Edge> getTopologyEdges() {
     return _topologyEdges;
+  }
+
+  @Override
+  public Map<String, Configuration> getConfigurations() {
+    return _configurations;
+  }
+
+  @Override
+  public SortedMap<String, SortedMap<String, Map<Prefix, Map<String, Set<String>>>>>
+      getPrefixTracingInfoSummary() {
+    return ImmutableSortedMap.of();
   }
 
   @Override
