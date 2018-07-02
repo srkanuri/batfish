@@ -4354,21 +4354,42 @@ public class Batfish extends PluginConsumer implements IBatfish {
             .collect(Collectors.toSet());
     IpSpaceAssignment ipSpaceAssignment =
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
+
+    boolean doBDDTrie = true;
+    boolean doNaive = true;
+    boolean dstIpOnly = false;
+
     long time = System.currentTimeMillis();
-    NetworkGraphFactory bddTrieGraphFactory =
-        new NetworkGraphFactory(configurations, forwardingAnalysis, BDDTrieAtomizer::new, true);
+    NetworkGraphFactory bddTrieGraphFactory;
+    if (doBDDTrie) {
+      BDDPacket.factory.reset();
+      bddTrieGraphFactory =
+          new NetworkGraphFactory(
+              configurations, forwardingAnalysis, BDDTrieAtomizer::new, dstIpOnly);
+      bddTrieGraphFactory.networkGraph(ipSpaceAssignment);
+    }
     long bddTrieGraphFactoryTime = System.currentTimeMillis() - time;
-    BDDPacket.factory.reset(); // just for benchmarking. not a good idea in general.
     time = System.currentTimeMillis();
-    NetworkGraphFactory atomicPredicatesGraphFactory =
-        new NetworkGraphFactory(configurations, forwardingAnalysis, AtomicPredicates::new, true);
+    NetworkGraphFactory atomicPredicatesGraphFactory;
+    if (doNaive) {
+      BDDPacket.factory.reset();
+      atomicPredicatesGraphFactory =
+          new NetworkGraphFactory(
+              configurations, forwardingAnalysis, AtomicPredicates::new, dstIpOnly);
+      atomicPredicatesGraphFactory.networkGraph(ipSpaceAssignment);
+    }
     long atomicPredicatesGraphFactoryTime = System.currentTimeMillis() - time;
     System.out.println(
         String.format(
             "bddTrie: %s, naive: %s", bddTrieGraphFactoryTime, atomicPredicatesGraphFactoryTime));
+    // atomicPredicatesMultipathConsistency(ipSpaceAssignment, atomicPredicatesGraphFactory);
+    throw new BatfishException("Done baby");
+  }
 
-    benchmarkAtomicPredicates(bddTrieGraphFactory);
-    NetworkGraph graph = bddTrieGraphFactory.networkGraph(ipSpaceAssignment);
+  private void atomicPredicatesMultipathConsistency(
+      IpSpaceAssignment ipSpaceAssignment, NetworkGraphFactory graphFactory) {
+    benchmarkAtomicPredicates(graphFactory);
+    NetworkGraph graph = graphFactory.networkGraph(ipSpaceAssignment);
     Map<StateExpr, Multimap<Integer, StateExpr>> reachableAps = graph.getReachableAps();
     for (StateExpr terminalState : graph.getTerminalStates()) {
       reachableAps
@@ -4380,7 +4401,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                       String.format("%s received %s from %s", terminalState, ap, sources)));
     }
     BDDPacket pkt = new BDDPacket();
-    Map<Integer, BDD> apBDDs = bddTrieGraphFactory.getApBDDs();
+    Map<Integer, BDD> apBDDs = graphFactory.getApBDDs();
     List<MultipathConsistencyViolation> violations = graph.detectMultipathInconsistency();
     for (MultipathConsistencyViolation violation : violations) {
       BDD pred = apBDDs.get(violation.predicate).fullSatOne();
@@ -4416,8 +4437,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
               pkt.getTcpUrg().and(pred).isZero() ? 0 : 1,
               violation.finalStates));
     }
-
-    throw new BatfishException("Done baby");
   }
 
   private void benchmarkAtomicPredicates(NetworkGraphFactory graphFactory) {
