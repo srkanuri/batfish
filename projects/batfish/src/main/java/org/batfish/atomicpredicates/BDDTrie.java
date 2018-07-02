@@ -113,6 +113,8 @@ public class BDDTrie {
     /** Invariant: For all i, _children[i]._headerspace is a strict subset of _headerspace. */
     final List<Node> _children;
 
+    int _inserts = 0;
+
     Node(BDD headerspace) {
       this(headerspace, new ArrayList<>());
     }
@@ -123,6 +125,7 @@ public class BDDTrie {
       _headerspaceMinusChildren = Suppliers.memoize(this::computeHeaderspaceMinusChildren);
       _notHeaderspace = Suppliers.memoize(_headerspace::not);
       _id = Suppliers.memoize(this::computeAtomicPredicateId);
+      _inserts = 0;
     }
 
     private void computeIds() {
@@ -183,6 +186,7 @@ public class BDDTrie {
     Stream<Node> insert(BDD bdd) {
       // invariant: bdd is a subset of _headerspace
       assert !bdd.isZero() && bdd.imp(_headerspace).isOne();
+      _inserts++;
 
       if (_headerspace.equals(bdd)) {
         return Stream.of(this);

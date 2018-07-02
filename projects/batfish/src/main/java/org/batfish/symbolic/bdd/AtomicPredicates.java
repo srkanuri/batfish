@@ -3,6 +3,7 @@ package org.batfish.symbolic.bdd;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.ImmutableSortedSet.Builder;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -20,7 +21,6 @@ public class AtomicPredicates implements BDDAtomizer {
   public AtomicPredicates(Collection<BDD> bdds) {
     List<BDD> atoms = ImmutableList.of(bdds.iterator().next().getFactory().one());
 
-    long totalTime = System.currentTimeMillis();
     _roundTimes = new long[bdds.size()];
     _roundSizes = new int[bdds.size()];
     int round = 0;
@@ -39,7 +39,7 @@ public class AtomicPredicates implements BDDAtomizer {
       _roundSizes[round] = atoms.size();
       round++;
     }
-    _totalTime = System.currentTimeMillis() - totalTime;
+    _totalTime = Arrays.stream(_roundTimes).sum();
     _atoms = ImmutableList.copyOf(atoms);
   }
 
