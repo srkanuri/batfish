@@ -1,14 +1,31 @@
 package org.batfish.question;
+// Vasu: When we wanted to migrate code to extension-pack
+// package com.intentionet.ext_questions.outliersanalyzer;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.SortedMap;
@@ -16,23 +33,42 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
 import org.batfish.common.plugin.IBatfish;
 import org.batfish.common.plugin.Plugin;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.answers.AnswerElement;
+import org.batfish.datamodel.answers.Schema;
 import org.batfish.datamodel.collections.NamedStructureEquivalenceSet;
 import org.batfish.datamodel.collections.NamedStructureEquivalenceSets;
 import org.batfish.datamodel.collections.NamedStructureOutlierSet;
 import org.batfish.datamodel.collections.OutlierSet;
+import org.batfish.datamodel.pojo.Node;
+import org.batfish.datamodel.questions.DisplayHints;
+import org.batfish.datamodel.questions.HypothesisPropertySpecifier;
 import org.batfish.datamodel.questions.INodeRegexQuestion;
 import org.batfish.datamodel.questions.NodesSpecifier;
+import org.batfish.datamodel.questions.PropertySpecifier;
 import org.batfish.datamodel.questions.Question;
+import org.batfish.datamodel.table.ColumnMetadata;
+import org.batfish.datamodel.table.Row;
+import org.batfish.datamodel.table.Row.RowBuilder;
+import org.batfish.datamodel.table.TableAnswerElement;
+import org.batfish.datamodel.table.TableMetadata;
 import org.batfish.role.OutliersHypothesis;
+
+// import java.util.regex.Pattern;
+
+// import java.util.regex.Pattern;
+
+// import java.util.regex.Pattern;
 
 @AutoService(Plugin.class)
 public class OutliersQuestionPlugin extends QuestionPlugin {
+
+  public static final String COL_NODE = "node";
 
   public static class OutliersAnswerElement extends AnswerElement {
 
@@ -125,6 +161,7 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
   public static class OutliersAnswerer extends Answerer {
 
+    static final String COL_ISSUE = "outliersIssue";
     private OutliersAnswerElement _answerElement;
 
     private Map<String, Configuration> _configurations;
@@ -176,22 +213,86 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
     }
 
     private <T> void addPropertyOutliers(
-        String name, Function<Configuration, T> accessor, SortedSet<OutlierSet<T>> rankedOutliers) {
+        String name,
+        Function<Configuration, T> accessor,
+        TableAnswerElement innerTableT,
+        int colIndexT,
+        SortedSet<OutlierSet<T>> rankedOutliers) {
 
       // partition the nodes into equivalence classes based on their values for the
       // property of interest
       Map<T, SortedSet<String>> equivSets = new HashMap<>();
+      Map<T, SortedSet<String>> equivSetsT = new HashMap<>();
+
+      /*
+      Vasu: here we can traverse through all the rows to handle each node, which keeping each
+      column constant for each server.
+      */
+
+      // break down the table into its various values and corresponding keys
+      Multimap<List<Object>, List<Object>> valueToKeys = HashMultimap.create();
+
+      innerTableT
+          .getRows()
+          .getData()
+          .forEach(
+              row -> {
+                valueToKeys.put(
+                    row.getValue(innerTableT.getMetadata().getColumnMetadata()),
+                    row.getKey(innerTableT.getMetadata().getColumnMetadata()));
+              });
+
+      for (Row row : innerTableT.getRows().getData()) {
+        // List of all the row entries
+        // List<Object> rowKeys = row.getKey(innerTableT.getMetadata().getColumnMetadata());
+        // Object rowVal =
+        //    row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
+        // Object colValues = row.get(name);
+        // Object rowKey = row.getKey(innerTableT.getMetadata().getColumnMetadata()).get(0);
+        // List<Object> rowMeta = row.getKey(innerTableT.getMetadata().getColumnMetadata());
+        // JsonNode rowNode = row.get("node");
+        // TreeNode rowNodeDetails = row.get("node");
+        // String rowNodeName2 = String.valueOf(row.get("node").get("name"));
+
+        // Node Name specific to that row.
+        String rowNodeName = row.get("node").get("name").toString();
+        rowNodeName.replace("\"\"", "\"");
+
+        // Row Entry specific  to column "colIndexT"
+        Object rowValueDef =
+            row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
+
+        SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
+        // Working node.
+        // T definitionTemp1 = (T) accessor.apply(_configurations.get("as1border2"));
+
+        // matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
+        matchingNodesTemp.add(rowNodeName);
+        equivSetsT.put((T) rowValueDef, matchingNodesTemp);
+
+        List<Object> rowValues = row.getValue(innerTableT.getMetadata().getColumnMetadata());
+        Collection<List<Object>> outlierNessT2 = valueToKeys.get(rowValues);
+        JsonNode rowNodeID2 = row.get("node").get("id");
+      }
+
       for (String node : _nodes) {
-        T definition = accessor.apply(_configurations.get(node));
+        T definition = (T) accessor.apply(_configurations.get(node));
         SortedSet<String> matchingNodes = equivSets.getOrDefault(definition, new TreeSet<>());
         matchingNodes.add(node);
         equivSets.put(definition, matchingNodes);
       }
 
+      List<Object> mostPopularValues =
+          Collections.max(
+              valueToKeys.keySet(), Comparator.comparingInt(k -> valueToKeys.get(k).size()));
+
+      Collection<List<Object>> nodeswithPopularValues = valueToKeys.get(mostPopularValues);
+      int mostPopularSize = valueToKeys.get(mostPopularValues).size();
+
       // the equivalence class of the largest size is treated as the one whose value is
       // hypothesized to be the correct one
       Map.Entry<T, SortedSet<String>> max =
-          equivSets
+          equivSetsT
               .entrySet()
               .stream()
               .max(Comparator.comparingInt(e -> e.getValue().size()))
@@ -199,13 +300,16 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
                   () -> new BatfishException("Set " + name + " has no equivalence classes"));
       SortedSet<String> conformers = max.getValue();
       T definition = max.getKey();
-      equivSets.remove(definition);
+      equivSetsT.remove(definition);
+      // equivSets.remove((T) rowValueDef);
+
       SortedSet<String> outliers = new TreeSet<>();
-      for (SortedSet<String> nodes : equivSets.values()) {
+      for (SortedSet<String> nodes : equivSetsT.values()) {
         outliers.addAll(nodes);
       }
       if (_verbose || isWithinThreshold(conformers, outliers)) {
         rankedOutliers.add(new OutlierSet<T>(name, definition, conformers, outliers));
+        // Vasu: Dummy code to stop debugger.
       }
     }
 
@@ -219,6 +323,22 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       _nodes = question.getNodeRegex().getMatchingNodes(_batfish);
       _verbose = question.getVerbose();
 
+      //      // Vasu code changes to table input
+      //      TableMetadata tableMetadata = createMetadata(question);
+      //      TableAnswerElement inneranswertable = new TableAnswerElement(tableMetadata);
+      //      Multiset<Row> propertyRows =
+      //          rawAnswer(question, _configurations, _nodes, tableMetadata.toColumnMap());
+      //      inneranswertable.postProcessAnswer(question, propertyRows);
+      //
+      //      if (!(inneranswertable instanceof TableAnswerElement)) {
+      //        throw new IllegalArgumentException("The inner question does not produce table
+      // answers");
+      //      }
+      //
+      //      TableMetadata metadata = createMetadata(question, inneranswertable);
+      //      // Multiset<Row> issues = rawAnswer(question, inneranswertable,
+      // metadata.toColumnMap());
+
       switch (question.getHypothesis()) {
         case SAME_DEFINITION:
         case SAME_NAME:
@@ -227,6 +347,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
           break;
         case SAME_SERVERS:
           _answerElement.setServerOutliers(serverOutliers(question));
+          // serverOutliers(question, inneranswertable, metadata.toColumnMap()));
+
           break;
         default:
           throw new BatfishException(
@@ -234,6 +356,82 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       }
 
       return _answerElement;
+    }
+
+    @VisibleForTesting
+    static Multiset<Row> rawAnswer(
+        OutliersQuestion question,
+        Map<String, Configuration> configurations,
+        Set<String> nodes,
+        Map<String, ColumnMetadata> columns) {
+      Multiset<Row> rows = HashMultiset.create();
+
+      for (String nodeName : nodes) {
+        RowBuilder row = Row.builder(columns).put(COL_NODE, new Node(nodeName));
+
+        for (String property : question.getPropertySpec().getMatchingProperties()) {
+          PropertySpecifier.fillProperty(
+              HypothesisPropertySpecifier.JAVA_MAP.get(property),
+              configurations.get(nodeName),
+              property,
+              row);
+        }
+
+        rows.add(row.build());
+      }
+
+      return rows;
+    }
+
+    /**
+     * Creates a {@link TableMetadata} object from the question.
+     *
+     * @param question The question
+     * @return The resulting {@link TableMetadata} object
+     */
+    static TableMetadata createMetadata(OutliersQuestion question) {
+      List<ColumnMetadata> columnMetadata =
+          new Builder<ColumnMetadata>()
+              .add(new ColumnMetadata(COL_NODE, Schema.NODE, "Node", true, false))
+              .addAll(
+                  question
+                      .getPropertySpec()
+                      .getMatchingProperties()
+                      .stream()
+                      .map(
+                          prop ->
+                              new ColumnMetadata(
+                                  prop,
+                                  HypothesisPropertySpecifier.JAVA_MAP.get(prop).getSchema(),
+                                  "Property " + prop,
+                                  false,
+                                  true))
+                      .collect(Collectors.toList()))
+              .build();
+
+      DisplayHints dhints = question.getDisplayHints();
+      if (dhints == null) {
+        dhints = new DisplayHints();
+        dhints.setTextDesc(String.format("Properties of node ${%s}.", COL_NODE));
+      }
+      return new TableMetadata(columnMetadata, dhints);
+    }
+
+    static TableMetadata createMetadata(Question question, TableAnswerElement inputTable) {
+      List<ColumnMetadata> columnMetadataMap =
+          new ImmutableList.Builder<ColumnMetadata>()
+              .addAll(inputTable.getMetadata().getColumnMetadata())
+              .add(
+                  new ColumnMetadata(
+                      COL_ISSUE, Schema.ISSUE, "Issue flagged by outliers analysis", false, false))
+              .build();
+
+      DisplayHints dhints = question.getDisplayHints();
+      if (dhints == null) {
+        dhints = new DisplayHints();
+        dhints.setTextDesc("Value is an outlier.");
+      }
+      return new TableMetadata(columnMetadataMap, dhints);
     }
 
     // check that there is at least one outlier, but also that the fraction of outliers
@@ -297,35 +495,80 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       return outliers;
     }
 
+    //    private SortedSet<OutlierSet<NavigableSet<String>>> serverOutliers(OutliersQuestion
+    // question
+    //        //        TableAnswerElement innerTable,
+    //        //        Map<String, ColumnMetadata> columns
+    //        ) {
+
     private SortedSet<OutlierSet<NavigableSet<String>>> serverOutliers(OutliersQuestion question) {
-      SortedSet<String> serverSets = new TreeSet<>(question.getServerSets());
+
+      int colIndex = 0;
+      TableMetadata tableMetadata = createMetadata(question);
+      TableAnswerElement inneranswertable = new TableAnswerElement(tableMetadata);
+      Multiset<Row> propertyRows =
+          rawAnswer(question, _configurations, _nodes, tableMetadata.toColumnMap());
+      inneranswertable.postProcessAnswer(question, propertyRows);
+
+      if (!(inneranswertable instanceof TableAnswerElement)) {
+        throw new IllegalArgumentException("The inner question does not produce table answers");
+      }
+
+      TableMetadata metadata = createMetadata(question, inneranswertable);
+      SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
+
+      // Multiset<Row> issues = rawAnswer(question, inneranswertable, metadata.toColumnMap());
+      // Multiset<Row> issues = HashMultiset.create();
+      // String minorIssueType = getMinorIssueType(innerTable.getMetadata());
+      // SortedSet<String> serverSets = new TreeSet<>(question.getServerSets());
 
       SortedMap<String, Function<Configuration, NavigableSet<String>>> serverSetAccessors =
           new TreeMap<>();
-      serverSetAccessors.put("DnsServers", Configuration::getDnsServers);
+
+      // Vasu: This is required to be removed and data to be used from the table.
       serverSetAccessors.put("LoggingServers", Configuration::getLoggingServers);
       serverSetAccessors.put("NtpServers", Configuration::getNtpServers);
-      serverSetAccessors.put("SnmpTrapServers", Configuration::getSnmpTrapServers);
       serverSetAccessors.put("TacacsServers", Configuration::getTacacsServers);
+      serverSetAccessors.put("DnsServers", Configuration::getDnsServers);
+      serverSetAccessors.put("SnmpTrapServers", Configuration::getSnmpTrapServers);
 
-      if (serverSets.isEmpty()) {
-        serverSets.addAll(serverSetAccessors.keySet());
-      }
+      //
+      //      if (serverSets.isEmpty()) {
+      //        serverSets.addAll(serverSetAccessors.keySet());
+      //      }
+      //      // SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
+      //
+      //      for (String serverSet : serverSets) {
+      //        Function<Configuration, NavigableSet<String>> accessorF =
+      // serverSetAccessors.get(serverSet);
+      //        if (accessorF != null) {
+      //          addPropertyOutliers(serverSet, accessorF, rankedOutliers);
+      //        }
+      //      }
+      //
+      //      if (!_verbose) {
+      //        // remove outlier sets where the hypothesis is that a particular server set
+      //        // should be empty. such hypotheses do not seem to be useful in general.
+      //        rankedOutliers.removeIf(oset -> oset.getDefinition().isEmpty());
+      //      }
 
-      SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
-      for (String serverSet : serverSets) {
-        Function<Configuration, NavigableSet<String>> accessorF = serverSetAccessors.get(serverSet);
-        if (accessorF != null) {
-          addPropertyOutliers(serverSet, accessorF, rankedOutliers);
+      Map<String, Configuration> popularVals = new TreeMap<>();
+
+      Iterator<Entry<String, ColumnMetadata>> iterator =
+          tableMetadata.toColumnMap().entrySet().iterator();
+      while (iterator.hasNext()) {
+        Entry<String, ColumnMetadata> entry = iterator.next();
+        String serverSet_2 = entry.getValue().getName();
+        if (!(serverSet_2.equalsIgnoreCase("node")
+            || serverSet_2.equalsIgnoreCase("outliersIssue"))) {
+          // Vasu: need to remove the accessor stuff.
+          Function<Configuration, NavigableSet<String>> accessorF2 =
+              serverSetAccessors.get(serverSet_2);
+
+          addPropertyOutliers(serverSet_2, accessorF2, inneranswertable, colIndex, rankedOutliers);
         }
+        colIndex++;
       }
-
-      if (!_verbose) {
-        // remove outlier sets where the hypothesis is that a particular server set
-        // should be empty. such hypotheses do not seem to be useful in general.
-        rankedOutliers.removeIf(oset -> oset.getDefinition().isEmpty());
-      }
-
       return rankedOutliers;
     }
 
@@ -427,6 +670,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
     private static final String PROP_VERBOSE = "verbose";
 
+    private static final String PROP_PROPERTY_SPEC = "propertySpec";
+
     private OutliersHypothesis _hypothesis;
 
     private SortedSet<String> _namedStructTypes;
@@ -435,13 +680,20 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
     private SortedSet<String> _serverSets;
 
+    private HypothesisPropertySpecifier _propertySpec;
+
     private boolean _verbose;
 
-    public OutliersQuestion() {
+    // private PropertySpecifier _propertySpec;
+
+    public OutliersQuestion(
+        @JsonProperty(PROP_NODE_REGEX) NodesSpecifier nodeRegex,
+        @JsonProperty(PROP_PROPERTY_SPEC) HypothesisPropertySpecifier propertySpec) {
       _namedStructTypes = new TreeSet<>();
       _serverSets = new TreeSet<>();
       _nodeRegex = NodesSpecifier.ALL;
       _hypothesis = OutliersHypothesis.SAME_DEFINITION;
+      _propertySpec = firstNonNull(propertySpec, HypothesisPropertySpecifier.ALL);
     }
 
     @Override
@@ -505,6 +757,11 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
     public void setVerbose(boolean verbose) {
       _verbose = verbose;
     }
+
+    @JsonProperty(PROP_PROPERTY_SPEC)
+    public PropertySpecifier getPropertySpec() {
+      return _propertySpec;
+    }
   }
 
   @Override
@@ -514,6 +771,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
   @Override
   protected OutliersQuestion createQuestion() {
-    return new OutliersQuestion();
+    return new OutliersQuestion(null, null);
   }
 }

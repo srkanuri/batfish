@@ -18,6 +18,8 @@ public enum OutliersHypothesis {
 
   private static final Map<String, OutliersHypothesis> _map = buildMap();
 
+  // private Pattern _pattern;
+
   private static Map<String, OutliersHypothesis> buildMap() {
     ImmutableMap.Builder<String, OutliersHypothesis> map = ImmutableMap.builder();
     for (OutliersHypothesis value : OutliersHypothesis.values()) {

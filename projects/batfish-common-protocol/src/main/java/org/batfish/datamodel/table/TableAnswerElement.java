@@ -24,9 +24,13 @@ public final class TableAnswerElement extends AnswerElement {
 
   private static final String PROP_ROWS = "rows";
 
+  // private static final String PROP_COLS = "cols";
+
   private List<ExcludedRows> _excludedRows;
 
   private Rows _rows;
+
+  // private Cols _rows;
 
   private TableMetadata _tableMetadata;
 
@@ -129,6 +133,11 @@ public final class TableAnswerElement extends AnswerElement {
   public Rows getRows() {
     return _rows;
   }
+
+  //  @JsonProperty(PROP_ROWS)
+  //  public Rows getCols() {
+  //    return _cols;
+  //  }
 
   /**
    * Given an initial set of rows produced by an {@link org.batfish.common.Answerer}, this procedure
