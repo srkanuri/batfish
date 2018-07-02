@@ -27,9 +27,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
-import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.batfish.common.Answerer;
 import org.batfish.common.BatfishException;
@@ -243,8 +241,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         Object rowValueDef =
             row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
 
-        // Working Test node.
-        // T definitionTemp1 = (T) accessor.apply(_configurations.get("as1border2"));
         SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
         matchingNodesTemp.add(rowNodeName);
         equivSetsT.put((T) rowValueDef, matchingNodesTemp);
@@ -441,32 +437,29 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
       int colIndex = 0;
       TableMetadata tableMetadata = createMetadata(question);
-      TableAnswerElement inneranswertable = new TableAnswerElement(tableMetadata);
-      Multiset<Row> propertyRows =
-          rawAnswer(question, _configurations, _nodes, tableMetadata.toColumnMap());
-      inneranswertable.postProcessAnswer(question, propertyRows);
+      TableAnswerElement innerAnswerTable = new TableAnswerElement(tableMetadata);
+      Map<String, Configuration> configurations = _batfish.loadConfigurations();
+      Set<String> nodes = question.getNodeRegex().getMatchingNodes(_batfish);
 
-      if (!(inneranswertable instanceof TableAnswerElement)) {
+      Multiset<Row> propertyRows =
+          rawAnswer(question, configurations, nodes, tableMetadata.toColumnMap());
+      innerAnswerTable.postProcessAnswer(question, propertyRows);
+
+      if (!(innerAnswerTable instanceof TableAnswerElement)) {
         throw new IllegalArgumentException("The inner question does not produce table answers");
       }
 
-      TableMetadata metadata = createMetadata(question, inneranswertable);
+      // TableMetadata metadata = createMetadata(question, inneranswertable);
       SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
-
-      SortedMap<String, Function<Configuration, NavigableSet<String>>> serverSetAccessors =
-          new TreeMap<>();
-
-      Map<String, Configuration> popularVals = new TreeMap<>();
 
       Iterator<Entry<String, ColumnMetadata>> iterator =
           tableMetadata.toColumnMap().entrySet().iterator();
       while (iterator.hasNext()) {
         Entry<String, ColumnMetadata> entry = iterator.next();
-        String serverSet_2 = entry.getValue().getName();
-        if (!(serverSet_2.equalsIgnoreCase("node")
-            || serverSet_2.equalsIgnoreCase("outliersIssue"))) {
+        String serverSet = entry.getValue().getName();
+        if (!(serverSet.equalsIgnoreCase("node") || serverSet.equalsIgnoreCase("outliersIssue"))) {
 
-          addPropertyOutliers(serverSet_2, inneranswertable, colIndex, rankedOutliers);
+          addPropertyOutliers(serverSet, innerAnswerTable, colIndex, rankedOutliers);
         }
         colIndex++;
       }
