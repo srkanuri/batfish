@@ -27,10 +27,11 @@ public class AtomicPredicates implements BDDAtomizer {
 
     for (BDD pred1 : bdds) {
       _roundTimes[round] = System.currentTimeMillis();
+      BDD notPred1 = pred1.not();
       List<BDD> newPreds =
           atoms
               .stream()
-              .flatMap(pred2 -> Stream.of(pred1.and(pred2), pred1.not().and(pred2)))
+              .flatMap(pred2 -> Stream.of(pred1.and(pred2), notPred1.and(pred2)))
               .filter(bdd -> !bdd.isZero())
               .collect(ImmutableList.toImmutableList());
       atoms = newPreds;
