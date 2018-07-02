@@ -28,25 +28,22 @@ public class HypothesisPropertySpecifier extends PropertySpecifier {
 
   public static Map<String, PropertyDescriptor<Configuration>> JAVA_MAP =
       new ImmutableMap.Builder<String, PropertyDescriptor<Configuration>>()
-          //          .put(
-          //              "LoggingServers",
-          //              new PropertyDescriptor<>(Configuration::getLoggingServers,
-          // Schema.set(Schema.STRING)))
+          .put(
+              "LoggingServers",
+              new PropertyDescriptor<>(Configuration::getLoggingServers, Schema.set(Schema.STRING)))
           .put(
               "NtpServers",
               new PropertyDescriptor<>(Configuration::getNtpServers, Schema.set(Schema.STRING)))
-          //          .put(
-          //              "TacacsServers",
-          //              new PropertyDescriptor<>(Configuration::getTacacsServers,
-          // Schema.set(Schema.STRING)))
-          //          .put(
-          //              "DnsServers",
-          //              new PropertyDescriptor<>(
-          //                  Configuration::getDnsServers, Schema.set(Schema.STRING)))
-          //          .put(
-          //              "SnmpTrapServers",
-          //              new PropertyDescriptor<>(Configuration::getSnmpTrapServers,
-          // Schema.set(Schema.STRING)))
+          .put(
+              "TacacsServers",
+              new PropertyDescriptor<>(Configuration::getTacacsServers, Schema.set(Schema.STRING)))
+          .put(
+              "DnsServers",
+              new PropertyDescriptor<>(Configuration::getDnsServers, Schema.set(Schema.STRING)))
+          .put(
+              "SnmpTrapServers",
+              new PropertyDescriptor<>(
+                  Configuration::getSnmpTrapServers, Schema.set(Schema.STRING)))
           .build();
 
   public static final HypothesisPropertySpecifier ALL = new HypothesisPropertySpecifier(".*");

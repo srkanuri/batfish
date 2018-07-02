@@ -211,14 +211,12 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
     private <T> void addPropertyOutliers(
         String name,
-        // Function<Configuration, T> accessor,
         TableAnswerElement innerTableT,
         int colIndexT,
         SortedSet<OutlierSet<T>> rankedOutliers) {
 
       // partition the nodes into equivalence classes based on their values for the
       // property of interest
-      // Map<T, SortedSet<String>> equivSets = new HashMap<>();
       Map<T, SortedSet<String>> equivSetsT = new HashMap<>();
 
       // break down the table into its various values and corresponding keys
@@ -245,20 +243,12 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         Object rowValueDef =
             row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
 
-        // Working node.
+        // Working Test node.
         // T definitionTemp1 = (T) accessor.apply(_configurations.get("as1border2"));
         SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
         matchingNodesTemp.add(rowNodeName);
         equivSetsT.put((T) rowValueDef, matchingNodesTemp);
       }
-
-      //      for (String node : _nodes) {
-      //        T definition = (T) accessor.apply(_configurations.get(node));
-      //        SortedSet<String> matchingNodes = equivSets.getOrDefault(definition, new
-      // TreeSet<>());
-      //        matchingNodes.add(node);
-      //        equivSets.put(definition, matchingNodes);
-      //      }
 
       // the equivalence class of the largest size is treated as the one whose value is
       // hypothesized to be the correct one
@@ -279,8 +269,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       }
       if (_verbose || isWithinThreshold(conformers, outliers)) {
         rankedOutliers.add(new OutlierSet<T>(name, definition, conformers, outliers));
-        // Vasu: Dummy code to stop debugger.
-        Multimap<List<Object>, List<Object>> valueToKeysDummyTest = HashMultimap.create();
       }
     }
 
@@ -294,22 +282,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       _nodes = question.getNodeRegex().getMatchingNodes(_batfish);
       _verbose = question.getVerbose();
 
-      //      // Vasu code changes to table input
-      //      TableMetadata tableMetadata = createMetadata(question);
-      //      TableAnswerElement inneranswertable = new TableAnswerElement(tableMetadata);
-      //      Multiset<Row> propertyRows =
-      //          rawAnswer(question, _configurations, _nodes, tableMetadata.toColumnMap());
-      //      inneranswertable.postProcessAnswer(question, propertyRows);
-      //
-      //      if (!(inneranswertable instanceof TableAnswerElement)) {
-      //        throw new IllegalArgumentException("The inner question does not produce table
-      // answers");
-      //      }
-      //
-      //      TableMetadata metadata = createMetadata(question, inneranswertable);
-      //      // Multiset<Row> issues = rawAnswer(question, inneranswertable,
-      // metadata.toColumnMap());
-
       switch (question.getHypothesis()) {
         case SAME_DEFINITION:
         case SAME_NAME:
@@ -318,7 +290,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
           break;
         case SAME_SERVERS:
           _answerElement.setServerOutliers(serverOutliers(question));
-          // serverOutliers(question, inneranswertable, metadata.toColumnMap()));
 
           break;
         default:
@@ -466,12 +437,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       return outliers;
     }
 
-    //    private SortedSet<OutlierSet<NavigableSet<String>>> serverOutliers(OutliersQuestion
-    // question
-    //        //        TableAnswerElement innerTable,
-    //        //        Map<String, ColumnMetadata> columns
-    //        ) {
-
     private SortedSet<OutlierSet<NavigableSet<String>>> serverOutliers(OutliersQuestion question) {
 
       int colIndex = 0;
@@ -488,40 +453,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       TableMetadata metadata = createMetadata(question, inneranswertable);
       SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
 
-      // Multiset<Row> issues = rawAnswer(question, inneranswertable, metadata.toColumnMap());
-      // Multiset<Row> issues = HashMultiset.create();
-      // String minorIssueType = getMinorIssueType(innerTable.getMetadata());
-      // SortedSet<String> serverSets = new TreeSet<>(question.getServerSets());
-
       SortedMap<String, Function<Configuration, NavigableSet<String>>> serverSetAccessors =
           new TreeMap<>();
-
-      // Vasu: This is required to be removed and data to be used from the table.
-      serverSetAccessors.put("LoggingServers", Configuration::getLoggingServers);
-      serverSetAccessors.put("NtpServers", Configuration::getNtpServers);
-      serverSetAccessors.put("TacacsServers", Configuration::getTacacsServers);
-      serverSetAccessors.put("DnsServers", Configuration::getDnsServers);
-      serverSetAccessors.put("SnmpTrapServers", Configuration::getSnmpTrapServers);
-
-      //
-      //      if (serverSets.isEmpty()) {
-      //        serverSets.addAll(serverSetAccessors.keySet());
-      //      }
-      //      // SortedSet<OutlierSet<NavigableSet<String>>> rankedOutliers = new TreeSet<>();
-      //
-      //      for (String serverSet : serverSets) {
-      //        Function<Configuration, NavigableSet<String>> accessorF =
-      // serverSetAccessors.get(serverSet);
-      //        if (accessorF != null) {
-      //          addPropertyOutliers(serverSet, accessorF, rankedOutliers);
-      //        }
-      //      }
-      //
-      //      if (!_verbose) {
-      //        // remove outlier sets where the hypothesis is that a particular server set
-      //        // should be empty. such hypotheses do not seem to be useful in general.
-      //        rankedOutliers.removeIf(oset -> oset.getDefinition().isEmpty());
-      //      }
 
       Map<String, Configuration> popularVals = new TreeMap<>();
 
@@ -532,13 +465,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         String serverSet_2 = entry.getValue().getName();
         if (!(serverSet_2.equalsIgnoreCase("node")
             || serverSet_2.equalsIgnoreCase("outliersIssue"))) {
-          // Vasu: need to remove the accessor stuff.
-          Function<Configuration, NavigableSet<String>> accessorF2 =
-              serverSetAccessors.get(serverSet_2);
 
           addPropertyOutliers(serverSet_2, inneranswertable, colIndex, rankedOutliers);
-          // addPropertyOutliers(serverSet_2, accessorF2, inneranswertable, colIndex,
-          // rankedOutliers);
         }
         colIndex++;
       }
