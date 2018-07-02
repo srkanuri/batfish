@@ -19,6 +19,7 @@ import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -237,13 +238,19 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         String rowNodeName = row.get("node").get("name").toString();
         rowNodeName.replace("\"\"", "\"");
 
-        // Row Entry specific  to column "colIndexT"
         Object rowValueDef =
             row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
 
+        HashSet<String> rowValueDefHash = new HashSet<String>();
+        rowValueDefHash =
+            (HashSet<String>)
+                row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
+
+        Set<String> rowValueDefTree = new TreeSet<String>(rowValueDefHash);
+
         SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
         matchingNodesTemp.add(rowNodeName);
-        equivSetsT.put((T) rowValueDef, matchingNodesTemp);
+        equivSetsT.put((T) rowValueDefTree, matchingNodesTemp);
       }
 
       // the equivalence class of the largest size is treated as the one whose value is
@@ -264,7 +271,7 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         outliers.addAll(nodes);
       }
       if (_verbose || isWithinThreshold(conformers, outliers)) {
-        rankedOutliers.add(new OutlierSet<T>(name, definition, conformers, outliers));
+        rankedOutliers.add(new OutlierSet(name, definition, conformers, outliers));
       }
     }
 
