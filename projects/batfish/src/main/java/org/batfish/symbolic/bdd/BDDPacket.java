@@ -26,6 +26,10 @@ public class BDDPacket {
   private static BDDPairing pairing;
 
   static {
+    initFactory();
+  }
+
+  public static void initFactory() {
     factory = JFactory.init(10000, 1000);
     factory.disableReorder();
     factory.setCacheRatio(64);

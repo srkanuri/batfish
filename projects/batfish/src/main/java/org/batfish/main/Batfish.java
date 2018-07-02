@@ -4362,7 +4362,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     long time = System.currentTimeMillis();
     NetworkGraphFactory bddTrieGraphFactory;
     if (doBDDTrie) {
-      BDDPacket.factory.reset();
+      BDDPacket.initFactory();
       bddTrieGraphFactory =
           new NetworkGraphFactory(
               configurations, forwardingAnalysis, BDDTrieAtomizer::new, dstIpOnly);
@@ -4372,7 +4372,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     time = System.currentTimeMillis();
     NetworkGraphFactory atomicPredicatesGraphFactory;
     if (doNaive) {
-      BDDPacket.factory.reset();
+      BDDPacket.initFactory();
       atomicPredicatesGraphFactory =
           new NetworkGraphFactory(
               configurations, forwardingAnalysis, AtomicPredicates::new, dstIpOnly);
