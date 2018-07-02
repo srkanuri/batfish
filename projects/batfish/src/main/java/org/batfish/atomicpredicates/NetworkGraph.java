@@ -10,7 +10,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
-import com.google.common.collect.TreeMultimap;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -64,7 +63,7 @@ public final class NetworkGraph {
             _graphRoots.keySet().stream(),
             _transitions.keySet().stream(),
             _transitions.values().stream().map(Map::keySet).flatMap(Set::stream))
-        .forEach(state -> _reachableAps.put(state, TreeMultimap.<Integer, StateExpr>create()));
+        .forEach(state -> _reachableAps.put(state, HashMultimap.create()));
 
     _graphRoots.forEach(
         (stateExpr, aps) -> {
