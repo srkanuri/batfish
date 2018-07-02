@@ -5,7 +5,6 @@ package org.batfish.question;
 import static com.google.common.base.MoreObjects.firstNonNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
@@ -18,8 +17,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -214,20 +211,15 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
     private <T> void addPropertyOutliers(
         String name,
-        Function<Configuration, T> accessor,
+        // Function<Configuration, T> accessor,
         TableAnswerElement innerTableT,
         int colIndexT,
         SortedSet<OutlierSet<T>> rankedOutliers) {
 
       // partition the nodes into equivalence classes based on their values for the
       // property of interest
-      Map<T, SortedSet<String>> equivSets = new HashMap<>();
+      // Map<T, SortedSet<String>> equivSets = new HashMap<>();
       Map<T, SortedSet<String>> equivSetsT = new HashMap<>();
-
-      /*
-      Vasu: here we can traverse through all the rows to handle each node, which keeping each
-      column constant for each server.
-      */
 
       // break down the table into its various values and corresponding keys
       Multimap<List<Object>, List<Object>> valueToKeys = HashMultimap.create();
@@ -242,17 +234,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
                     row.getKey(innerTableT.getMetadata().getColumnMetadata()));
               });
 
+      /*Traverse each row of the table to handle the data.*/
       for (Row row : innerTableT.getRows().getData()) {
-        // List of all the row entries
-        // List<Object> rowKeys = row.getKey(innerTableT.getMetadata().getColumnMetadata());
-        // Object rowVal =
-        //    row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
-        // Object colValues = row.get(name);
-        // Object rowKey = row.getKey(innerTableT.getMetadata().getColumnMetadata()).get(0);
-        // List<Object> rowMeta = row.getKey(innerTableT.getMetadata().getColumnMetadata());
-        // JsonNode rowNode = row.get("node");
-        // TreeNode rowNodeDetails = row.get("node");
-        // String rowNodeName2 = String.valueOf(row.get("node").get("name"));
 
         // Node Name specific to that row.
         String rowNodeName = row.get("node").get("name").toString();
@@ -262,32 +245,20 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
         Object rowValueDef =
             row.getValue(innerTableT.getMetadata().getColumnMetadata()).get(colIndexT - 1);
 
-        SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
         // Working node.
         // T definitionTemp1 = (T) accessor.apply(_configurations.get("as1border2"));
-
-        // matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
+        SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
         matchingNodesTemp.add(rowNodeName);
         equivSetsT.put((T) rowValueDef, matchingNodesTemp);
-
-        List<Object> rowValues = row.getValue(innerTableT.getMetadata().getColumnMetadata());
-        Collection<List<Object>> outlierNessT2 = valueToKeys.get(rowValues);
-        JsonNode rowNodeID2 = row.get("node").get("id");
       }
 
-      for (String node : _nodes) {
-        T definition = (T) accessor.apply(_configurations.get(node));
-        SortedSet<String> matchingNodes = equivSets.getOrDefault(definition, new TreeSet<>());
-        matchingNodes.add(node);
-        equivSets.put(definition, matchingNodes);
-      }
-
-      List<Object> mostPopularValues =
-          Collections.max(
-              valueToKeys.keySet(), Comparator.comparingInt(k -> valueToKeys.get(k).size()));
-
-      Collection<List<Object>> nodeswithPopularValues = valueToKeys.get(mostPopularValues);
-      int mostPopularSize = valueToKeys.get(mostPopularValues).size();
+      //      for (String node : _nodes) {
+      //        T definition = (T) accessor.apply(_configurations.get(node));
+      //        SortedSet<String> matchingNodes = equivSets.getOrDefault(definition, new
+      // TreeSet<>());
+      //        matchingNodes.add(node);
+      //        equivSets.put(definition, matchingNodes);
+      //      }
 
       // the equivalence class of the largest size is treated as the one whose value is
       // hypothesized to be the correct one
@@ -301,7 +272,6 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       SortedSet<String> conformers = max.getValue();
       T definition = max.getKey();
       equivSetsT.remove(definition);
-      // equivSets.remove((T) rowValueDef);
 
       SortedSet<String> outliers = new TreeSet<>();
       for (SortedSet<String> nodes : equivSetsT.values()) {
@@ -310,6 +280,7 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
       if (_verbose || isWithinThreshold(conformers, outliers)) {
         rankedOutliers.add(new OutlierSet<T>(name, definition, conformers, outliers));
         // Vasu: Dummy code to stop debugger.
+        Multimap<List<Object>, List<Object>> valueToKeysDummyTest = HashMultimap.create();
       }
     }
 
@@ -565,7 +536,9 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
           Function<Configuration, NavigableSet<String>> accessorF2 =
               serverSetAccessors.get(serverSet_2);
 
-          addPropertyOutliers(serverSet_2, accessorF2, inneranswertable, colIndex, rankedOutliers);
+          addPropertyOutliers(serverSet_2, inneranswertable, colIndex, rankedOutliers);
+          // addPropertyOutliers(serverSet_2, accessorF2, inneranswertable, colIndex,
+          // rankedOutliers);
         }
         colIndex++;
       }
