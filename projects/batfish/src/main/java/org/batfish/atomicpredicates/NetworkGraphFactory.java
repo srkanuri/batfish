@@ -54,7 +54,6 @@ public class NetworkGraphFactory {
   private Map<String, Map<String, BDD>> _aclDenyBDDs;
   private Map<String, Map<String, BDD>> _aclPermitBDDs;
   private Map<org.batfish.datamodel.Edge, BDD> _arpTrueEdgeBDDs;
-  private final Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> _apTransitions;
   private final Map<BDD, SortedSet<Integer>> _bddAtoms;
   private final BDDFactory _bddFactory;
   private final BDDOps _bddOps;
@@ -123,8 +122,6 @@ public class NetworkGraphFactory {
     long startPredAps = System.currentTimeMillis();
     _bddAtoms = toImmutableMap(_bddPredicates, Function.identity(), _atomizer::atoms);
     _timePredAps = System.currentTimeMillis() - startPredAps;
-
-    _apTransitions = computeAPTransitions();
   }
 
   private Map<String, Map<String, BDDAcl>> computeBDDAcls(Map<String, Configuration> configs) {
@@ -231,10 +228,6 @@ public class NetworkGraphFactory {
 
   Map<String, Map<String, BDD>> getVrfAcceptBDDs() {
     return _vrfAcceptBDDs;
-  }
-
-  public Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> getApTransitions() {
-    return _apTransitions;
   }
 
   public BDDFactory getBDDFactory() {
@@ -711,7 +704,7 @@ public class NetworkGraphFactory {
       }
     }
 
-    return new NetworkGraph(roots, _apTransitions);
+    return new NetworkGraph(roots, computeAPTransitions());
   }
 
   @VisibleForTesting

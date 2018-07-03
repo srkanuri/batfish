@@ -65,7 +65,7 @@ public class NetworkGraphTest {
     List<BDD> apBDDs = _graphFactory.getApBDDs();
     Map<StateExpr, Map<StateExpr, BDD>> bddTransitions = _graphFactory.getBDDTransitions();
     Map<StateExpr, Map<StateExpr, SortedSet<Integer>>> apTransitions =
-        _graphFactory.getApTransitions();
+        _graphFactory.computeAPTransitions();
     apTransitions.forEach(
         (src, srcTransitions) ->
             srcTransitions.forEach(

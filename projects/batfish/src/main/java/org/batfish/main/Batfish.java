@@ -4357,7 +4357,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     boolean doBDDTrie = true;
     boolean doNaive = true;
-    boolean dstIpOnly = false;
+    boolean dstIpOnly = true;
 
     long time = System.currentTimeMillis();
     NetworkGraphFactory bddTrieGraphFactory;

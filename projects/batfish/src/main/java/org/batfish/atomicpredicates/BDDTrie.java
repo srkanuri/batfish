@@ -25,8 +25,9 @@ import net.sf.javabdd.BDD;
  * headerspace into headerspaces such that for each one, the network does not distinguish between
  * any to headers in that space.
  *
- * <p>Each node represents the headerspace described by its BDD minus the headerspaces of its
- * children.
+ * <p>Each leaf node is an atomic predicate. Leaf nodes can be split into multiple disjoint subtries
+ *
+ * <p>The headerspace of each internal node is equal to the union of its children's headerspaces.
  */
 public class BDDTrie {
   public final class AtomicPredicate {
@@ -47,45 +48,6 @@ public class BDDTrie {
     }
   }
 
-  interface Atoms {
-    Stream<AtomicPredicate> atomEntries();
-  }
-
-  /*
-   * An internal node has already been divided, so don't include child entries.
-   */
-  static class InternalNodeAtoms implements Atoms {
-    private final Node _node;
-
-    InternalNodeAtoms(Node node) {
-      assert node._children == null || node._children.size() == 0;
-      _node = node;
-    }
-
-    @Override
-    public Stream<AtomicPredicate> atomEntries() {
-      return _node.atomicPredicate();
-    }
-  }
-
-  /*
-   * A leaf node haven't been divided yet, but we know that once it is, all children will be
-   * subsets. Use this when we want to include them all.
-   */
-  static class LeafNodeAtoms implements Atoms {
-    private final Node _node;
-
-    LeafNodeAtoms(Node node) {
-      assert node._children.size() > 0;
-      _node = node;
-    }
-
-    @Override
-    public Stream<AtomicPredicate> atomEntries() {
-      return _node.atomicPredicates();
-    }
-  }
-
   public static class BDDTrieException extends Exception {
     private static final long serialVersionUID = 0;
 
@@ -102,11 +64,9 @@ public class BDDTrie {
 
   private class Node {
     // the original space.
-    final BDD _headerspace;
+    BDD _headerspace;
     // the negation of the original headerspace
-    final Supplier<BDD> _notHeaderspace;
-    // headerspace minus children headerspaces
-    final Supplier<BDD> _headerspaceMinusChildren;
+    Supplier<BDD> _notHeaderspace;
 
     final Supplier<Integer> _id;
 
@@ -123,10 +83,16 @@ public class BDDTrie {
     Node(BDD headerspace, List<Node> children) {
       _children = children;
       _headerspace = headerspace;
-      _headerspaceMinusChildren = Suppliers.memoize(this::computeHeaderspaceMinusChildren);
       _notHeaderspace = Suppliers.memoize(_headerspace::not);
       _id = Suppliers.memoize(this::computeAtomicPredicateId);
       _size = 1 + children.stream().map(c -> c._size).reduce(0, (x, y) -> x + y);
+      assert _children.stream().noneMatch(child -> child._headerspace.equals(_headerspace));
+      assert _children.isEmpty()
+          || _children
+              .stream()
+              .map(node -> node._headerspace)
+              .reduce(_headerspace.getFactory().zero(), BDD::or)
+              .equals(_headerspace);
     }
 
     private void computeIds() {
@@ -137,28 +103,19 @@ public class BDDTrie {
     }
 
     private @Nullable Integer computeAtomicPredicateId() {
-      BDD atomicPredicate = _headerspaceMinusChildren.get();
-      if (atomicPredicate.isZero()) {
+      if (!_children.isEmpty()) {
         return null;
       }
 
       Integer id = _atomicPredicates.size();
-      _atomicPredicates.add(atomicPredicate);
+      _atomicPredicates.add(_headerspace);
       return id;
     }
 
-    BDD computeHeaderspaceMinusChildren() {
-      BDD result = _headerspace;
-      for (Node child : _children) {
-        result = result.and(child._notHeaderspace.get());
-      }
-      return result;
-    }
-
     Stream<AtomicPredicate> atomicPredicate() {
-      Integer id = _id.get();
-      BDD atomicPredicate = _headerspaceMinusChildren.get();
-      return id == null ? Stream.empty() : Stream.of(new AtomicPredicate(id, atomicPredicate));
+      return _children.isEmpty()
+          ? Stream.of(new AtomicPredicate(_id.get(), _headerspace))
+          : Stream.empty();
     }
 
     Stream<AtomicPredicate> atomicPredicates() {
@@ -183,6 +140,15 @@ public class BDDTrie {
         childrenHeaderspaces = childrenHeaderspaces.or(childHeaderspace);
       }
 
+      if (!_children.isEmpty()
+          && !_children
+              .stream()
+              .map(node -> node._headerspace)
+              .reduce(_headerspace.getFactory().zero(), BDD::or)
+              .equals(_headerspace)) {
+        throw new BDDTrieException("children don't partition parent headerspace", path, -1);
+      }
+
       // recursively check child invariants
       for (int i = 0; i < _children.size(); i++) {
         path.add(i);
@@ -192,7 +158,8 @@ public class BDDTrie {
     }
 
     /*
-     * return how many nodes were created.
+     * @param atoms - store which atoms intersect
+     * return how many leaf nodes were created.
      */
     int insert(BDD bdd, List<Node> bddNodes) {
       // invariant: bdd is a subset of _headerspace
@@ -203,14 +170,56 @@ public class BDDTrie {
         return 0;
       }
 
-      int newNodes = insertIntoChildren(bdd, bddNodes);
+      if (_children.isEmpty()) {
+        // split
+        _children.add(new Node(bdd));
+        _children.add(new Node(bdd.not().and(_headerspace)));
+        // net 1 leaf node was created: 1 leaf became an internal node, and we created 2 new leaves.
+        return 1;
+      }
+
+      boolean absorbChildren = _children.size() > 10;
+      int newNodes = insertIntoChildren(bdd, bddNodes, absorbChildren);
       _size += newNodes;
+
+      reorder();
+      rebalance();
 
       return newNodes;
     }
 
-    int insertIntoChildren(BDD bdd, List<Node> bddNodes) {
-      List<Node> bddChildren = new LinkedList<>();
+    void reorder() {
+      for (int i = 0; i < _children.size() - 1; i++) {
+        Node child1 = _children.get(i);
+        Node child2 = _children.get(i + 1);
+        if (child1._size < child2._size) {
+          _children.set(i, child2);
+          _children.set(i + 1, child1);
+        }
+      }
+    }
+
+    void rebalance() {
+      // if our largest grandchild is responsible for more than half our size, then move it up
+      if (!_children.isEmpty()) {
+        Node largestChild = _children.get(0);
+        if (!largestChild._children.isEmpty()) {
+          Node largestGrandchild = largestChild._children.get(0);
+          if (largestGrandchild._size > _size - largestGrandchild._size) {
+            // adopt the grandchild
+            _children.add(0, largestGrandchild);
+            largestChild._size -= largestGrandchild._size;
+            largestChild._children.remove(0);
+            largestChild._headerspace =
+                largestChild._headerspace.and(largestGrandchild._notHeaderspace.get());
+            largestChild._notHeaderspace = Suppliers.memoize(() -> largestChild._headerspace.not());
+          }
+        }
+      }
+    }
+
+    int insertIntoChildren(BDD bdd, List<Node> bddNodes, boolean adoptChildren) {
+      List<Node> adoptedChildren = new LinkedList<>();
 
       int newNodes = 0;
 
@@ -229,14 +238,18 @@ public class BDDTrie {
            * headerspace (it may intersect other _children). So we have to wait until we've checked
            * all the other children.
            */
-          bddChildren.add(child);
+          if (adoptChildren) {
+            adoptedChildren.add(child);
+          } else {
+            bdd = bdd.and(child._notHeaderspace.get());
+          }
           continue;
         } else if (intersection.equals(bdd)) {
           /*
            * bdd is a subset of child._headerspace.
            * since children headerspaces are disjoint, bddChildren must be empty;
            */
-          assert bddChildren.isEmpty();
+          assert adoptedChildren.isEmpty();
 
           // bdd is a strict subset of child._headerspace
           return newNodes + child.insert(bdd, bddNodes);
@@ -262,18 +275,20 @@ public class BDDTrie {
            * Either bddChildren is empty (i.e. bdd is not a superset of any previous children), or
            * every previous child that is a subset of bdd is also a subset of nonIntersection.
            */
-          assert bddChildren
+          assert adoptedChildren
               .stream()
               .allMatch(bddChild -> bddChild._headerspace.imp(bddMinusIntersection).isOne());
         }
       }
 
-      // bdd does not intersect any child headerspace. add a new child for it.
-      _children.removeAll(bddChildren);
-      Node node = new Node(bdd, bddChildren);
+      // since the children's headerspaces partitions this headerspace, can only reach here if we're
+      // adopting. so children must not be empty.
+      assert !_children.isEmpty();
+      _children.removeAll(adoptedChildren);
+      Node node = new Node(bdd, adoptedChildren);
       _children.add(node);
       bddNodes.add(node);
-      return newNodes + 1;
+      return newNodes;
     }
 
     public void atomicPredicates(BDD bdd, List<AtomicPredicate> atomicPredicates) {
@@ -303,7 +318,6 @@ public class BDDTrie {
 
       if (!bdd.isZero()) {
         // part of the input bdd is disjoint from the children. so it overlaps this
-        assert !_headerspaceMinusChildren.get().isZero();
         atomicPredicates.addAll(atomicPredicate().collect(Collectors.toList()));
       }
       return;
@@ -323,9 +337,9 @@ public class BDDTrie {
     _root = new Node(bdds.iterator().next().getFactory().one());
     for (BDD bdd : bdds) {
       if (!bdd.isZero()) {
-        List<Node> bddNodes = new LinkedList<>();
-        _root.insert(bdd, bddNodes);
-        _bddNodes.put(bdd, bddNodes);
+        List<Node> bddAtoms = new LinkedList<>();
+        _root.insert(bdd, bddAtoms);
+        _bddNodes.put(bdd, bddAtoms);
       }
     }
   }
@@ -337,6 +351,7 @@ public class BDDTrie {
   }
 
   public List<AtomicPredicate> atomicPredicates(BDD bdd) {
+    // TODO: have to handle the fact that Nodes can move, have their headerspace reduced, etc.
     if (false && _bddNodes.containsKey(bdd)) {
       // bdd is one of the input BDDs.
       return _bddNodes
