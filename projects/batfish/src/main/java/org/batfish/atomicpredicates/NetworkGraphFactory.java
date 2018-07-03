@@ -15,6 +15,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import javax.annotation.Nonnull;
 import net.sf.javabdd.BDD;
 import net.sf.javabdd.BDDFactory;
 import org.batfish.common.util.CommonUtil;
@@ -674,26 +675,7 @@ public class NetworkGraphFactory {
   }
 
   public NetworkGraph networkGraph(IpSpaceAssignment assignment) {
-    LocationVisitor<StateExpr> toStateExpr =
-        new LocationVisitor<StateExpr>() {
-          @Override
-          public StateExpr visitInterfaceLinkLocation(InterfaceLinkLocation interfaceLinkLocation) {
-            return new OriginateInterfaceLink(
-                interfaceLinkLocation.getNodeName(), interfaceLinkLocation.getInterfaceName());
-          }
-
-          @Override
-          public StateExpr visitInterfaceLocation(InterfaceLocation interfaceLocation) {
-            String vrf =
-                _configs
-                    .get(interfaceLocation.getNodeName())
-                    .getInterfaces()
-                    .get(interfaceLocation.getInterfaceName())
-                    .getVrf()
-                    .getName();
-            return new OriginateVrf(interfaceLocation.getNodeName(), vrf);
-          }
-        };
+    LocationVisitor<StateExpr> toStateExpr = getLocationToStateExpr();
 
     Map<StateExpr, SortedSet<Integer>> roots = new HashMap<>();
     for (IpSpaceAssignment.Entry entry : assignment.getEntries()) {
@@ -705,6 +687,42 @@ public class NetworkGraphFactory {
     }
 
     return new NetworkGraph(roots, computeAPTransitions());
+  }
+
+  @Nonnull
+  private LocationVisitor<StateExpr> getLocationToStateExpr() {
+    return new LocationVisitor<StateExpr>() {
+      @Override
+      public StateExpr visitInterfaceLinkLocation(InterfaceLinkLocation interfaceLinkLocation) {
+        return new OriginateInterfaceLink(
+            interfaceLinkLocation.getNodeName(), interfaceLinkLocation.getInterfaceName());
+      }
+
+      @Override
+      public StateExpr visitInterfaceLocation(InterfaceLocation interfaceLocation) {
+        String vrf =
+            _configs
+                .get(interfaceLocation.getNodeName())
+                .getInterfaces()
+                .get(interfaceLocation.getInterfaceName())
+                .getVrf()
+                .getName();
+        return new OriginateVrf(interfaceLocation.getNodeName(), vrf);
+      }
+    };
+  }
+
+  public BDDNetworkGraph bddNetworkGraph(IpSpaceAssignment assignment) {
+    Map<StateExpr, BDD> roots = new HashMap<>();
+    for (IpSpaceAssignment.Entry entry : assignment.getEntries()) {
+      BDD ipSpaceBDD = entry.getIpSpace().accept(_ipSpaceToBDD);
+      for (Location loc : entry.getLocations()) {
+        StateExpr root = loc.accept(getLocationToStateExpr());
+        roots.put(root, ipSpaceBDD);
+      }
+    }
+
+    return new BDDNetworkGraph(roots, _bddTransitions);
   }
 
   @VisibleForTesting

@@ -397,4 +397,23 @@ public class NetworkGraphFactoryTest {
         GRAPH_FACTORY.getApBDDs().get(violation.predicate), isEquivalentTo(ipBDD(_dstIface2Ip)));
     assertThat(violation.finalStates, equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
   }
+
+  @Test
+  public void testBDDNetworkGraph() {
+    IpSpaceAssignment assignment =
+        IpSpaceAssignment.builder()
+            .assign(
+                new InterfaceLocation(NET._srcNode.getName(), NET._link1Src.getName()),
+                UniverseIpSpace.INSTANCE)
+            .build();
+
+    BDDNetworkGraph graph = GRAPH_FACTORY.bddNetworkGraph(assignment);
+    graph.computeReachability();
+    List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
+        graph.detectMultipathInconsistency();
+    assertThat(violations, hasSize(1));
+    BDDNetworkGraph.MultipathConsistencyViolation violation = violations.get(0);
+    assertThat(violation.finalStates, equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
+    assertThat(violation.predicate, isEquivalentTo(ipBDD(_dstIface2Ip)));
+  }
 }

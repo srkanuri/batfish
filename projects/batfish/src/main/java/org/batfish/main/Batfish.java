@@ -61,9 +61,11 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.configuration2.ImmutableConfiguration;
 import org.apache.commons.lang3.SerializationUtils;
+import org.batfish.atomicpredicates.BDDNetworkGraph;
 import org.batfish.atomicpredicates.BDDTrie;
 import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
 import org.batfish.atomicpredicates.BDDTrieAtomizer;
+import org.batfish.atomicpredicates.DummyAtomizer;
 import org.batfish.atomicpredicates.NetworkGraph;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
 import org.batfish.atomicpredicates.NetworkGraphFactory;
@@ -4355,17 +4357,76 @@ public class Batfish extends PluginConsumer implements IBatfish {
     IpSpaceAssignment ipSpaceAssignment =
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
 
+    boolean doBDDNetworkGraph = true;
     boolean doBDDTrie = true;
     boolean doNaive = true;
-    boolean dstIpOnly = true;
+    boolean dstIpOnly = false;
 
     long time = System.currentTimeMillis();
     NetworkGraphFactory bddTrieGraphFactory;
+    if (doBDDNetworkGraph) {
+      BDDPacket.initFactory();
+      long timeConstructGraph = System.currentTimeMillis();
+      bddTrieGraphFactory =
+          new NetworkGraphFactory(
+              configurations, forwardingAnalysis, (preds) -> new DummyAtomizer(), dstIpOnly);
+      BDDNetworkGraph bddNetworkGraph = bddTrieGraphFactory.bddNetworkGraph(ipSpaceAssignment);
+      timeConstructGraph = System.currentTimeMillis() - timeConstructGraph;
+      long timeComputeReachability = System.currentTimeMillis();
+      bddNetworkGraph.computeReachability();
+      timeComputeReachability = System.currentTimeMillis() - timeComputeReachability;
+      long timeComputeViolations = System.currentTimeMillis();
+      List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
+          bddNetworkGraph.detectMultipathInconsistency();
+      timeComputeViolations = System.currentTimeMillis() - timeComputeViolations;
+      System.out.println(timeComputeReachability);
+      System.out.println(timeComputeViolations);
+
+      BDDPacket pkt = new BDDPacket();
+      for (BDDNetworkGraph.MultipathConsistencyViolation violation : violations) {
+        BDD satAssignment = violation.predicate.fullSatOne();
+
+        Ip dstIp = new Ip(pkt.getDstIp().satAssignmentToLong(satAssignment));
+        if (dstIp.asLong() < 0) {
+          System.out.println("wtf" + dstIp);
+        }
+        Ip srcIp = new Ip(pkt.getSrcIp().satAssignmentToLong(satAssignment));
+        Long dstPort = pkt.getDstPort().satAssignmentToLong(satAssignment);
+        Long srcPort = pkt.getSrcPort().satAssignmentToLong(satAssignment);
+        Long ipProtocol = pkt.getIpProtocol().satAssignmentToLong(satAssignment);
+        Long icmpCode = pkt.getIcmpCode().satAssignmentToLong(satAssignment);
+        Long icmpType = pkt.getIcmpType().satAssignmentToLong(satAssignment);
+
+        System.out.println(
+            String.format(
+                "Src=%s, dstIp=%s, dstPort=%s, srcIp=%s, srcPort=%s, ipProtocol=%s, icmpCode=%s, icmpType=%s, ack=%s, cwr=%s, ece=%s,"
+                    + " fin=%s, psh=%s, rst=%s, syn=%s, urg=%s, Terminal States=%s",
+                violation.originateState,
+                dstIp.toString(),
+                dstPort,
+                srcIp,
+                srcPort,
+                ipProtocol,
+                icmpCode,
+                icmpType,
+                pkt.getTcpAck().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpCwr().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpEce().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpFin().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpPsh().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpRst().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpSyn().and(satAssignment).isZero() ? 0 : 1,
+                pkt.getTcpUrg().and(satAssignment).isZero() ? 0 : 1,
+                violation.finalStates));
+      }
+    }
     if (doBDDTrie) {
       BDDPacket.initFactory();
+      long timeConstructGraph = System.currentTimeMillis();
       bddTrieGraphFactory =
           new NetworkGraphFactory(
               configurations, forwardingAnalysis, BDDTrieAtomizer::new, dstIpOnly);
+      timeConstructGraph = System.currentTimeMillis() - timeConstructGraph;
     }
     long bddTrieGraphFactoryTime = System.currentTimeMillis() - time;
     time = System.currentTimeMillis();
