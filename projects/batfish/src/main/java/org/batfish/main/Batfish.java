@@ -4339,7 +4339,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
         false);
   }
 
-  private void atomicPredicates(
+  private void testGraphFactory(
       Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
     Set<Location> allLocations =
         configurations
@@ -4358,8 +4358,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
         IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
 
     boolean doBDDNetworkGraph = true;
-    boolean doBDDTrie = true;
-    boolean doNaive = true;
+    boolean doBDDTrie = false;
+    boolean doNaive = false;
     boolean dstIpOnly = false;
 
     long time = System.currentTimeMillis();
@@ -4550,7 +4550,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     _logger.info("Synthesizing Z3 logic...");
 
-    atomicPredicates(configurations, dataPlane.getForwardingAnalysis());
+    testGraphFactory(configurations, dataPlane.getForwardingAnalysis());
 
     Synthesizer s =
         new Synthesizer(
