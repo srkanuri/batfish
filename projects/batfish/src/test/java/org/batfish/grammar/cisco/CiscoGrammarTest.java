@@ -25,6 +25,8 @@ import static org.batfish.datamodel.matchers.BgpProcessMatchers.hasNeighbors;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasConfigurationFormat;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasDefaultVrf;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasIkeGateway;
+import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasIkePhase1Policy;
+import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasIkePhase1Proposal;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasIkeProposal;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasInterface;
 import static org.batfish.datamodel.matchers.ConfigurationMatchers.hasInterfaces;
@@ -59,6 +61,11 @@ import static org.batfish.datamodel.matchers.IkeGatewayMatchers.hasAddress;
 import static org.batfish.datamodel.matchers.IkeGatewayMatchers.hasExternalInterface;
 import static org.batfish.datamodel.matchers.IkeGatewayMatchers.hasIkePolicy;
 import static org.batfish.datamodel.matchers.IkeGatewayMatchers.hasLocalIp;
+import static org.batfish.datamodel.matchers.IkePhase1PolicyMatchers.hasIkePhase1Key;
+import static org.batfish.datamodel.matchers.IkePhase1PolicyMatchers.hasIkePhase1Proposals;
+import static org.batfish.datamodel.matchers.IkePhase1PolicyMatchers.hasLocalInterface;
+import static org.batfish.datamodel.matchers.IkePhase1PolicyMatchers.hasRemoteIdentity;
+import static org.batfish.datamodel.matchers.IkePhase1PolicyMatchers.hasSelfIdentity;
 import static org.batfish.datamodel.matchers.IkePolicyMatchers.hasPresharedKeyHash;
 import static org.batfish.datamodel.matchers.IkeProposalMatchers.hasAuthenticationAlgorithm;
 import static org.batfish.datamodel.matchers.IkeProposalMatchers.hasAuthenticationMethod;
@@ -113,6 +120,7 @@ import static org.batfish.representation.cisco.CiscoConfiguration.computeCombine
 import static org.batfish.representation.cisco.CiscoConfiguration.computeInspectClassMapAclName;
 import static org.batfish.representation.cisco.CiscoConfiguration.computeInspectPolicyMapAclName;
 import static org.batfish.representation.cisco.CiscoConfiguration.computeProtocolObjectGroupAclName;
+import static org.batfish.representation.cisco.CiscoConfiguration.computeServiceObjectAclName;
 import static org.batfish.representation.cisco.CiscoConfiguration.computeServiceObjectGroupAclName;
 import static org.batfish.representation.cisco.CiscoConfiguration.computeZonePairAclName;
 import static org.batfish.representation.cisco.OspfProcess.getReferenceOspfBandwidth;
@@ -166,6 +174,7 @@ import org.batfish.datamodel.DiffieHellmanGroup;
 import org.batfish.datamodel.EncryptionAlgorithm;
 import org.batfish.datamodel.Flow;
 import org.batfish.datamodel.HeaderSpace;
+import org.batfish.datamodel.IcmpType;
 import org.batfish.datamodel.IkeAuthenticationMethod;
 import org.batfish.datamodel.IkeHashingAlgorithm;
 import org.batfish.datamodel.Interface;
@@ -192,6 +201,8 @@ import org.batfish.datamodel.acl.MatchHeaderSpace;
 import org.batfish.datamodel.answers.ConvertConfigurationAnswerElement;
 import org.batfish.datamodel.matchers.ConfigurationMatchers;
 import org.batfish.datamodel.matchers.IkeGatewayMatchers;
+import org.batfish.datamodel.matchers.IkePhase1KeyMatchers;
+import org.batfish.datamodel.matchers.IkePhase1ProposalMatchers;
 import org.batfish.datamodel.matchers.InterfaceMatchers;
 import org.batfish.datamodel.matchers.IpsecPolicyMatchers;
 import org.batfish.datamodel.matchers.IpsecProposalMatchers;
@@ -229,6 +240,25 @@ public class CiscoGrammarTest {
     String[] names =
         Arrays.stream(configurationNames).map(s -> TESTCONFIGS_PREFIX + s).toArray(String[]::new);
     return BatfishTestUtils.getBatfishForTextConfigs(_folder, names);
+  }
+
+  private Flow createFlow(IpProtocol protocol, int srcPort, int dstPort) {
+    return Flow.builder()
+        .setIngressNode("")
+        .setTag("")
+        .setIpProtocol(protocol)
+        .setSrcPort(srcPort)
+        .setDstPort(dstPort)
+        .build();
+  }
+
+  private Flow createIcmpFlow(Integer icmpType) {
+    return Flow.builder()
+        .setIngressNode("")
+        .setTag("")
+        .setIpProtocol(IpProtocol.ICMP)
+        .setIcmpType(icmpType)
+        .build();
   }
 
   @Test
@@ -487,6 +517,45 @@ public class CiscoGrammarTest {
     assertThat(
         defaults.getDefaultVrf().getOspfProcess().getReferenceBandwidth(),
         equalTo(getReferenceOspfBandwidth(ConfigurationFormat.CISCO_ASA)));
+  }
+
+  @Test
+  public void testAsaServiceObject() throws IOException {
+    String hostname = "asa-service-object";
+    Configuration c = parseConfig(hostname);
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+
+    String osIcmpAclName = computeServiceObjectAclName("OS_ICMP");
+    String osTcpAclName = computeServiceObjectAclName("OS_TCPUDP");
+    String ogsAclName = computeServiceObjectGroupAclName("OGS1");
+
+    Flow flowIcmpPass = createIcmpFlow(IcmpType.ECHO_REQUEST);
+    Flow flowIcmpFail = createIcmpFlow(IcmpType.ECHO_REPLY);
+    Flow flowInlinePass = createFlow(IpProtocol.UDP, 1, 1234);
+    Flow flowTcpPass = createFlow(IpProtocol.TCP, 65535, 1);
+    Flow flowUdpPass = createFlow(IpProtocol.UDP, 65535, 1);
+    Flow flowTcpFail = createFlow(IpProtocol.TCP, 65534, 1);
+
+    /* Confirm service objects have the correct number of referrers */
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.SERVICE_OBJECT, "OS_TCPUDP", 1));
+    assertThat(ccae, hasNumReferrers(hostname, CiscoStructureType.SERVICE_OBJECT, "OS_ICMP", 0));
+    /* Confirm undefined reference shows up as such */
+    assertThat(
+        ccae, hasUndefinedReference(hostname, CiscoStructureType.SERVICE_OBJECT, "OS_UNDEFINED"));
+
+    /* Confirm IpAcls created from service objects permit and reject the correct flows */
+    assertThat(c, hasIpAccessList(osTcpAclName, accepts(flowTcpPass, null, c)));
+    assertThat(c, hasIpAccessList(osTcpAclName, accepts(flowUdpPass, null, c)));
+    assertThat(c, hasIpAccessList(osTcpAclName, not(accepts(flowTcpFail, null, c))));
+    assertThat(c, hasIpAccessList(osIcmpAclName, accepts(flowIcmpPass, null, c)));
+    assertThat(c, hasIpAccessList(osIcmpAclName, not(accepts(flowIcmpFail, null, c))));
+
+    /* Confirm object-group permits and rejects the flows determined by its constituent service objects */
+    assertThat(c, hasIpAccessList(ogsAclName, accepts(flowTcpPass, null, c)));
+    assertThat(c, hasIpAccessList(ogsAclName, not(accepts(flowTcpFail, null, c))));
+    assertThat(c, hasIpAccessList(ogsAclName, accepts(flowInlinePass, null, c)));
   }
 
   @Test
@@ -1827,6 +1896,24 @@ public class CiscoGrammarTest {
                 hasBindInterface(InterfaceMatchers.hasName("TenGigabitEthernet0/0")),
                 IpsecVpnMatchers.hasIpsecPolicy(IpsecPolicyMatchers.hasName("mymap:30:15")),
                 hasPolicy(hasLines(equalTo(expectedAclLines))))));
+
+    assertThat(c, hasInterface("TenGigabitEthernet0/0", isActive()));
+  }
+
+  @Test
+  public void testInvalidCryptoMapDef() throws IOException {
+    String hostname = "ios-crypto-map";
+
+    Batfish batfish = getBatfishForConfigurationNames(hostname);
+    ConvertConfigurationAnswerElement ccae =
+        batfish.loadConvertConfigurationAnswerElementOrReparse();
+
+    assertThat(
+        ccae,
+        hasRedFlagWarning(
+            hostname,
+            containsString(
+                "Interface TenGigabitEthernet0/1 with declared crypto-map mymap has no ip-address")));
   }
 
   @Test
@@ -1835,7 +1922,7 @@ public class CiscoGrammarTest {
     assertThat(
         c,
         hasIkeProposal(
-            "020",
+            "20",
             allOf(
                 hasEncryptionAlgorithm(EncryptionAlgorithm.AES_128_CBC),
                 hasAuthenticationMethod(IkeAuthenticationMethod.RSA_SIGNATURES),
@@ -1846,7 +1933,7 @@ public class CiscoGrammarTest {
     assertThat(
         c,
         hasIkeProposal(
-            "030",
+            "30",
             allOf(
                 hasEncryptionAlgorithm(EncryptionAlgorithm.THREEDES_CBC),
                 hasAuthenticationMethod(IkeAuthenticationMethod.PRE_SHARED_KEYS),
@@ -1862,7 +1949,7 @@ public class CiscoGrammarTest {
     assertThat(
         c,
         hasIkeProposal(
-            "010",
+            "10",
             allOf(
                 hasEncryptionAlgorithm(EncryptionAlgorithm.AES_128_CBC),
                 hasAuthenticationMethod(IkeAuthenticationMethod.RSA_SIGNATURES),
@@ -1874,13 +1961,38 @@ public class CiscoGrammarTest {
     assertThat(
         c,
         hasIkeProposal(
-            "020",
+            "20",
             allOf(
                 hasEncryptionAlgorithm(EncryptionAlgorithm.THREEDES_CBC),
                 hasAuthenticationMethod(IkeAuthenticationMethod.PRE_SHARED_KEYS),
                 hasAuthenticationAlgorithm(IkeHashingAlgorithm.SHA1),
                 hasDiffieHellmanGroup(DiffieHellmanGroup.GROUP2),
                 hasLifeTimeSeconds(86400))));
+
+    // test for IKE phase1 proposals
+    assertThat(
+        c,
+        hasIkePhase1Proposal(
+            "10",
+            allOf(
+                IkePhase1ProposalMatchers.hasEncryptionAlgorithm(EncryptionAlgorithm.AES_128_CBC),
+                IkePhase1ProposalMatchers.hasAuthenticationMethod(
+                    IkeAuthenticationMethod.RSA_SIGNATURES),
+                IkePhase1ProposalMatchers.hasHashingAlgorithm(IkeHashingAlgorithm.MD5),
+                IkePhase1ProposalMatchers.hasDiffieHellmanGroup(DiffieHellmanGroup.GROUP1),
+                IkePhase1ProposalMatchers.hasLifeTimeSeconds(14400))));
+
+    assertThat(
+        c,
+        hasIkePhase1Proposal(
+            "20",
+            allOf(
+                IkePhase1ProposalMatchers.hasEncryptionAlgorithm(EncryptionAlgorithm.THREEDES_CBC),
+                IkePhase1ProposalMatchers.hasAuthenticationMethod(
+                    IkeAuthenticationMethod.PRE_SHARED_KEYS),
+                IkePhase1ProposalMatchers.hasHashingAlgorithm(IkeHashingAlgorithm.SHA1),
+                IkePhase1ProposalMatchers.hasDiffieHellmanGroup(DiffieHellmanGroup.GROUP2),
+                IkePhase1ProposalMatchers.hasLifeTimeSeconds(86400))));
   }
 
   @Test
@@ -1908,6 +2020,33 @@ public class CiscoGrammarTest {
                 hasLocalIp(new Ip("2.3.4.6")),
                 hasIkePolicy(
                     hasPresharedKeyHash(CommonUtil.sha256Digest("psk1" + CommonUtil.salt()))))));
+
+    // test for IKE phase 1 policy
+    assertThat(
+        c,
+        hasIkePhase1Policy(
+            "ISAKMP-PROFILE-ADDRESS",
+            allOf(
+                hasIkePhase1Key(
+                    IkePhase1KeyMatchers.hasKeyHash(
+                        CommonUtil.sha256Digest("psk1" + CommonUtil.salt()))),
+                hasRemoteIdentity(containsIp(new Ip("1.2.3.4"))),
+                hasSelfIdentity(equalTo(new Ip("2.3.4.6"))),
+                hasLocalInterface(equalTo("TenGigabitEthernet0/0")),
+                hasIkePhase1Proposals(equalTo(ImmutableList.of("10", "20"))))));
+
+    assertThat(
+        c,
+        hasIkePhase1Policy(
+            "ISAKMP-PROFILE-INTERFACE",
+            allOf(
+                hasIkePhase1Key(
+                    IkePhase1KeyMatchers.hasKeyHash(
+                        CommonUtil.sha256Digest("psk1" + CommonUtil.salt()))),
+                hasRemoteIdentity(containsIp(new Ip("1.2.3.4"))),
+                hasSelfIdentity(equalTo(new Ip("2.3.4.6"))),
+                hasLocalInterface(equalTo("TenGigabitEthernet0/0")),
+                hasIkePhase1Proposals(equalTo(ImmutableList.of("10", "20"))))));
   }
 
   private static String getCLRegex(

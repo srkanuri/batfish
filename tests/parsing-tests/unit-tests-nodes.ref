@@ -1214,9 +1214,19 @@
         "defaultCrossZoneAction" : "ACCEPT",
         "defaultInboundAction" : "ACCEPT",
         "deviceType" : "SWITCH",
+        "ikePhase1Proposals" : {
+          "1" : {
+            "name" : "1",
+            "authenticationMethod" : "RSA_SIGNATURES",
+            "diffieHellmanGroup" : "GROUP20",
+            "encryptionAlgorithm" : "AES_256_CBC",
+            "hashingAlgorithm" : "SHA_256",
+            "lifetimeSeconds" : 86400
+          }
+        },
         "ikeProposals" : {
-          "001" : {
-            "name" : "001",
+          "1" : {
+            "name" : "1",
             "authenticationAlgorithm" : "SHA_256",
             "authenticationMethod" : "RSA_SIGNATURES",
             "diffieHellmanGroup" : "GROUP20",
@@ -5799,17 +5809,52 @@
         "defaultCrossZoneAction" : "ACCEPT",
         "defaultInboundAction" : "ACCEPT",
         "deviceType" : "SWITCH",
+        "ikePhase1Keys" : {
+          "VRF:ABC:DEF:GHI:1234" : {
+            "keyHash" : "f300fd9a9833dc8b16a2c399b2b51c32fc40293606df9c1e814d978f6ebcb9f8",
+            "keyType" : "PRE_SHARED_KEY",
+            "localInterface" : "unset_local_interface",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "1.1.1.1"
+            }
+          }
+        },
+        "ikePhase1Policies" : {
+          "myprofile" : {
+            "name" : "myprofile",
+            "ikePhase1Proposals" : [
+              "1"
+            ],
+            "localInterface" : "unset_local_interface",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "1.2.3.4"
+            },
+            "selfIdentity" : "2.3.4.6"
+          }
+        },
+        "ikePhase1Proposals" : {
+          "1" : {
+            "name" : "1",
+            "authenticationMethod" : "PRE_SHARED_KEYS",
+            "diffieHellmanGroup" : "GROUP2",
+            "encryptionAlgorithm" : "THREEDES_CBC",
+            "hashingAlgorithm" : "MD5",
+            "lifetimeSeconds" : 28800
+          }
+        },
         "ikePolicies" : {
           "myprofile" : {
             "name" : "myprofile",
             "proposals" : [
-              "001"
+              "1"
             ]
           }
         },
         "ikeProposals" : {
-          "001" : {
-            "name" : "001",
+          "1" : {
+            "name" : "1",
             "authenticationAlgorithm" : "MD5",
             "authenticationMethod" : "PRE_SHARED_KEYS",
             "diffieHellmanGroup" : "GROUP2",
@@ -8381,7 +8426,21 @@
               {
                 "action" : "ACCEPT",
                 "matchCondition" : {
-                  "class" : "org.batfish.datamodel.acl.OrMatchExpr"
+                  "class" : "org.batfish.datamodel.acl.OrMatchExpr",
+                  "disjuncts" : [
+                    {
+                      "class" : "org.batfish.datamodel.acl.MatchHeaderSpace",
+                      "headerSpace" : {
+                        "icmpTypes" : [
+                          "8-8"
+                        ],
+                        "ipProtocols" : [
+                          "ICMP"
+                        ],
+                        "negate" : false
+                      }
+                    }
+                  ]
                 }
               }
             ]
@@ -13694,6 +13753,117 @@
           }
         }
       },
+      "juniper_bgp_remove_private_as" : {
+        "configurationFormat" : "FLAT_JUNIPER",
+        "name" : "juniper_bgp_remove_private_as",
+        "defaultCrossZoneAction" : "ACCEPT",
+        "defaultInboundAction" : "ACCEPT",
+        "deviceType" : "ROUTER",
+        "routingPolicies" : {
+          "~DEFAULT_BGP_EXPORT_POLICY~" : {
+            "name" : "~DEFAULT_BGP_EXPORT_POLICY~",
+            "statements" : [
+              {
+                "class" : "org.batfish.datamodel.routing_policy.statement.If",
+                "falseStatements" : [
+                  {
+                    "class" : "org.batfish.datamodel.routing_policy.statement.If",
+                    "falseStatements" : [
+                      {
+                        "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                        "type" : "ExitReject"
+                      }
+                    ],
+                    "guard" : {
+                      "class" : "org.batfish.datamodel.routing_policy.expr.BooleanExprs$StaticBooleanExpr",
+                      "type" : "CallExprContext"
+                    },
+                    "trueStatements" : [
+                      {
+                        "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                        "type" : "ReturnFalse"
+                      }
+                    ]
+                  }
+                ],
+                "guard" : {
+                  "class" : "org.batfish.datamodel.routing_policy.expr.Disjunction",
+                  "disjuncts" : [
+                    {
+                      "class" : "org.batfish.datamodel.routing_policy.expr.MatchProtocol",
+                      "protocol" : "bgp"
+                    },
+                    {
+                      "class" : "org.batfish.datamodel.routing_policy.expr.MatchProtocol",
+                      "protocol" : "ibgp"
+                    }
+                  ]
+                },
+                "trueStatements" : [
+                  {
+                    "class" : "org.batfish.datamodel.routing_policy.statement.If",
+                    "falseStatements" : [
+                      {
+                        "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                        "type" : "ExitAccept"
+                      }
+                    ],
+                    "guard" : {
+                      "class" : "org.batfish.datamodel.routing_policy.expr.BooleanExprs$StaticBooleanExpr",
+                      "type" : "CallExprContext"
+                    },
+                    "trueStatements" : [
+                      {
+                        "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                        "type" : "ReturnTrue"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "~DEFAULT_BGP_IMPORT_POLICY~" : {
+            "name" : "~DEFAULT_BGP_IMPORT_POLICY~",
+            "statements" : [
+              {
+                "class" : "org.batfish.datamodel.routing_policy.statement.If",
+                "falseStatements" : [
+                  {
+                    "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                    "type" : "ExitAccept"
+                  }
+                ],
+                "guard" : {
+                  "class" : "org.batfish.datamodel.routing_policy.expr.BooleanExprs$StaticBooleanExpr",
+                  "type" : "CallExprContext"
+                },
+                "trueStatements" : [
+                  {
+                    "class" : "org.batfish.datamodel.routing_policy.statement.Statements$StaticStatement",
+                    "type" : "ReturnTrue"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "vendorFamily" : {
+          "juniper" : { }
+        },
+        "vrfs" : {
+          "default" : {
+            "name" : "default",
+            "bgpProcess" : {
+              "multipathEbgp" : false,
+              "multipathEquivalentAsPathMatchMode" : "FIRST_AS",
+              "multipathIbgp" : false,
+              "routerId" : "0.0.0.0",
+              "tieBreaker" : "ARRIVAL_ORDER"
+            }
+          }
+        }
+      },
       "juniper_extended_community" : {
         "configurationFormat" : "FLAT_JUNIPER",
         "name" : "juniper_extended_community",
@@ -14695,6 +14865,38 @@
         "defaultCrossZoneAction" : "ACCEPT",
         "defaultInboundAction" : "ACCEPT",
         "deviceType" : "SWITCH",
+        "ikePhase1Keys" : {
+          "~IKE_PHASE1_KEY_1.2.3.4~" : {
+            "keyType" : "PRE_SHARED_KEY",
+            "localInterface" : "unset_local_interface",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "0.0.0.0"
+            }
+          }
+        },
+        "ikePhase1Policies" : {
+          "1.2.3.4" : {
+            "name" : "1.2.3.4",
+            "ikePhase1Key" : {
+              "keyType" : "PRE_SHARED_KEY",
+              "localInterface" : "unset_local_interface",
+              "remoteIdentity" : {
+                "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+                "ipWildcard" : "0.0.0.0"
+              }
+            },
+            "ikePhase1Proposals" : [
+              "PROPOSAL"
+            ]
+          }
+        },
+        "ikePhase1Proposals" : {
+          "PROPOSAL" : {
+            "name" : "PROPOSAL",
+            "lifetimeSeconds" : 28800
+          }
+        },
         "ikePolicies" : {
           "1.2.3.4" : {
             "name" : "1.2.3.4",
@@ -16244,6 +16446,100 @@
         "vendorFamily" : {
           "cisco" : {
             "hostname" : "no_aaa_group_server",
+            "logging" : {
+              "on" : true
+            }
+          }
+        },
+        "vrfs" : {
+          "default" : {
+            "name" : "default"
+          }
+        }
+      },
+      "no_ip_name_server" : {
+        "configurationFormat" : "CISCO_IOS",
+        "name" : "no_ip_name_server",
+        "defaultCrossZoneAction" : "ACCEPT",
+        "defaultInboundAction" : "ACCEPT",
+        "deviceType" : "SWITCH",
+        "vendorFamily" : {
+          "cisco" : {
+            "hostname" : "no_ip_name_server",
+            "logging" : {
+              "on" : true
+            }
+          }
+        },
+        "vrfs" : {
+          "default" : {
+            "name" : "default"
+          }
+        }
+      },
+      "no_mask_reply" : {
+        "configurationFormat" : "CISCO_IOS",
+        "name" : "no_mask_reply",
+        "defaultCrossZoneAction" : "ACCEPT",
+        "defaultInboundAction" : "ACCEPT",
+        "deviceType" : "SWITCH",
+        "interfaces" : {
+          "GigabitEthernet1" : {
+            "name" : "GigabitEthernet1",
+            "accessVlan" : 0,
+            "active" : true,
+            "allPrefixes" : [
+              "10.10.10.1/24"
+            ],
+            "autostate" : true,
+            "bandwidth" : 1.0E9,
+            "declaredNames" : [
+              "GigabitEthernet1"
+            ],
+            "mtu" : 1500,
+            "nativeVlan" : 1,
+            "ospfDeadInterval" : 0,
+            "ospfEnabled" : false,
+            "ospfHelloMultiplier" : 0,
+            "ospfPassive" : false,
+            "ospfPointToPoint" : false,
+            "prefix" : "10.10.10.1/24",
+            "proxyArp" : true,
+            "ripEnabled" : false,
+            "ripPassive" : false,
+            "spanningTreePortfast" : false,
+            "switchportMode" : "NONE",
+            "switchportTrunkEncapsulation" : "DOT1Q",
+            "type" : "PHYSICAL",
+            "vrf" : "default"
+          }
+        },
+        "vendorFamily" : {
+          "cisco" : {
+            "hostname" : "no_mask_reply",
+            "logging" : {
+              "on" : true
+            }
+          }
+        },
+        "vrfs" : {
+          "default" : {
+            "name" : "default",
+            "interfaces" : [
+              "GigabitEthernet1"
+            ]
+          }
+        }
+      },
+      "no_snmp_server" : {
+        "configurationFormat" : "CISCO_IOS",
+        "name" : "no_snmp_server",
+        "defaultCrossZoneAction" : "ACCEPT",
+        "defaultInboundAction" : "ACCEPT",
+        "deviceType" : "SWITCH",
+        "vendorFamily" : {
+          "cisco" : {
+            "hostname" : "no_snmp_server",
             "logging" : {
               "on" : true
             }

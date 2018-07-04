@@ -2,10 +2,16 @@ package org.batfish.representation.cisco;
 
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 import static org.batfish.common.util.CommonUtil.toImmutableMap;
+import static org.batfish.datamodel.Interface.UNSET_LOCAL_INTERFACE;
 import static org.batfish.datamodel.MultipathEquivalentAsPathMatchMode.EXACT_PATH;
 import static org.batfish.datamodel.MultipathEquivalentAsPathMatchMode.PATH_LENGTH;
 import static org.batfish.representation.cisco.CiscoConversions.generateAggregateRoutePolicy;
+import static org.batfish.representation.cisco.CiscoConversions.resolveIsakmpProfileIfaceNames;
+import static org.batfish.representation.cisco.CiscoConversions.resolveKeyringIfaceNames;
 import static org.batfish.representation.cisco.CiscoConversions.suppressSummarizedPrefixes;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Key;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Policy;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Proposal;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -49,6 +55,8 @@ import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.GeneratedRoute6;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.IkeGateway;
+import org.batfish.datamodel.IkePhase1Key;
+import org.batfish.datamodel.IkePhase1Proposal;
 import org.batfish.datamodel.IkePolicy;
 import org.batfish.datamodel.IkeProposal;
 import org.batfish.datamodel.InterfaceAddress;
@@ -278,6 +286,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return String.format("~PROTOCOL_OBJECT_GROUP~%s~", name);
   }
 
+  public static String computeServiceObjectAclName(String name) {
+    return String.format("~SERVICE_OBJECT~%s~", name);
+  }
+
   public static String computeServiceObjectGroupAclName(String name) {
     return String.format("~SERVICE_OBJECT_GROUP~%s~", name);
   }
@@ -375,7 +387,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   private final Map<String, IpsecTransformSet> _ipsecTransformSets;
 
-  private final Map<String, IsakmpPolicy> _isakmpPolicies;
+  private final Map<Integer, IsakmpPolicy> _isakmpPolicies;
 
   private final Map<String, IsakmpProfile> _isakmpProfiles;
 
@@ -404,6 +416,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
   private final Map<String, RouteMap> _routeMaps;
 
   private final Map<String, RoutePolicy> _routePolicies;
+
+  private final Map<String, ServiceObject> _serviceObjects;
 
   private SnmpServer _snmpServer;
 
@@ -476,6 +490,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _securityZonePairs = new TreeMap<>();
     _securityZones = new TreeMap<>();
     _serviceObjectGroups = new TreeMap<>();
+    _serviceObjects = new TreeMap<>();
     _standardAccessLists = new TreeMap<>();
     _standardIpv6AccessLists = new TreeMap<>();
     _standardCommunityLists = new TreeMap<>();
@@ -751,7 +766,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return _ipsecTransformSets;
   }
 
-  public Map<String, IsakmpPolicy> getIsakmpPolicies() {
+  public Map<Integer, IsakmpPolicy> getIsakmpPolicies() {
     return _isakmpPolicies;
   }
 
@@ -2012,6 +2027,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
    */
   private List<IpsecVpn> toIpsecVpns(
       Configuration c, CryptoMapEntry cryptoMapEntry, String ipsecVpnName, String cryptoMapName) {
+
     List<org.batfish.datamodel.Interface> referencingInterfaces =
         c.getInterfaces()
             .values()
@@ -2022,6 +2038,14 @@ public final class CiscoConfiguration extends VendorConfiguration {
     List<IpsecVpn> ipsecVpns = new ArrayList<>();
 
     for (org.batfish.datamodel.Interface iface : referencingInterfaces) {
+      // skipping interfaces with no ip-address
+      if (iface.getAddress() == null) {
+        _w.redFlag(
+            String.format(
+                "Interface %s with declared crypto-map %s has no ip-address",
+                iface.getName(), cryptoMapName));
+        continue;
+      }
       Ip bindingInterfaceIp = iface.getAddress().getIp();
       IkeGateway ikeGateway = null;
 
@@ -2164,7 +2188,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
   }
 
   private static IkeProposal toIkeProposal(IsakmpPolicy isakmpPolicy) {
-    IkeProposal ikeProposal = new IkeProposal(isakmpPolicy.getName());
+    IkeProposal ikeProposal = new IkeProposal(isakmpPolicy.getName().toString());
     ikeProposal.setDiffieHellmanGroup(isakmpPolicy.getDiffieHellmanGroup());
     ikeProposal.setAuthenticationMethod(isakmpPolicy.getAuthenticationMethod());
     ikeProposal.setEncryptionAlgorithm(isakmpPolicy.getEncryptionAlgorithm());
@@ -3134,13 +3158,19 @@ public final class CiscoConfiguration extends VendorConfiguration {
             c.getIpAccessLists()
                 .put(computeProtocolObjectGroupAclName(name), toIpAccessList(protocolObjectGroup)));
 
-    // convert each ServiceObjectGroup to IpAccessList
+    // convert each ServiceObject and ServiceObjectGroup to IpAccessList
     _serviceObjectGroups.forEach(
         (name, serviceObjectGroup) ->
             c.getIpAccessLists()
                 .put(
                     computeServiceObjectGroupAclName(name),
                     CiscoConversions.toIpAccessList(serviceObjectGroup)));
+    _serviceObjects.forEach(
+        (name, serviceObject) ->
+            c.getIpAccessLists()
+                .put(
+                    computeServiceObjectAclName(name),
+                    CiscoConversions.toIpAccessList(serviceObject)));
 
     // convert standard/extended ipv6 access lists to ipv6 access lists or
     // route6 filter
@@ -3218,12 +3248,37 @@ public final class CiscoConfiguration extends VendorConfiguration {
     applyVrrp(c);
 
     // ISAKMP policies to IKE proposals
-    for (Entry<String, IsakmpPolicy> e : _isakmpPolicies.entrySet()) {
-      c.getIkeProposals().put(e.getKey(), toIkeProposal(e.getValue()));
+    for (Entry<Integer, IsakmpPolicy> e : _isakmpPolicies.entrySet()) {
+      IkeProposal ikeProposal = toIkeProposal(e.getValue());
+      c.getIkeProposals().put(ikeProposal.getName(), ikeProposal);
+
+      IkePhase1Proposal ikePhase1Proposal = toIkePhase1Proposal(e.getValue());
+      c.getIkePhase1Proposals().put(ikePhase1Proposal.getName(), ikePhase1Proposal);
     }
     resolveKeyringIsakmpProfileAddresses();
     resolveTunnelSourceInterfaces();
+
+    resolveKeyringIfaceNames(_interfaces, _keyrings);
+    resolveIsakmpProfileIfaceNames(_interfaces, _isakmpProfiles);
+
     addIkePoliciesAndGateways(c);
+
+    // keyrings to IKE phase 1 keys
+    ImmutableSortedMap.Builder<String, IkePhase1Key> ikePhase1KeysBuilder =
+        ImmutableSortedMap.naturalOrder();
+    _keyrings
+        .values()
+        .forEach(keyring -> ikePhase1KeysBuilder.put(keyring.getName(), toIkePhase1Key(keyring)));
+
+    c.setIkePhase1Keys(ikePhase1KeysBuilder.build());
+
+    // ISAKMP profiles to IKE phase 1 policies
+    _isakmpProfiles
+        .values()
+        .forEach(
+            isakmpProfile ->
+                c.getIkePhase1Policies()
+                    .put(isakmpProfile.getName(), toIkePhase1Policy(isakmpProfile, this, c, _w)));
 
     // ipsec proposals
     for (Entry<String, IpsecTransformSet> e : _ipsecTransformSets.entrySet()) {
@@ -3529,6 +3584,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
     // objects
     markConcreteStructure(
         CiscoStructureType.NETWORK_OBJECT, CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT);
+    markConcreteStructure(
+        CiscoStructureType.SERVICE_OBJECT, CiscoStructureUsage.SERVICE_OBJECT_GROUP_SERVICE_OBJECT);
 
     // service template
     markConcreteStructure(
@@ -3858,8 +3915,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
       }
 
       Ip localAddress = isakmpProfile.getLocalAddress();
-      Prefix remotePrefix = isakmpProfile.getMatchIdentity();
-      if (localAddress == null || remotePrefix == null) {
+      IpWildcard remoteIdentity = isakmpProfile.getMatchIdentity();
+      if (localAddress == null || remoteIdentity == null) {
         _w.redFlag(
             String.format(
                 "Can't get IkeGateway: Local or remote address is not set for isakmpProfile %s",
@@ -3867,8 +3924,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
       } else {
         IkeGateway ikeGateway = new IkeGateway(e.getKey());
         c.getIkeGateways().put(name, ikeGateway);
-        ikeGateway.setAddress(remotePrefix.getStartIp());
-        Interface oldIface = getInterfaceByTunnelAddresses(localAddress, remotePrefix);
+        ikeGateway.setAddress(remoteIdentity.toPrefix().getStartIp());
+        Interface oldIface = getInterfaceByTunnelAddresses(localAddress, remoteIdentity.toPrefix());
         if (oldIface != null) {
           ikeGateway.setExternalInterface(c.getInterfaces().get(oldIface.getName()));
         } else {
@@ -4066,7 +4123,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _keyrings
         .values()
         .stream()
-        .filter(keyring -> keyring.getLocalInterfaceName() != null)
+        .filter(keyring -> !keyring.getLocalInterfaceName().equals(UNSET_LOCAL_INTERFACE))
         .forEach(
             keyring ->
                 keyring.setLocalAddress(
@@ -4076,7 +4133,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _isakmpProfiles
         .values()
         .stream()
-        .filter(isakmpProfile -> isakmpProfile.getLocalInterfaceName() != null)
+        .filter(
+            isakmpProfile -> !isakmpProfile.getLocalInterfaceName().equals(UNSET_LOCAL_INTERFACE))
         .forEach(
             isakmpProfile ->
                 isakmpProfile.setLocalAddress(
@@ -4114,6 +4172,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   public Map<String, ServiceObjectGroup> getServiceObjectGroups() {
     return _serviceObjectGroups;
+  }
+
+  public Map<String, ServiceObject> getServiceObjects() {
+    return _serviceObjects;
   }
 
   public Map<String, InspectClassMap> getInspectClassMaps() {
