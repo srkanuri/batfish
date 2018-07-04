@@ -4,6 +4,8 @@ import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.DST_PREFIX
 import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.DST_PREFIX_2;
 import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.LINK_1_NETWORK;
 import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.LINK_2_NETWORK;
+import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.SOURCE_NAT_ACL_IP;
+import static org.batfish.atomicpredicates.TwoNodeNetworkWithTwoLinks.SOURCE_NAT_POOL_IP;
 import static org.batfish.datamodel.Configuration.DEFAULT_VRF_NAME;
 import static org.batfish.symbolic.bdd.BDDMatchers.intersects;
 import static org.batfish.symbolic.bdd.BDDMatchers.isEquivalentTo;
@@ -26,14 +28,18 @@ import net.sf.javabdd.BDD;
 import org.batfish.atomicpredicates.BDDTrie.AtomicPredicate;
 import org.batfish.atomicpredicates.BDDTrie.BDDTrieException;
 import org.batfish.atomicpredicates.NetworkGraph.MultipathConsistencyViolation;
+import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.DataPlane;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
 import org.batfish.symbolic.bdd.AtomicPredicates;
+import org.batfish.symbolic.bdd.BDDAcl;
 import org.batfish.symbolic.bdd.BDDInteger;
 import org.batfish.symbolic.bdd.BDDOps;
+import org.batfish.symbolic.bdd.BDDPacket;
+import org.batfish.symbolic.bdd.IpSpaceToBDD;
 import org.batfish.z3.expr.StateExpr;
 import org.batfish.z3.state.Accept;
 import org.batfish.z3.state.Drop;
@@ -44,8 +50,10 @@ import org.batfish.z3.state.NodeDropAclOut;
 import org.batfish.z3.state.NodeDropNoRoute;
 import org.batfish.z3.state.NodeDropNullRoute;
 import org.batfish.z3.state.NodeInterfaceNeighborUnreachable;
+import org.batfish.z3.state.OriginateVrf;
 import org.batfish.z3.state.PostInVrf;
 import org.batfish.z3.state.PreInInterface;
+import org.batfish.z3.state.PreOutEdge;
 import org.batfish.z3.state.PreOutEdgePostNat;
 import org.batfish.z3.state.PreOutVrf;
 import org.junit.Before;
@@ -70,6 +78,8 @@ public class NetworkGraphFactoryTest {
   private PostInVrf _dstPostInVrf;
   private PreInInterface _dstPreInInterface1;
   private PreInInterface _dstPreInInterface2;
+  private PreOutEdge _dstPreOutEdge1;
+  private PreOutEdge _dstPreOutEdge2;
   private PreOutEdgePostNat _dstPreOutEdgePostNat1;
   private PreOutEdgePostNat _dstPreOutEdgePostNat2;
   private PreOutVrf _dstPreOutVrf;
@@ -93,6 +103,8 @@ public class NetworkGraphFactoryTest {
   private PostInVrf _srcPostInVrf;
   private PreInInterface _srcPreInInterface1;
   private PreInInterface _srcPreInInterface2;
+  private PreOutEdge _srcPreOutEdge1;
+  private PreOutEdge _srcPreOutEdge2;
   private PreOutEdgePostNat _srcPreOutEdgePostNat1;
   private PreOutEdgePostNat _srcPreOutEdgePostNat2;
   private PreOutVrf _srcPreOutVrf;
@@ -119,9 +131,9 @@ public class NetworkGraphFactoryTest {
   public void setup() {
     _bddOps = new BDDOps(GRAPH_FACTORY.getBDDFactory());
     _dstIface1Ip = DST_PREFIX_1.getStartIp();
-    _dstIface1IpBDD = ipBDD(_dstIface1Ip);
+    _dstIface1IpBDD = dstIpBDD(_dstIface1Ip);
     _dstIface2Ip = DST_PREFIX_2.getStartIp();
-    _dstIface2IpBDD = ipBDD(_dstIface2Ip);
+    _dstIface2IpBDD = dstIpBDD(_dstIface2Ip);
     _dstIface1Name = NET._dstIface1.getName();
     _dstIface2Name = NET._dstIface2.getName();
     _dstName = NET._dstNode.getHostname();
@@ -130,17 +142,17 @@ public class NetworkGraphFactoryTest {
     _dstPreOutVrf = new PreOutVrf(_dstName, DEFAULT_VRF_NAME);
 
     _link1DstIp = LINK_1_NETWORK.getEndIp();
-    _link1DstIpBDD = ipBDD(_link1DstIp);
+    _link1DstIpBDD = dstIpBDD(_link1DstIp);
     _link1DstName = NET._link1Dst.getName();
 
     _link1SrcName = NET._link1Src.getName();
-    _link1SrcIpBDD = ipBDD(LINK_1_NETWORK.getStartIp());
+    _link1SrcIpBDD = dstIpBDD(LINK_1_NETWORK.getStartIp());
 
     _link2DstIp = LINK_2_NETWORK.getEndIp();
-    _link2DstIpBDD = ipBDD(_link2DstIp);
+    _link2DstIpBDD = dstIpBDD(_link2DstIp);
     _link2DstName = NET._link2Dst.getName();
 
-    _link2SrcIpBDD = ipBDD(LINK_2_NETWORK.getStartIp());
+    _link2SrcIpBDD = dstIpBDD(LINK_2_NETWORK.getStartIp());
     _link2SrcName = NET._link2Src.getName();
 
     _srcName = NET._srcNode.getHostname();
@@ -153,10 +165,14 @@ public class NetworkGraphFactoryTest {
     _srcPreInInterface1 = new PreInInterface(_srcName, _link1SrcName);
     _srcPreInInterface2 = new PreInInterface(_srcName, _link2SrcName);
 
+    _dstPreOutEdge1 = new PreOutEdge(_dstName, _link1DstName, _srcName, _link1SrcName);
+    _dstPreOutEdge2 = new PreOutEdge(_dstName, _link2DstName, _srcName, _link2SrcName);
     _dstPreOutEdgePostNat1 =
         new PreOutEdgePostNat(_dstName, _link1DstName, _srcName, _link1SrcName);
     _dstPreOutEdgePostNat2 =
         new PreOutEdgePostNat(_dstName, _link2DstName, _srcName, _link2SrcName);
+    _srcPreOutEdge1 = new PreOutEdge(_srcName, _link1SrcName, _dstName, _link1DstName);
+    _srcPreOutEdge2 = new PreOutEdge(_srcName, _link2SrcName, _dstName, _link2DstName);
     _srcPreOutEdgePostNat1 =
         new PreOutEdgePostNat(_srcName, _link1SrcName, _dstName, _link1DstName);
     _srcPreOutEdgePostNat2 =
@@ -178,8 +194,12 @@ public class NetworkGraphFactoryTest {
     return GRAPH_FACTORY.getBDDTransitions().get(preState).get(postState);
   }
 
-  private static BDD ipBDD(Ip ip) {
-    return GRAPH_FACTORY.getIpSpaceToBDD().toBDD(ip);
+  private static BDD dstIpBDD(Ip ip) {
+    return new IpSpaceToBDD(BDDPacket.factory, new BDDPacket().getDstIp()).toBDD(ip);
+  }
+
+  private static BDD srcIpBDD(Ip ip) {
+    return new IpSpaceToBDD(BDDPacket.factory, new BDDPacket().getSrcIp()).toBDD(ip);
   }
 
   private BDD or(BDD... bdds) {
@@ -281,7 +301,7 @@ public class NetworkGraphFactoryTest {
   public void testBDDTransitions_PreInInterface_NodeDropAclIn() {
     NodeDropAclIn dstDropAclIn = new NodeDropAclIn(_dstName);
     assertThat(
-        bddTransition(_dstPreInInterface1, dstDropAclIn), isEquivalentTo(ipBDD(_dstIface2Ip)));
+        bddTransition(_dstPreInInterface1, dstDropAclIn), isEquivalentTo(dstIpBDD(_dstIface2Ip)));
     assertThat(bddTransition(_dstPreInInterface2, dstDropAclIn), nullValue());
   }
 
@@ -290,7 +310,7 @@ public class NetworkGraphFactoryTest {
     // link1: not(_dstIface2Ip)
     assertThat(
         bddTransition(_dstPreInInterface1, _dstPostInVrf),
-        isEquivalentTo(ipBDD(_dstIface2Ip).not()));
+        isEquivalentTo(dstIpBDD(_dstIface2Ip).not()));
     // link2: universe
     assertThat(bddTransition(_dstPreInInterface2, _dstPostInVrf), isOne());
   }
@@ -308,8 +328,8 @@ public class NetworkGraphFactoryTest {
         bddTransition(_srcPreOutVrf, new NodeInterfaceNeighborUnreachable(_srcName, link1SrcName));
     BDD nodeInterfaceNeighborUnreachable2 =
         bddTransition(_srcPreOutVrf, new NodeInterfaceNeighborUnreachable(_srcName, link2SrcName));
-    BDD preOutEdgePostNat1 = bddTransition(_srcPreOutVrf, link1PreOutEdgePostNat);
-    BDD preOutEdgePostNat2 = bddTransition(_srcPreOutVrf, link2PreOutEdgePostNat);
+    BDD preOutEdge1 = bddTransition(_srcPreOutVrf, _srcPreOutEdge1);
+    BDD preOutEdge2 = bddTransition(_srcPreOutVrf, _srcPreOutEdge2);
 
     assertThat(nodeDropNullRoute, nullValue());
 
@@ -317,14 +337,13 @@ public class NetworkGraphFactoryTest {
     assertThat(nodeInterfaceNeighborUnreachable2, isEquivalentTo(_link2SrcIpBDD));
 
     assertThat(
-        bddIps(preOutEdgePostNat1),
+        bddIps(preOutEdge1),
         containsInAnyOrder(_dstIface1Ip, _dstIface2Ip, NET._link1Dst.getAddress().getIp()));
     assertThat(
-        bddIps(preOutEdgePostNat2),
-        containsInAnyOrder(_dstIface2Ip, NET._link2Dst.getAddress().getIp()));
+        bddIps(preOutEdge2), containsInAnyOrder(_dstIface2Ip, NET._link2Dst.getAddress().getIp()));
 
     // ECMP: _dstIface1Ip is routed out both edges
-    assertThat(preOutEdgePostNat1.and(preOutEdgePostNat2), isEquivalentTo(ipBDD(_dstIface2Ip)));
+    assertThat(preOutEdge1.and(preOutEdge2), isEquivalentTo(dstIpBDD(_dstIface2Ip)));
   }
 
   @Test
@@ -350,18 +369,16 @@ public class NetworkGraphFactoryTest {
   }
 
   @Test
-  public void testBDDTransitions_PreOutVrf_PreOutEdgePostNat() {
+  public void testBDDTransitions_PreOutVrf_PreOutEdge() {
     assertThat(
-        bddTransition(_srcPreOutVrf, _srcPreOutEdgePostNat1),
+        bddTransition(_srcPreOutVrf, _srcPreOutEdge1),
         isEquivalentTo(or(_link1DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
     assertThat(
-        bddTransition(_srcPreOutVrf, _srcPreOutEdgePostNat2),
+        bddTransition(_srcPreOutVrf, _srcPreOutEdge2),
         isEquivalentTo(or(_link2DstIpBDD, _dstIface2IpBDD)));
 
-    assertThat(
-        bddTransition(_dstPreOutVrf, _dstPreOutEdgePostNat1), isEquivalentTo(_link1SrcIpBDD));
-    assertThat(
-        bddTransition(_dstPreOutVrf, _dstPreOutEdgePostNat2), isEquivalentTo(_link2SrcIpBDD));
+    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge1), isEquivalentTo(_link1SrcIpBDD));
+    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge2), isEquivalentTo(_link2SrcIpBDD));
   }
 
   @Test
@@ -394,26 +411,78 @@ public class NetworkGraphFactoryTest {
     assertThat(violations, hasSize(1));
     MultipathConsistencyViolation violation = violations.get(0);
     assertThat(
-        GRAPH_FACTORY.getApBDDs().get(violation.predicate), isEquivalentTo(ipBDD(_dstIface2Ip)));
+        GRAPH_FACTORY.getApBDDs().get(violation.predicate), isEquivalentTo(dstIpBDD(_dstIface2Ip)));
     assertThat(violation.finalStates, equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
   }
 
   @Test
-  public void testBDDNetworkGraph() {
+  public void testBDDNetworkGraph_sourceNat_match() {
     IpSpaceAssignment assignment =
         IpSpaceAssignment.builder()
             .assign(
                 new InterfaceLocation(NET._srcNode.getName(), NET._link1Src.getName()),
-                UniverseIpSpace.INSTANCE)
+                SOURCE_NAT_ACL_IP.toIpSpace())
             .build();
 
-    BDDNetworkGraph graph = GRAPH_FACTORY.bddNetworkGraph(assignment);
+    BDDNetworkGraph graph = GRAPH_FACTORY.bddNetworkGraph(assignment, _dstIface2Ip.toIpSpace());
     graph.computeReachability();
+
+    BDDPacket pkt = new BDDPacket();
+    BDD dstIpBDD = GRAPH_FACTORY.getIpSpaceToBDD().toBDD(_dstIface2Ip);
+    BDD natPoolIpBDD = srcIpBDD(SOURCE_NAT_POOL_IP);
+    BDD natAclIpBDD = srcIpBDD(SOURCE_NAT_ACL_IP);
+
+    BDD srcNatAclBDD = BDDAcl.create(NET._link2SrcSourceNatAcl).getBdd();
+    assertThat(srcNatAclBDD, isEquivalentTo(natAclIpBDD));
+
+    OriginateVrf originateVrf = new OriginateVrf(_srcName, Configuration.DEFAULT_VRF_NAME);
+    BDD preOutEdgePostNat_link2 =
+        graph
+            ._reachableStates
+            .get(new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName))
+            .get(originateVrf);
+
+    assertThat(preOutEdgePostNat_link2, isEquivalentTo(dstIpBDD.and(natPoolIpBDD)));
+
+    List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
+        graph.detectMultipathInconsistency();
+
+    /*
+     * TODO: we should get a violation, but it's masked because NAT only occurs along one path.
+     * The solution is to map back to the original headerspaces, and report violations based on
+     * those.
+     */
+    assertThat(violations, hasSize(0));
+  }
+
+  @Test
+  public void testBDDNetworkGraph_sourceNat_noMatch() {
+    IpSpaceAssignment assignment =
+        IpSpaceAssignment.builder()
+            .assign(
+                new InterfaceLocation(NET._srcNode.getName(), NET._link1Src.getName()),
+                Ip.MAX.toIpSpace())
+            .build();
+
+    BDDNetworkGraph graph = GRAPH_FACTORY.bddNetworkGraph(assignment, _dstIface2Ip.toIpSpace());
+    graph.computeReachability();
+
+    BDD dstIpBDD = GRAPH_FACTORY.getIpSpaceToBDD().toBDD(_dstIface2Ip);
+    BDD srcIpBDD = srcIpBDD(Ip.MAX);
+
+    OriginateVrf originateVrf = new OriginateVrf(_srcName, Configuration.DEFAULT_VRF_NAME);
+    BDD preOutEdgePostNat_link2 =
+        graph
+            ._reachableStates
+            .get(new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName))
+            .get(originateVrf);
+
+    assertThat(preOutEdgePostNat_link2, isEquivalentTo(dstIpBDD.and(srcIpBDD)));
     List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
         graph.detectMultipathInconsistency();
     assertThat(violations, hasSize(1));
     BDDNetworkGraph.MultipathConsistencyViolation violation = violations.get(0);
     assertThat(violation.finalStates, equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
-    assertThat(violation.predicate, isEquivalentTo(ipBDD(_dstIface2Ip)));
+    assertThat(violation.predicate, isEquivalentTo(dstIpBDD.and(srcIpBDD)));
   }
 }

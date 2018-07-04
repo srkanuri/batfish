@@ -122,7 +122,6 @@ import org.batfish.datamodel.RipProcess;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.SwitchportMode;
 import org.batfish.datamodel.Topology;
-import org.batfish.datamodel.UniverseIpSpace;
 import org.batfish.datamodel.Vrf;
 import org.batfish.datamodel.answers.AclLinesAnswerElementInterface;
 import org.batfish.datamodel.answers.AclLinesAnswerElementInterface.AclSpecs;
@@ -182,7 +181,6 @@ import org.batfish.representation.iptables.IptablesVendorConfiguration;
 import org.batfish.role.InferRoles;
 import org.batfish.role.NodeRoleDimension;
 import org.batfish.role.NodeRolesData;
-import org.batfish.specifier.InterfaceLinkLocation;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
 import org.batfish.specifier.Location;
@@ -4149,6 +4147,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     Map<String, Configuration> configurations = parameters.getConfigurations();
     DataPlane dataPlane = parameters.getDataPlane();
+
+    testGraphFactory(
+        configurations, dataPlane.getForwardingAnalysis(), parameters.getSourceIpAssignment());
+
     Set<String> forbiddenTransitNodes = parameters.getForbiddenTransitNodes();
     HeaderSpace headerSpace = parameters.getHeaderSpace();
     Set<String> requiredTransitNodes = parameters.getRequiredTransitNodes();
@@ -4340,22 +4342,9 @@ public class Batfish extends PluginConsumer implements IBatfish {
   }
 
   private void testGraphFactory(
-      Map<String, Configuration> configurations, ForwardingAnalysis forwardingAnalysis) {
-    Set<Location> allLocations =
-        configurations
-            .values()
-            .stream()
-            .flatMap(node -> node.getInterfaces().values().stream())
-            .flatMap(
-                iface -> {
-                  String node = iface.getOwner().getHostname();
-                  String name = iface.getName();
-                  return Stream.of(
-                      new InterfaceLocation(node, name), new InterfaceLinkLocation(node, name));
-                })
-            .collect(Collectors.toSet());
-    IpSpaceAssignment ipSpaceAssignment =
-        IpSpaceAssignment.builder().assign(allLocations, UniverseIpSpace.INSTANCE).build();
+      Map<String, Configuration> configurations,
+      ForwardingAnalysis forwardingAnalysis,
+      IpSpaceAssignment sourceIpAssignment) {
 
     boolean doBDDNetworkGraph = true;
     boolean doBDDTrie = false;
@@ -4370,7 +4359,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
       bddTrieGraphFactory =
           new NetworkGraphFactory(
               configurations, forwardingAnalysis, (preds) -> new DummyAtomizer(), dstIpOnly);
-      BDDNetworkGraph bddNetworkGraph = bddTrieGraphFactory.bddNetworkGraph(ipSpaceAssignment);
+      BDDNetworkGraph bddNetworkGraph = bddTrieGraphFactory.bddNetworkGraph(sourceIpAssignment);
       timeConstructGraph = System.currentTimeMillis() - timeConstructGraph;
       long timeComputeReachability = System.currentTimeMillis();
       bddNetworkGraph.computeReachability();
@@ -4402,7 +4391,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
                 "Src=%s, dstIp=%s, dstPort=%s, srcIp=%s, srcPort=%s, ipProtocol=%s, icmpCode=%s, icmpType=%s, ack=%s, cwr=%s, ece=%s,"
                     + " fin=%s, psh=%s, rst=%s, syn=%s, urg=%s, Terminal States=%s",
                 violation.originateState,
-                dstIp.toString(),
+                dstIp,
                 dstPort,
                 srcIp,
                 srcPort,
@@ -4549,8 +4538,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
     _logger.resetTimer();
 
     _logger.info("Synthesizing Z3 logic...");
-
-    testGraphFactory(configurations, dataPlane.getForwardingAnalysis());
 
     Synthesizer s =
         new Synthesizer(

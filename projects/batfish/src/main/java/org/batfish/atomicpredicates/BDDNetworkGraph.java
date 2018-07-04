@@ -1,5 +1,6 @@
 package org.batfish.atomicpredicates;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -13,36 +14,39 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
+import org.batfish.symbolic.bdd.BDDOps;
+import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.z3.expr.StateExpr;
 
 public class BDDNetworkGraph {
   // preState --> postState --> predicate
-  private final Map<StateExpr, Map<StateExpr, BDD>> _transitions;
+  private final Map<StateExpr, Map<StateExpr, Edge>> _edges;
 
   private final Map<StateExpr, BDD> _graphRoots;
 
   // postState --> source state --> predicate
-  private final Map<StateExpr, Map<StateExpr, BDD>> _reachableStates;
+  @VisibleForTesting final Map<StateExpr, Map<StateExpr, BDD>> _reachableStates;
+
+  // for NAT
+  private final BDD _srcIpVars;
 
   private Set<StateExpr> _terminalStates;
 
-  BDDNetworkGraph(Map<StateExpr, BDD> graphRoots, Map<StateExpr, Map<StateExpr, BDD>> transitions) {
-    _transitions = transitions;
+  BDDNetworkGraph(
+      Map<StateExpr, BDD> graphRoots, Map<StateExpr, Map<StateExpr, Edge>> transitions) {
+    _edges = transitions;
     _graphRoots = ImmutableMap.copyOf(graphRoots);
     _reachableStates = new HashMap<>();
     _graphRoots.forEach(
         (root, bdd) -> _reachableStates.computeIfAbsent(root, k -> new HashMap<>()).put(root, bdd));
     _terminalStates = computeTerminalStates();
+    _srcIpVars = new BDDOps(BDDPacket.factory).and(new BDDPacket().getSrcIp().getBitvec());
   }
 
   private Set<StateExpr> computeTerminalStates() {
-    Set<StateExpr> preStates = _transitions.keySet();
+    Set<StateExpr> preStates = _edges.keySet();
     Set<StateExpr> postStates =
-        _transitions
-            .values()
-            .stream()
-            .flatMap(m -> m.keySet().stream())
-            .collect(Collectors.toSet());
+        _edges.values().stream().flatMap(m -> m.keySet().stream()).collect(Collectors.toSet());
     return ImmutableSet.copyOf(Sets.difference(postStates, preStates));
   }
 
@@ -63,24 +67,47 @@ public class BDDNetworkGraph {
 
       dirty.forEach(
           (preState, root) -> {
-            Map<StateExpr, BDD> postStateConstraints = _transitions.get(preState);
-            if (postStateConstraints == null) {
+            Map<StateExpr, Edge> preStateOutEdges = _edges.get(preState);
+            if (preStateOutEdges == null) {
               // preState has no out-edges
               return;
             }
 
             BDD preStateBDD = _reachableStates.get(preState).get(root);
-            postStateConstraints.forEach(
-                (postState, edgeBDD) -> {
-                  BDD intersection = preStateBDD.and(edgeBDD);
-                  if (intersection.isZero()) {
+            preStateOutEdges.forEach(
+                (postState, edge) -> {
+                  BDD result = preStateBDD.and(edge.getConstraint());
+                  if (result.isZero()) {
                     return;
                   }
+
+                  List<BDDSourceNat> sourceNats = edge.getSourceNats();
+                  if (sourceNats != null) {
+                    BDD existSrcIp = result.exist(_srcIpVars);
+                    BDD orig = result;
+                    result = orig.getFactory().zero();
+                    for (BDDSourceNat sourceNat : sourceNats) {
+                      BDD match = orig.and(sourceNat._condition);
+                      if (!match.isZero()) {
+                        result = result.or(existSrcIp.and(sourceNat._updateSrcIp));
+                        orig = orig.and(sourceNat._condition.not());
+                      }
+                    }
+                    result = result.or(orig);
+                    /*
+                    BDD existSrcIp = result.exist(_srcIpVars);
+                    for (BDDSourceNat sourceNat : Lists.reverse(sourceNats)) {
+                      result =
+                          sourceNat._condition.ite(existSrcIp.and(sourceNat._updateSrcIp), result);
+                    }
+                    */
+                  }
+
                   // update postState BDD reachable from source
                   Map<StateExpr, BDD> reachPostState =
                       _reachableStates.computeIfAbsent(postState, k -> new HashMap<>());
                   BDD oldReach = reachPostState.get(root);
-                  BDD newReach = oldReach == null ? intersection : oldReach.or(intersection);
+                  BDD newReach = oldReach == null ? result : oldReach.or(result);
 
                   if (oldReach == null || !oldReach.equals(newReach)) {
                     reachPostState.put(root, newReach);

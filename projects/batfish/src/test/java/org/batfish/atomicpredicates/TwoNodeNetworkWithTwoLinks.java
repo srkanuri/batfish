@@ -11,10 +11,12 @@ import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.Interface;
 import org.batfish.datamodel.InterfaceAddress;
+import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpAccessList;
 import org.batfish.datamodel.IpAccessListLine;
 import org.batfish.datamodel.NetworkFactory;
 import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.SourceNat;
 import org.batfish.datamodel.StaticRoute;
 import org.batfish.datamodel.Vrf;
 import org.batfish.main.Batfish;
@@ -27,6 +29,8 @@ class TwoNodeNetworkWithTwoLinks {
   static final Prefix DST_PREFIX_2 = Prefix.parse("2.1.0.0/32");
   static final Prefix LINK_1_NETWORK = Prefix.parse("1.0.0.0/31");
   static final Prefix LINK_2_NETWORK = Prefix.parse("2.0.0.0/31");
+  static final Ip SOURCE_NAT_ACL_IP = new Ip("5.5.5.5");
+  static final Ip SOURCE_NAT_POOL_IP = new Ip("6.6.6.6");
 
   final Batfish _batfish;
   final SortedMap<String, Configuration> _configs;
@@ -38,6 +42,7 @@ class TwoNodeNetworkWithTwoLinks {
   final Interface _link2Src;
   final Interface _link1Dst;
   final Interface _link2Dst;
+  final IpAccessList _link2SrcSourceNatAcl;
 
   TwoNodeNetworkWithTwoLinks() throws IOException {
     NetworkFactory nf = new NetworkFactory();
@@ -79,12 +84,32 @@ class TwoNodeNetworkWithTwoLinks {
     ib.setIncomingFilter(null);
 
     // second link
+    _link2SrcSourceNatAcl =
+        nf.aclBuilder()
+            .setOwner(_srcNode)
+            .setLines(
+                ImmutableList.of(
+                    IpAccessListLine.acceptingHeaderSpace(
+                        HeaderSpace.builder().setSrcIps(SOURCE_NAT_ACL_IP.toIpSpace()).build())))
+            .build();
+
     _link2Src =
         ib.setAddress(
                 new InterfaceAddress(LINK_2_NETWORK.getStartIp(), LINK_2_NETWORK.getPrefixLength()))
+            .setSourceNats(
+                ImmutableList.of(
+                    SourceNat.builder()
+                        .setAcl(_link2SrcSourceNatAcl)
+                        .setPoolIpFirst(SOURCE_NAT_POOL_IP)
+                        .setPoolIpLast(SOURCE_NAT_POOL_IP)
+                        .build()))
             .setOwner(_srcNode)
             .setVrf(srcVrf)
             .build();
+
+    // unset source nats
+    ib.setSourceNats(null);
+
     _link2Dst =
         ib.setAddress(
                 new InterfaceAddress(LINK_2_NETWORK.getEndIp(), LINK_2_NETWORK.getPrefixLength()))

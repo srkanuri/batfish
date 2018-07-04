@@ -166,8 +166,8 @@ public class BDDInteger {
   /*
    * Less than or equal to on integers
    */
-  public BDD leq(int val) {
-    int currentVal = val;
+  public BDD leq(long val) {
+    long currentVal = val;
     BDD[] eq = new BDD[_bitvec.length];
     BDD[] less = new BDD[_bitvec.length];
     for (int i = _bitvec.length - 1; i >= 0; i--) {
@@ -190,8 +190,8 @@ public class BDDInteger {
   /*
    * Less than or equal to on integers
    */
-  public BDD geq(int val) {
-    int currentVal = val;
+  public BDD geq(long val) {
+    long currentVal = val;
     BDD[] eq = new BDD[_bitvec.length];
     BDD[] greater = new BDD[_bitvec.length];
     for (int i = _bitvec.length - 1; i >= 0; i--) {

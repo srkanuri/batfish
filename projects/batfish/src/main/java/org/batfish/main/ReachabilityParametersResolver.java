@@ -9,8 +9,12 @@ import org.batfish.datamodel.questions.InvalidReachabilityParametersException;
 import org.batfish.main.Batfish.CompressDataPlaneResult;
 import org.batfish.question.ReachabilityParameters;
 import org.batfish.question.ResolvedReachabilityParameters;
+import org.batfish.specifier.AllInterfaceLinksLocationSpecifier;
+import org.batfish.specifier.AllInterfacesLocationSpecifier;
+import org.batfish.specifier.InferFromLocationIpSpaceSpecifier;
 import org.batfish.specifier.SpecifierContext;
 import org.batfish.specifier.SpecifierContextImpl;
+import org.batfish.specifier.UnionLocationSpecifier;
 
 /**
  * Resolve a {@link ReachabilityParameters} and return a {@link ResolvedReachabilityParameters}
@@ -53,9 +57,16 @@ final class ReachabilityParametersResolver {
         .setHeaderSpace(params.getHeaderSpace())
         .setMaxChunkSize(params.getMaxChunkSize())
         .setSourceIpSpaceAssignment(
+            /*
             params
-                .getSourceIpSpaceSpecifier()
-                .resolve(params.getSourceLocationSpecifier().resolve(context), context))
+                .getSourceIpSpaceSpecifier().resolve(
+                params.getSourceLocationSpecifier().resolve(context), context))*/
+            InferFromLocationIpSpaceSpecifier.INSTANCE.resolve(
+                new UnionLocationSpecifier(
+                        AllInterfacesLocationSpecifier.INSTANCE,
+                        AllInterfaceLinksLocationSpecifier.INSTANCE)
+                    .resolve(context),
+                context))
         .setSrcNatted(params.getSrcNatted())
         .setSpecialize(params.getSpecialize())
         .setRequiredTransitNodes(params.getRequiredTransitNodesSpecifier().resolve(context))
