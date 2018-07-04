@@ -1,5 +1,6 @@
 package org.batfish.datamodel;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static java.util.Objects.requireNonNull;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -218,6 +219,13 @@ public abstract class AbstractRoute
     return rb.build();
   }
 
+  @Override
+  public final @Nonnull RouteOuterClass.Route toMessage() {
+    return completeMessage(RouteOuterClass.Route.newBuilder().setNetwork(_network.toString()));
+  }
+
+  protected abstract @Nonnull RouteOuterClass.Route completeMessage(@Nonnull RouteOuterClass.Route.Builder routeBuilder);
+  
   public static AbstractRoute fromMessage(RouteOuterClass.Route message) {
     String hostname = message.getHostname();
     String vrfName = message.getVrfName();

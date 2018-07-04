@@ -5,6 +5,11 @@ import static org.batfish.common.plugin.PluginConsumer.detectFormat;
 
 import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.util.JsonFormat.TypeRegistry;
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -119,6 +124,33 @@ final class BatfishStorage {
           "Failed to deserialize ConvertConfigurationAnswerElement: %s",
           Throwables.getStackTraceAsString(e));
       return null;
+    }
+  }
+
+  /** Serializes the given message to a file with the given output name. */
+  public void serializeMessage(Message message, Path outputFile) {
+    try {
+      try (Closer closer = Closer.create()) {
+        OutputStream out = closer.register(Files.newOutputStream(outputFile));
+        BufferedOutputStream bout = closer.register(new BufferedOutputStream(out));
+        LZ4FrameOutputStream lout = closer.register(new LZ4FrameOutputStream(bout));
+        message.writeTo(lout);
+      }
+    } catch (IOException e) {
+      throw new BatfishException("Failed to serialize object to output file: " + outputFile, e);
+    }
+  }
+
+  /** Serializes the given message to a json file with the given output name. */
+  public void serializeMessageAsJson(Message message, Path outputFile, TypeRegistry typeRegistry) {
+    try {
+      try (Closer closer = Closer.create()) {
+        BufferedWriter bout = closer.register(Files.newBufferedWriter(outputFile));
+        JsonFormat.printer().usingTypeRegistry(typeRegistry).appendTo(message, bout);
+      }
+    } catch (IOException e) {
+      throw new BatfishException(
+          "Failed to serialize message as JSON to output file: " + outputFile, e);
     }
   }
 

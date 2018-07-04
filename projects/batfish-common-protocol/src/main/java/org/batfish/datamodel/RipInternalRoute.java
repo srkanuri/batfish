@@ -78,9 +78,8 @@ public class RipInternalRoute extends RipRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
-        .setRipRoute(RipRouteOuterClass.RipRoute.newBuilder().build())
-        .build();
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder.setRipRoute(RipRouteOuterClass.RipRoute.newBuilder().build()).build();
   }
 }

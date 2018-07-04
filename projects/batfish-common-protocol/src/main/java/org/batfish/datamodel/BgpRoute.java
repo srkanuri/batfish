@@ -486,10 +486,9 @@ public class BgpRoute extends AbstractRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
-        .setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build())
-        .build();
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder.setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build()).build();
   }
 
   public static Builder fromBgpRoute(RouteOuterClass.Route route) {

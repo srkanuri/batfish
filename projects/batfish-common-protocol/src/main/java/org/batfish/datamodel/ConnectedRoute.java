@@ -87,8 +87,9 @@ public class ConnectedRoute extends AbstractRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
         .setConnectedRoute(ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
         .build();
   }

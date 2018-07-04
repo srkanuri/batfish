@@ -289,15 +289,16 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
   public DataPlaneOuterClass.DataPlane toMessage() {
     IncrementalDataPlaneOuterClass.IncrementalDataPlane.Builder implBuilder =
         IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder();
-    _ribs
-        .values()
-        .stream()
-        .map(Map::values)
-        .flatMap(Collection::stream)
-        .map(GenericRib::getRoutes)
-        .flatMap(Collection::stream)
-        .map(AbstractRoute::toMessage)
-        .forEach(implBuilder::addRoutes);
+    _ribs.forEach(
+        (hostname, ribsByVrf) ->
+            ribsByVrf.forEach(
+                (vrfName, rib) -> {
+                  RibOuterClass.Rib.Builder ribBuilder = RibOuterClass.Rib.newBuilder();
+                  ribBuilder.setHostname(hostname);
+                  ribBuilder.setVrfName(vrfName);
+                  rib.getRoutes().forEach(route -> ribBuilder.addRoutes(route.toMessage()));
+                  implBuilder.addMainRibs(ribBuilder.build());
+                }));
     return DataPlaneOuterClass.DataPlane.newBuilder()
         .setImpl(Any.pack(implBuilder.build()))
         .build();

@@ -106,9 +106,8 @@ public class LocalRoute extends AbstractRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
-        .setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build())
-        .build();
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder.setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build()).build();
   }
 }

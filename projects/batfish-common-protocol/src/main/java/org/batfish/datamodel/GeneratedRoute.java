@@ -316,8 +316,9 @@ public final class GeneratedRoute extends AbstractRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
         .setGeneratedRoute(GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
         .build();
   }

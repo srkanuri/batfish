@@ -288,9 +288,8 @@ public class IsisRoute extends AbstractRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
-        .setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build())
-        .build();
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder.setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build()).build();
   }
 }

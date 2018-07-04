@@ -3,6 +3,9 @@ package org.batfish.common.plugin;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.util.JsonFormat.TypeRegistry;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import java.io.BufferedInputStream;
@@ -21,7 +24,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.SortedSet;
@@ -62,10 +67,13 @@ public abstract class PluginConsumer implements IPluginConsumer {
 
   private ClassLoader _currentClassLoader;
 
+  private final Map<String, Descriptor> _descriptors;
+
   private final boolean _serializeToText;
 
   public PluginConsumer(boolean serializeToText) {
     _currentClassLoader = Thread.currentThread().getContextClassLoader();
+    _descriptors = new HashMap<>();
     _serializeToText = serializeToText;
   }
 
@@ -172,6 +180,10 @@ public abstract class PluginConsumer implements IPluginConsumer {
     return _currentClassLoader;
   }
 
+  public Map<String, Descriptor> getDescriptors() {
+    return _descriptors;
+  }
+
   public abstract PluginClientType getType();
 
   protected final void loadPlugins() {
@@ -243,5 +255,9 @@ public abstract class PluginConsumer implements IPluginConsumer {
     } catch (IOException e) {
       throw new BatfishException("Failed to convert object to LZ4 data", e);
     }
+  }
+
+  protected TypeRegistry typeRegistry() {
+    return JsonFormat.TypeRegistry.newBuilder().add(_descriptors.values()).build();
   }
 }

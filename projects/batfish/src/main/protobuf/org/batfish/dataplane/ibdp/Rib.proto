@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package org.batfish.dataplane.ibdp;
+
+import "org/batfish/datamodel/Route.proto";
+
+message Rib {
+  string hostname = 1;
+  string vrf_name = 2;
+  repeated org.batfish.datamodel.Route routes = 3;
+}

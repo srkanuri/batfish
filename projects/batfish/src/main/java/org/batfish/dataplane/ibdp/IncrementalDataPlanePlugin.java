@@ -2,7 +2,9 @@ package org.batfish.dataplane.ibdp;
 
 import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.Descriptors.Descriptor;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -95,6 +97,13 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
   @Override
   public ITracerouteEngine getTracerouteEngine() {
     return TracerouteEngineImpl.getInstance();
+  }
+
+  @Override
+  public Map<String, Descriptor> getDescriptors() {
+    return ImmutableMap.of(
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.class.getCanonicalName(),
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.getDescriptor());
   }
 
   @Override

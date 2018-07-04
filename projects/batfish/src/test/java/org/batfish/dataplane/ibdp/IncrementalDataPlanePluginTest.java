@@ -117,68 +117,69 @@ public class IncrementalDataPlanePluginTest {
 
   @Test
   public void testProto() throws IOException {
-    IncrementalDataPlaneOuterClass.IncrementalDataPlane newidp =
-        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder()
-            .addAllRoutes(
-                ImmutableList.of(
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setConnectedRoute(
-                            ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setGeneratedRoute(
-                            GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setRipRoute(RipRouteOuterClass.RipRoute.newBuilder().build())
-                        .build(),
-                    RouteOuterClass.Route.newBuilder()
-                        .setHostname("host1")
-                        .setVrfName("vrf1")
-                        .setStaticRoute(StaticRouteOuterClass.StaticRoute.newBuilder().build())
-                        .build()))
-            .build();
-    DataPlaneOuterClass.DataPlane newdp =
-        DataPlaneOuterClass.DataPlane.newBuilder().setImpl(Any.pack(newidp)).build();
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    newdp.writeTo(baos);
-    System.out.println("output:");
-    System.out.println(baos.toString());
-
-    StringBuilder sb = new StringBuilder();
-    JsonFormat.TypeRegistry registry =
-        JsonFormat.TypeRegistry.newBuilder()
-            .add(IncrementalDataPlaneOuterClass.IncrementalDataPlane.getDescriptor())
-            .build();
-    JsonFormat.printer().usingTypeRegistry(registry).appendTo(newdp, sb);
-    System.out.println("outputjson:");
-    System.out.println(sb.toString());
+    //    IncrementalDataPlaneOuterClass.IncrementalDataPlane newidp =
+    //        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder()
+    //            .addAllRoutes(
+    //                ImmutableList.of(
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setBgpRoute(BgpRouteOuterClass.BgpRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setConnectedRoute(
+    //                            ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setGeneratedRoute(
+    //                            GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //                        .setRipRoute(RipRouteOuterClass.RipRoute.newBuilder().build())
+    //                        .build(),
+    //                    RouteOuterClass.Route.newBuilder()
+    //                        .setHostname("host1")
+    //                        .setVrfName("vrf1")
+    //
+    // .setStaticRoute(StaticRouteOuterClass.StaticRoute.newBuilder().build())
+    //                        .build()))
+    //            .build();
+    //    DataPlaneOuterClass.DataPlane newdp =
+    //        DataPlaneOuterClass.DataPlane.newBuilder().setImpl(Any.pack(newidp)).build();
+    //    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    //    newdp.writeTo(baos);
+    //    System.out.println("output:");
+    //    System.out.println(baos.toString());
+    //
+    //    StringBuilder sb = new StringBuilder();
+    //    JsonFormat.TypeRegistry registry =
+    //        JsonFormat.TypeRegistry.newBuilder()
+    //            .add(IncrementalDataPlaneOuterClass.IncrementalDataPlane.getDescriptor())
+    //            .build();
+    //    JsonFormat.printer().usingTypeRegistry(registry).appendTo(newdp, sb);
+    //    System.out.println("outputjson:");
+    //    System.out.println(sb.toString());
   }
 
   @Test(timeout = 5000)

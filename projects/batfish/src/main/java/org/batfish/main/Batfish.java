@@ -16,6 +16,7 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.protobuf.Message;
 import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
 import java.io.File;
@@ -1018,6 +1019,10 @@ public class Batfish extends PluginConsumer implements IBatfish {
         GlobalTracer.get().buildSpan("Writing data plane").startActive()) {
       assert writeDataplane != null; // avoid unused warning
       serializeObject(dataPlane, dataPlanePath);
+      Message dpMessage = dataPlane.toMessage();
+      _storage.serializeMessage(dpMessage, dataPlanePath.getParent().resolve("dataplanemessage"));
+      _storage.serializeMessageAsJson(
+          dpMessage, dataPlanePath.getParent().resolve("dataplanemessage.json"), typeRegistry());
       serializeObject(answerElement, answerElementPath);
     }
     _logger.printElapsedTime();

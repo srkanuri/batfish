@@ -61,9 +61,8 @@ public class OspfInterAreaRoute extends OspfInternalRoute {
   }
 
   @Override
-  public RouteOuterClass.Route toMessage() {
-    return RouteOuterClass.Route.newBuilder()
-        .setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build())
-        .build();
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder.setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build()).build();
   }
 }

@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-import "org/batfish/datamodel/Route.proto";
-
 package org.batfish.dataplane.ibdp;
 
+import "org/batfish/dataplane/ibdp/Rib.proto";
+
 message IncrementalDataPlane {
-  repeated org.batfish.datamodel.Route routes = 1;
+  repeated org.batfish.dataplane.ibdp.Rib main_ribs = 1;
 }
