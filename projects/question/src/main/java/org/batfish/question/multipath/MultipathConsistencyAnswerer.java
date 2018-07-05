@@ -22,7 +22,6 @@ public class MultipathConsistencyAnswerer extends Answerer {
 
   @Override
   public AnswerElement answer() {
-    String tag = _batfish.getFlowTag();
     Set<Flow> flows = _batfish.bddMultipathConsistency();
     _batfish.processFlows(flows, false);
     FlowHistory flowHistory = _batfish.getHistory();
