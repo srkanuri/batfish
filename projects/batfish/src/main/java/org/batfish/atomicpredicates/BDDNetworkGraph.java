@@ -17,12 +17,17 @@ import net.sf.javabdd.BDD;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.z3.expr.StateExpr;
+import org.batfish.z3.state.NumberedQuery;
 
 public class BDDNetworkGraph {
   // preState --> postState --> predicate
   private final Map<StateExpr, Map<StateExpr, Edge>> _edges;
 
   private final Map<StateExpr, BDD> _graphRoots;
+
+  // natting postState --> root --> logical root
+  private Map<StateExpr, Map<StateExpr, StateExpr>> _natRoots;
+  private int _natRootCounter = 0;
 
   // postState --> source state --> predicate
   @VisibleForTesting final Map<StateExpr, Map<StateExpr, BDD>> _reachableStates;
@@ -36,6 +41,7 @@ public class BDDNetworkGraph {
       Map<StateExpr, BDD> graphRoots, Map<StateExpr, Map<StateExpr, Edge>> transitions) {
     _edges = transitions;
     _graphRoots = ImmutableMap.copyOf(graphRoots);
+    _natRoots = new HashMap<>();
     _reachableStates = new HashMap<>();
     _graphRoots.forEach(
         (root, bdd) -> _reachableStates.computeIfAbsent(root, k -> new HashMap<>()).put(root, bdd));
@@ -48,6 +54,10 @@ public class BDDNetworkGraph {
     Set<StateExpr> postStates =
         _edges.values().stream().flatMap(m -> m.keySet().stream()).collect(Collectors.toSet());
     return ImmutableSet.copyOf(Sets.difference(postStates, preStates));
+  }
+
+  Map<StateExpr, Map<StateExpr, StateExpr>> getNatRoots() {
+    return _natRoots;
   }
 
   public void computeReachability() {
@@ -82,6 +92,7 @@ public class BDDNetworkGraph {
                   }
 
                   List<BDDSourceNat> sourceNats = edge.getSourceNats();
+                  boolean natted = false;
                   if (sourceNats != null) {
                     BDD existSrcIp = result.exist(_srcIpVars);
                     BDD orig = result;
@@ -89,29 +100,33 @@ public class BDDNetworkGraph {
                     for (BDDSourceNat sourceNat : sourceNats) {
                       BDD match = orig.and(sourceNat._condition);
                       if (!match.isZero()) {
+                        natted = true;
                         result = result.or(existSrcIp.and(sourceNat._updateSrcIp));
                         orig = orig.and(sourceNat._condition.not());
                       }
                     }
                     result = result.or(orig);
-                    /*
-                    BDD existSrcIp = result.exist(_srcIpVars);
-                    for (BDDSourceNat sourceNat : Lists.reverse(sourceNats)) {
-                      result =
-                          sourceNat._condition.ite(existSrcIp.and(sourceNat._updateSrcIp), result);
-                    }
-                    */
                   }
+
+                  // we want to remember the source BDD, but NAT is destructive. So we're going
+                  // to map back to it. We'll create a new dummy state for each combination of
+                  // postState/root.
+                  StateExpr logicalRoot =
+                      natted
+                          ? _natRoots
+                              .computeIfAbsent(postState, k -> new HashMap<>())
+                              .computeIfAbsent(root, k -> new NumberedQuery(this._natRootCounter++))
+                          : root;
 
                   // update postState BDD reachable from source
                   Map<StateExpr, BDD> reachPostState =
                       _reachableStates.computeIfAbsent(postState, k -> new HashMap<>());
-                  BDD oldReach = reachPostState.get(root);
+                  BDD oldReach = reachPostState.get(logicalRoot);
                   BDD newReach = oldReach == null ? result : oldReach.or(result);
 
                   if (oldReach == null || !oldReach.equals(newReach)) {
-                    reachPostState.put(root, newReach);
-                    newDirty.put(postState, root);
+                    reachPostState.put(logicalRoot, newReach);
+                    newDirty.put(postState, logicalRoot);
                   }
                 });
           });

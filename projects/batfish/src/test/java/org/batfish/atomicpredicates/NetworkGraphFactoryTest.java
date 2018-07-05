@@ -13,6 +13,7 @@ import static org.batfish.symbolic.bdd.BDDMatchers.isOne;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -22,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.sf.javabdd.BDD;
@@ -427,7 +429,6 @@ public class NetworkGraphFactoryTest {
     BDDNetworkGraph graph = GRAPH_FACTORY.bddNetworkGraph(assignment, _dstIface2Ip.toIpSpace());
     graph.computeReachability();
 
-    BDDPacket pkt = new BDDPacket();
     BDD dstIpBDD = GRAPH_FACTORY.getIpSpaceToBDD().toBDD(_dstIface2Ip);
     BDD natPoolIpBDD = srcIpBDD(SOURCE_NAT_POOL_IP);
     BDD natAclIpBDD = srcIpBDD(SOURCE_NAT_ACL_IP);
@@ -436,13 +437,17 @@ public class NetworkGraphFactoryTest {
     assertThat(srcNatAclBDD, isEquivalentTo(natAclIpBDD));
 
     OriginateVrf originateVrf = new OriginateVrf(_srcName, Configuration.DEFAULT_VRF_NAME);
-    BDD preOutEdgePostNat_link2 =
-        graph
-            ._reachableStates
-            .get(new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName))
-            .get(originateVrf);
+    PreOutEdgePostNat preOutEdge2PostNat =
+        new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName);
 
-    assertThat(preOutEdgePostNat_link2, isEquivalentTo(dstIpBDD.and(natPoolIpBDD)));
+    assertThat(graph.getNatRoots(), hasKey(preOutEdge2PostNat));
+    Map<StateExpr, StateExpr> natRoots = graph.getNatRoots().get(preOutEdge2PostNat);
+    assertThat(natRoots, hasKey(originateVrf));
+    StateExpr logicalRoot = natRoots.get(originateVrf);
+
+    BDD preOutEdgePostNatLink2 = graph._reachableStates.get(preOutEdge2PostNat).get(logicalRoot);
+
+    assertThat(preOutEdgePostNatLink2, isEquivalentTo(dstIpBDD.and(natPoolIpBDD)));
 
     List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
         graph.detectMultipathInconsistency();
@@ -471,13 +476,13 @@ public class NetworkGraphFactoryTest {
     BDD srcIpBDD = srcIpBDD(Ip.MAX);
 
     OriginateVrf originateVrf = new OriginateVrf(_srcName, Configuration.DEFAULT_VRF_NAME);
-    BDD preOutEdgePostNat_link2 =
+    BDD preOutEdgePostNatLink2 =
         graph
             ._reachableStates
             .get(new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName))
             .get(originateVrf);
 
-    assertThat(preOutEdgePostNat_link2, isEquivalentTo(dstIpBDD.and(srcIpBDD)));
+    assertThat(preOutEdgePostNatLink2, isEquivalentTo(dstIpBDD.and(srcIpBDD)));
     List<BDDNetworkGraph.MultipathConsistencyViolation> violations =
         graph.detectMultipathInconsistency();
     assertThat(violations, hasSize(1));
