@@ -14,12 +14,18 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.sf.javabdd.BDD;
+import org.batfish.common.BatfishException;
+import org.batfish.datamodel.Flow;
 import org.batfish.symbolic.bdd.BDDOps;
 import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.z3.expr.StateExpr;
 import org.batfish.z3.state.NumberedQuery;
+import org.batfish.z3.state.OriginateInterfaceLink;
+import org.batfish.z3.state.OriginateVrf;
 
 public class BDDNetworkGraph {
+  private final BDDPacket _bddPacket;
+
   // preState --> postState --> predicate
   private final Map<StateExpr, Map<StateExpr, Edge>> _edges;
 
@@ -39,6 +45,7 @@ public class BDDNetworkGraph {
 
   BDDNetworkGraph(
       Map<StateExpr, BDD> graphRoots, Map<StateExpr, Map<StateExpr, Edge>> transitions) {
+    _bddPacket = new BDDPacket();
     _edges = transitions;
     _graphRoots = ImmutableMap.copyOf(graphRoots);
     _natRoots = new HashMap<>();
@@ -46,7 +53,7 @@ public class BDDNetworkGraph {
     _graphRoots.forEach(
         (root, bdd) -> _reachableStates.computeIfAbsent(root, k -> new HashMap<>()).put(root, bdd));
     _terminalStates = computeTerminalStates();
-    _srcIpVars = new BDDOps(BDDPacket.factory).and(new BDDPacket().getSrcIp().getBitvec());
+    _srcIpVars = new BDDOps(BDDPacket.factory).and(_bddPacket.getSrcIp().getBitvec());
   }
 
   private Set<StateExpr> computeTerminalStates() {
@@ -149,6 +156,31 @@ public class BDDNetworkGraph {
       this.originateState = originateState;
       this.finalStates = ImmutableSet.copyOf(finalStates);
       this.predicate = predicate;
+    }
+
+    public Flow getFlow(String tag) {
+      Flow.Builder fb =
+          _bddPacket
+              .getFlow(this.predicate)
+              .orElseGet(
+                  () -> {
+                    throw new BatfishException(
+                        "MultipathConsistencyViolation with UNSAT predicate");
+                  });
+      fb.setTag(tag);
+      if (originateState instanceof OriginateVrf) {
+        OriginateVrf originateVrf = (OriginateVrf) originateState;
+        fb.setIngressNode(originateVrf.getHostname());
+        fb.setIngressVrf(originateVrf.getVrf());
+      } else if (originateState instanceof OriginateInterfaceLink) {
+        OriginateInterfaceLink originateInterfaceLink = (OriginateInterfaceLink) originateState;
+        fb.setIngressNode(originateInterfaceLink.getHostname());
+        fb.setIngressInterface(originateInterfaceLink.getIface());
+      } else {
+        throw new BatfishException(
+            "Unexpected originateState type: " + originateState.getClass().getSimpleName());
+      }
+      return fb.build();
     }
   }
 

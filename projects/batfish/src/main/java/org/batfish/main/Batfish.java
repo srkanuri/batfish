@@ -181,11 +181,15 @@ import org.batfish.representation.iptables.IptablesVendorConfiguration;
 import org.batfish.role.InferRoles;
 import org.batfish.role.NodeRoleDimension;
 import org.batfish.role.NodeRolesData;
+import org.batfish.specifier.AllInterfaceLinksLocationSpecifier;
+import org.batfish.specifier.AllInterfacesLocationSpecifier;
+import org.batfish.specifier.InferFromLocationIpSpaceSpecifier;
 import org.batfish.specifier.InterfaceLocation;
 import org.batfish.specifier.IpSpaceAssignment;
 import org.batfish.specifier.Location;
 import org.batfish.specifier.SpecifierContext;
 import org.batfish.specifier.SpecifierContextImpl;
+import org.batfish.specifier.UnionLocationSpecifier;
 import org.batfish.symbolic.abstraction.BatfishCompressor;
 import org.batfish.symbolic.abstraction.Roles;
 import org.batfish.symbolic.bdd.AtomicPredicates;
@@ -4148,9 +4152,6 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Map<String, Configuration> configurations = parameters.getConfigurations();
     DataPlane dataPlane = parameters.getDataPlane();
 
-    testGraphFactory(
-        configurations, dataPlane.getForwardingAnalysis(), parameters.getSourceIpAssignment());
-
     Set<String> forbiddenTransitNodes = parameters.getForbiddenTransitNodes();
     HeaderSpace headerSpace = parameters.getHeaderSpace();
     Set<String> requiredTransitNodes = parameters.getRequiredTransitNodes();
@@ -4339,6 +4340,34 @@ public class Batfish extends PluginConsumer implements IBatfish {
         ImmutableSet.of(),
         IpSpaceAssignment.empty(),
         false);
+  }
+
+  @Override
+  public Set<Flow> bddMultipathConsistency() {
+    Map<String, Configuration> configurations = loadConfigurations();
+    DataPlane dataPlane = loadDataPlane();
+    ForwardingAnalysis forwardingAnalysis = dataPlane.getForwardingAnalysis();
+    SpecifierContextImpl specifierContext = new SpecifierContextImpl(this, configurations);
+    String tag = getFlowTag();
+    Set<Location> locations =
+        new UnionLocationSpecifier(
+                AllInterfacesLocationSpecifier.INSTANCE,
+                AllInterfaceLinksLocationSpecifier.INSTANCE)
+            .resolve(specifierContext);
+    IpSpaceAssignment sourceIpAssignment =
+        InferFromLocationIpSpaceSpecifier.INSTANCE.resolve(locations, specifierContext);
+
+    NetworkGraphFactory graphFactory =
+        new NetworkGraphFactory(
+            configurations, forwardingAnalysis, (preds) -> new DummyAtomizer(), false);
+    BDDNetworkGraph bddNetworkGraph = graphFactory.bddNetworkGraph(sourceIpAssignment);
+    bddNetworkGraph.computeReachability();
+
+    return bddNetworkGraph
+        .detectMultipathInconsistency()
+        .stream()
+        .map(violation -> violation.getFlow(tag))
+        .collect(ImmutableSet.toImmutableSet());
   }
 
   private void testGraphFactory(
