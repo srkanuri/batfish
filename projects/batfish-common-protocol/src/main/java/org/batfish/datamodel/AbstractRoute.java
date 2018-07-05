@@ -221,14 +221,19 @@ public abstract class AbstractRoute
 
   @Override
   public final @Nonnull RouteOuterClass.Route toMessage() {
-    return completeMessage(RouteOuterClass.Route.newBuilder().setNetwork(_network.toString()));
+    return completeMessage(
+        RouteOuterClass.Route.newBuilder()
+            .setNetwork(_network.toString())
+            .setNextHop(firstNonNull(_nextHop, "")));
   }
 
-  protected abstract @Nonnull RouteOuterClass.Route completeMessage(@Nonnull RouteOuterClass.Route.Builder routeBuilder);
-  
+  protected abstract @Nonnull RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder);
+
   public static AbstractRoute fromMessage(RouteOuterClass.Route message) {
-    String hostname = message.getHostname();
-    String vrfName = message.getVrfName();
+    //    String hostname = message.getHostname();
+    String nextHop = message.getNextHop();
+    //    String vrfName = message.getVrfName();
     AbstractRouteBuilder<?, ?> builder;
     switch (message.getProtocolSpecificAttributesCase()) {
       case BGP_ROUTE:
@@ -236,18 +241,25 @@ public abstract class AbstractRoute
         break;
 
       case CONNECTED_ROUTE:
+        builder = ConnectedRoute.fromConnectedRoute(message);
 
       case GENERATED_ROUTE:
+        builder = GeneratedRoute.fromGeneratedRoute(message);
 
       case ISIS_ROUTE:
+        builder = IsisRoute.fromIsisRoute(message);
 
       case LOCAL_ROUTE:
+        builder = LocalRoute.fromLocalRoute(message);
 
       case OSPF_ROUTE:
+        builder = OspfRoute.fromOspfRoute(message);
 
       case RIP_ROUTE:
+        builder = RipRoute.fromRipRoute(message);
 
       case STATIC_ROUTE:
+        builder = StaticRoute.fromStaticRoute(message);
 
       default:
         throw new BatfishException(
@@ -259,8 +271,9 @@ public abstract class AbstractRoute
     }
     builder.setNetwork(Prefix.parse(message.getNetwork()));
     AbstractRoute route = builder.build();
-    route.setNode(hostname);
-    route.setVrf(vrfName);
+    route.setNextHop(nextHop.isEmpty() ? null : nextHop);
+    //    route.setNode(hostname.isEmpty() ? null : hostname);
+    //    route.setVrf(vrfName.isEmpty() ? null : vrfName);
     return route;
   }
 }

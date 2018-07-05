@@ -14,11 +14,21 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import org.batfish.common.SerializableAsMessage;
 import org.batfish.common.util.CommonUtil;
 
-public class AsPath implements Serializable, Comparable<AsPath> {
+public class AsPath
+    implements Serializable, SerializableAsMessage<AsPathOuterClass.AsPath>, Comparable<AsPath> {
 
   private static final long serialVersionUID = 1L;
+
+  public static List<SortedSet<Long>> fromMessage(AsPathOuterClass.AsPath message) {
+    return message
+        .getAsSetsList()
+        .stream()
+        .map(asSet -> ImmutableSortedSet.copyOf(asSet.getMembersList()))
+        .collect(ImmutableList.toImmutableList());
+  }
 
   /**
    * Returns true iff the provided AS number is reserved for private use by RFC 6696:
@@ -28,12 +38,12 @@ public class AsPath implements Serializable, Comparable<AsPath> {
     return (as >= 64512L && as <= 65534L) || (as >= 4200000000L && as <= 4294967294L);
   }
 
-  public static AsPath ofSingletonAsSets(Long... asNums) {
-    return ofSingletonAsSets(Arrays.asList(asNums));
-  }
-
   public static AsPath ofSingletonAsSets(List<Long> asNums) {
     return new AsPath(asNums.stream().map(ImmutableSortedSet::of).collect(Collectors.toList()));
+  }
+
+  public static AsPath ofSingletonAsSets(Long... asNums) {
+    return ofSingletonAsSets(Arrays.asList(asNums));
   }
 
   public static List<SortedSet<Long>> removePrivateAs(List<SortedSet<Long>> asPath) {
@@ -145,6 +155,16 @@ public class AsPath implements Serializable, Comparable<AsPath> {
 
   public int size() {
     return _asSets.size();
+  }
+
+  @Override
+  public AsPathOuterClass.AsPath toMessage() {
+    AsPathOuterClass.AsPath.Builder builder = AsPathOuterClass.AsPath.newBuilder();
+    _asSets
+        .stream()
+        .map(asSet -> AsSetOuterClass.AsSet.newBuilder().addAllMembers(asSet).build())
+        .forEach(builder::addAsSets);
+    return builder.build();
   }
 
   @Override

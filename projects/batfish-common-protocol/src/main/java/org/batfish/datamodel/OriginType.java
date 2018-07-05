@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.batfish.common.BatfishException;
+import org.batfish.common.SerializableAsProtocolMessageEnum;
 
-public enum OriginType {
+public enum OriginType
+    implements SerializableAsProtocolMessageEnum<OriginTypeOuterClass.OriginType> {
   EGP("egp", 1),
   IGP("igp", 2),
   INCOMPLETE("incomplete", 0);
@@ -20,6 +22,20 @@ public enum OriginType {
       map.put(name, value);
     }
     return map.build();
+  }
+
+  public static OriginType fromProtocolMessageEnum(OriginTypeOuterClass.OriginType message) {
+    switch (message) {
+      case OriginType_EGP:
+        return EGP;
+      case OriginType_IGP:
+        return IGP;
+      case OriginType_INCOMPLETE:
+        return INCOMPLETE;
+      case UNRECOGNIZED:
+      default:
+        throw new BatfishException(String.format("Invalid OriginType: %s", message));
+    }
   }
 
   @JsonCreator
@@ -49,8 +65,16 @@ public enum OriginType {
     return _preference;
   }
 
-  public static OriginType fromMessage(OriginTypeOuterClass.OriginType originType) {
-    throw new UnsupportedOperationException(
-        "no implementation for generated method"); // TODO Auto-generated method stub
+  public OriginTypeOuterClass.OriginType toProtocolMessageEnum() {
+    switch (this) {
+      case EGP:
+        return OriginTypeOuterClass.OriginType.OriginType_EGP;
+      case IGP:
+        return OriginTypeOuterClass.OriginType.OriginType_IGP;
+      case INCOMPLETE:
+        return OriginTypeOuterClass.OriginType.OriginType_INCOMPLETE;
+      default:
+        throw new BatfishException(String.format("Invalid OriginType: %s", this));
+    }
   }
 }

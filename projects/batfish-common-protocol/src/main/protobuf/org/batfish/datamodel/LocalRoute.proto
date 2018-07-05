@@ -3,4 +3,6 @@ syntax = "proto3";
 package org.batfish.datamodel;
 
 message LocalRoute {
+  string next_hop_interface = 1;
+  int32 source_prefix_length = 2;
 }

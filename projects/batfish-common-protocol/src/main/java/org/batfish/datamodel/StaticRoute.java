@@ -172,7 +172,24 @@ public class StaticRoute extends AbstractRoute {
   protected RouteOuterClass.Route completeMessage(
       @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
     return routeBuilder
-        .setStaticRoute(StaticRouteOuterClass.StaticRoute.newBuilder().build())
+        .setStaticRoute(
+            StaticRouteOuterClass.StaticRoute.newBuilder()
+                .setAdministrativeDistance(_administrativeCost)
+                .setMetric(_metric)
+                .setNextHopInterface(_nextHopInterface)
+                .setNextHopIp(_nextHopIp.toString())
+                .setTag(_tag)
+                .build())
         .build();
+  }
+
+  public static @Nonnull Builder fromStaticRoute(RouteOuterClass.Route message) {
+    StaticRouteOuterClass.StaticRoute staticRoute = message.getStaticRoute();
+    return builder()
+        .setAdministrativeCost(staticRoute.getAdministrativeDistance())
+        .setMetric(staticRoute.getMetric())
+        .setNextHopInterface(staticRoute.getNextHopInterface())
+        .setNextHopIp(new Ip(staticRoute.getNextHopIp()))
+        .setTag(staticRoute.getTag());
   }
 }

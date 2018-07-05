@@ -3,4 +3,7 @@ syntax = "proto3";
 package org.batfish.datamodel;
 
 message RipRoute {
+  int32 administrative_distance = 1;
+  int64 metric = 2;
+  string next_hop_ip = 3;
 }

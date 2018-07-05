@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+import "org/batfish/datamodel/RoutingProtocol.proto";
+
+message OspfInternalRoute {
+  org.batfish.datamodel.RoutingProtocol protocol = 1;
+}

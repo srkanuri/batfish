@@ -2,5 +2,13 @@ syntax = "proto3";
 
 package org.batfish.datamodel;
 
+import "org/batfish/datamodel/AsPath.proto";
+
 message GeneratedRoute {
+  int32 administrative_distance = 1;
+  org.batfish.datamodel.AsPath as_path = 2;
+  string attribute_policy = 3;
+  bool discard = 4;
+  string generation_policy = 5;
+  string next_hop_interface = 6;
 }

@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.batfish.common.BatfishException;
+import org.batfish.common.SerializableAsProtocolMessageEnum;
 
-public enum RoutingProtocol {
+public enum RoutingProtocol
+    implements SerializableAsProtocolMessageEnum<RoutingProtocolOuterClass.RoutingProtocol> {
   AGGREGATE("aggregate"),
   BGP("bgp"),
   CONNECTED("connected"),
@@ -41,6 +43,63 @@ public enum RoutingProtocol {
       map.put(protocolName, protocol);
     }
     return map.build();
+  }
+
+  public static RoutingProtocol fromProtocolMessageEnum(
+      RoutingProtocolOuterClass.RoutingProtocol protocol) {
+    switch (protocol) {
+      case RoutingProtocol_AGGREGATE:
+        return AGGREGATE;
+      case RoutingProtocol_BGP:
+        return BGP;
+      case RoutingProtocol_CONNECTED:
+        return CONNECTED;
+      case RoutingProtocol_EGP:
+        return EGP;
+      case RoutingProtocol_EIGRP:
+        return EIGRP;
+      case RoutingProtocol_IBGP:
+        return IBGP;
+      case RoutingProtocol_IGP:
+        return IGP;
+      case RoutingProtocol_ISIS:
+        return ISIS;
+      case RoutingProtocol_ISIS_EL1:
+        return ISIS_EL1;
+      case RoutingProtocol_ISIS_EL2:
+        return ISIS_EL2;
+      case RoutingProtocol_ISIS_L1:
+        return ISIS_L1;
+      case RoutingProtocol_ISIS_L2:
+        return ISIS_L2;
+      case RoutingProtocol_LDP:
+        return LDP;
+      case RoutingProtocol_LISP:
+        return LISP;
+      case RoutingProtocol_LOCAL:
+        return LOCAL;
+      case RoutingProtocol_MSDP:
+        return MSDP;
+      case RoutingProtocol_OSPF:
+        return OSPF;
+      case RoutingProtocol_OSPF3:
+        return OSPF3;
+      case RoutingProtocol_OSPF_E1:
+        return OSPF_E1;
+      case RoutingProtocol_OSPF_E2:
+        return OSPF_E2;
+      case RoutingProtocol_OSPF_IA:
+        return OSPF_IA;
+      case RoutingProtocol_RIP:
+        return RIP;
+      case RoutingProtocol_RSVP:
+        return RSVP;
+      case RoutingProtocol_STATIC:
+        return STATIC;
+      case UNRECOGNIZED:
+      default:
+        throw new BatfishException(String.format("Invalid RoutingProtocol: %s", protocol));
+    }
   }
 
   @JsonCreator
@@ -662,8 +721,59 @@ public enum RoutingProtocol {
     return _protocolName;
   }
 
-  public static RoutingProtocol fromMessage(RoutingProtocolOuterClass.RoutingProtocol protocol) {
-    throw new UnsupportedOperationException(
-        "no implementation for generated method"); // TODO Auto-generated method stub
+  @Override
+  public RoutingProtocolOuterClass.RoutingProtocol toProtocolMessageEnum() {
+    switch (this) {
+      case AGGREGATE:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_AGGREGATE;
+      case BGP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_BGP;
+      case CONNECTED:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_CONNECTED;
+      case EGP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_EGP;
+      case EIGRP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_EIGRP;
+      case IBGP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_IBGP;
+      case IGP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_IGP;
+      case ISIS:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_ISIS;
+      case ISIS_EL1:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_ISIS_EL1;
+      case ISIS_EL2:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_ISIS_EL2;
+      case ISIS_L1:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_ISIS_L1;
+      case ISIS_L2:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_ISIS_L2;
+      case LDP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_LDP;
+      case LISP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_LISP;
+      case LOCAL:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_LOCAL;
+      case MSDP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_MSDP;
+      case OSPF:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_OSPF;
+      case OSPF3:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_OSPF3;
+      case OSPF_E1:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_OSPF_E1;
+      case OSPF_E2:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_OSPF_E2;
+      case OSPF_IA:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_OSPF_IA;
+      case RIP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_RIP;
+      case RSVP:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_RSVP;
+      case STATIC:
+        return RoutingProtocolOuterClass.RoutingProtocol.RoutingProtocol_STATIC;
+      default:
+        throw new BatfishException(String.format("Invalid RoutingProtocol: %s", this));
+    }
   }
 }

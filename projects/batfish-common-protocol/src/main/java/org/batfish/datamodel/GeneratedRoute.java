@@ -319,7 +319,32 @@ public final class GeneratedRoute extends AbstractRoute {
   protected RouteOuterClass.Route completeMessage(
       @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
     return routeBuilder
-        .setGeneratedRoute(GeneratedRouteOuterClass.GeneratedRoute.newBuilder().build())
+        .setGeneratedRoute(
+            GeneratedRouteOuterClass.GeneratedRoute.newBuilder()
+                .setAdministrativeDistance(_administrativeCost)
+                .setAsPath(_asPath.toMessage())
+                .setAttributePolicy(firstNonNull(_attributePolicy, ""))
+                .setDiscard(_discard)
+                .setGenerationPolicy(firstNonNull(_generationPolicy, ""))
+                .setNextHopInterface(_nextHopInterface)
+                .build())
         .build();
+  }
+
+  public static @Nonnull Builder fromGeneratedRoute(@Nonnull RouteOuterClass.Route message) {
+    GeneratedRouteOuterClass.GeneratedRoute generatedRoute = message.getGeneratedRoute();
+    return new Builder()
+        .setAdmin(generatedRoute.getAdministrativeDistance())
+        .setAsPath(AsPath.fromMessage(generatedRoute.getAsPath()))
+        .setAttributePolicy(
+            generatedRoute.getAttributePolicy().isEmpty()
+                ? null
+                : generatedRoute.getAttributePolicy())
+        .setDiscard(generatedRoute.getDiscard())
+        .setGenerationPolicy(
+            generatedRoute.getGenerationPolicy().isEmpty()
+                ? null
+                : generatedRoute.getAttributePolicy())
+        .setNextHopInterface(generatedRoute.getNextHopInterface());
   }
 }

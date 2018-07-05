@@ -52,10 +52,4 @@ public class OspfExternalType1Route extends OspfExternalRoute {
     OspfExternalType1Route other = (OspfExternalType1Route) obj;
     return getCostToAdvertiser() == other.getCostToAdvertiser();
   }
-
-  @Override
-  protected RouteOuterClass.Route completeMessage(
-      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
-    return routeBuilder.setOspfRoute(OspfRouteOuterClass.OspfRoute.newBuilder().build()).build();
-  }
 }

@@ -3,5 +3,9 @@ syntax = "proto3";
 package org.batfish.datamodel;
 
 message StaticRoute {
-  string a = 1;
+  int32 administrative_distance = 1;
+  int64 metric = 2;
+  string next_hop_interface = 3;
+  string next_hop_ip = 4;
+  int32 tag = 5;
 }

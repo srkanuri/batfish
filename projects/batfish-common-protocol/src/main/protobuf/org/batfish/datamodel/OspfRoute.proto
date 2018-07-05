@@ -2,5 +2,16 @@ syntax = "proto3";
 
 package org.batfish.datamodel;
 
+import "org/batfish/datamodel/OspfExternalRoute.proto";
+import "org/batfish/datamodel/OspfInternalRoute.proto";
+
 message OspfRoute {
+  int32 administrative_distance = 1;
+  int64 area = 2;
+  int64 metric = 3;
+  string next_hop_ip = 4;
+  oneof subtype {
+    org.batfish.datamodel.OspfExternalRoute external = 5;
+    org.batfish.datamodel.OspfInternalRoute internal = 6;
+  }
 }

@@ -9,6 +9,26 @@ import javax.annotation.Nonnull;
 
 public class ConnectedRoute extends AbstractRoute {
 
+  public static class Builder extends AbstractRouteBuilder<Builder, ConnectedRoute> {
+
+    private String _nextHopInterface;
+
+    @Override
+    public ConnectedRoute build() {
+      return new ConnectedRoute(getNetwork(), _nextHopInterface);
+    }
+
+    @Override
+    protected Builder getThis() {
+      return this;
+    }
+
+    public Builder setNextHopInterface(@Nonnull String nextHopInterface) {
+      _nextHopInterface = nextHopInterface;
+      return this;
+    }
+  }
+
   private static final long serialVersionUID = 1L;
 
   private final String _nextHopInterface;
@@ -90,7 +110,14 @@ public class ConnectedRoute extends AbstractRoute {
   protected RouteOuterClass.Route completeMessage(
       @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
     return routeBuilder
-        .setConnectedRoute(ConnectedRouteOuterClass.ConnectedRoute.newBuilder().build())
+        .setConnectedRoute(
+            ConnectedRouteOuterClass.ConnectedRoute.newBuilder()
+                .setNextHopInterface(_nextHopInterface)
+                .build())
         .build();
+  }
+
+  public static Builder fromConnectedRoute(RouteOuterClass.Route route) {
+    return new Builder().setNextHopInterface(route.getConnectedRoute().getNextHopInterface());
   }
 }

@@ -10,6 +10,19 @@ import org.batfish.common.BatfishException;
 
 public abstract class RipRoute extends AbstractRoute {
 
+  public static class Builder extends AbstractRouteBuilder<Builder, RipRoute> {
+
+    @Override
+    public RipRoute build() {
+      return new RipInternalRoute(getNetwork(), getNextHopIp(), getAdmin(), getMetric());
+    }
+
+    @Override
+    protected Builder getThis() {
+      return this;
+    }
+  }
+
   /** */
   private static final long serialVersionUID = 1L;
 
@@ -59,5 +72,25 @@ public abstract class RipRoute extends AbstractRoute {
   @Override
   public final Ip getNextHopIp() {
     return _nextHopIp;
+  }
+
+  @Override
+  protected final RouteOuterClass.Route completeMessage(
+      RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
+        .setRipRoute(
+            RipRouteOuterClass.RipRoute.newBuilder()
+                .setAdministrativeDistance(_admin)
+                .setMetric(_metric)
+                .setNextHopIp(_nextHopIp.toString()))
+        .build();
+  }
+
+  public static Builder fromRipRoute(RouteOuterClass.Route message) {
+    RipRouteOuterClass.RipRoute ripRoute = message.getRipRoute();
+    return new Builder()
+        .setAdmin(ripRoute.getAdministrativeDistance())
+        .setMetric(ripRoute.getMetric())
+        .setNextHopIp(new Ip(ripRoute.getNextHopIp()));
   }
 }

@@ -1,6 +1,7 @@
 package org.batfish.datamodel;
 
 import java.util.Objects;
+import javax.annotation.Nonnull;
 
 public abstract class OspfInternalRoute extends OspfRoute {
 
@@ -50,5 +51,34 @@ public abstract class OspfInternalRoute extends OspfRoute {
   @Override
   public final int hashCode() {
     return Objects.hash(_admin, _area, _metric, _network, _nextHopIp);
+  }
+
+  @Override
+  protected final RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
+        .setOspfRoute(
+            OspfRouteOuterClass.OspfRoute.newBuilder()
+                .setAdministrativeDistance(_admin)
+                .setArea(_area)
+                .setInternal(
+                    OspfInternalRouteOuterClass.OspfInternalRoute.newBuilder()
+                        .setProtocol(getProtocol().toProtocolMessageEnum())
+                        .build())
+                .setMetric(_metric)
+                .setNextHopIp(_nextHopIp.toString())
+                .build())
+        .build();
+  }
+
+  public static @Nonnull Builder fromOspfInternalRoute(@Nonnull RouteOuterClass.Route message) {
+    OspfRouteOuterClass.OspfRoute ospfRoute = message.getOspfRoute();
+    OspfInternalRouteOuterClass.OspfInternalRoute internal = message.getOspfRoute().getInternal();
+    return new Builder()
+        .setAdmin(ospfRoute.getAdministrativeDistance())
+        .setArea(ospfRoute.getArea())
+        .setMetric(ospfRoute.getMetric())
+        .setNextHopIp(new Ip(ospfRoute.getNextHopIp()))
+        .setProtocol(RoutingProtocol.fromProtocolMessageEnum(internal.getProtocol()));
   }
 }

@@ -2,5 +2,17 @@ syntax = "proto3";
 
 package org.batfish.datamodel;
 
+import "org/batfish/datamodel/IsisLevel.proto";
+import "org/batfish/datamodel/RoutingProtocol.proto";
+
 message IsisRoute {
+  int32 administrative_distance = 1;
+  string area = 2;
+  bool attach = 3;
+  bool down = 4;
+  org.batfish.datamodel.IsisLevel level = 5;
+  int64 metric = 6;
+  string next_hop_ip = 7;
+  org.batfish.datamodel.RoutingProtocol protocol = 8;
+  string system_id = 9;
 }

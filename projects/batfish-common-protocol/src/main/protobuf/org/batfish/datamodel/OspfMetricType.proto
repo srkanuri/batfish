@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+enum OspfMetricType {
+  OspfMetricType_E1 = 0;
+  OspfMetricType_E2 = 1;
+}

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+import "org/batfish/datamodel/OspfMetricType.proto";
+
+message OspfExternalRoute {
+  string advertiser = 1;
+  int64 cost_to_advertiser = 2;
+  int64 lsa_metric = 3;
+  org.batfish.datamodel.OspfMetricType metric_type = 4; 
+}

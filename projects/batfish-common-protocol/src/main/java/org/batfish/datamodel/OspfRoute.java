@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.batfish.common.BatfishException;
 
 public abstract class OspfRoute extends AbstractRoute {
 
@@ -78,5 +79,18 @@ public abstract class OspfRoute extends AbstractRoute {
   @Override
   public int getTag() {
     return NO_TAG;
+  }
+
+  public static AbstractRouteBuilder<?, ?> fromOspfRoute(RouteOuterClass.Route message) {
+    switch (message.getOspfRoute().getSubtypeCase()) {
+      case EXTERNAL:
+        return OspfExternalRoute.fromOspfExternalRoute(message);
+      case INTERNAL:
+        return OspfInternalRoute.fromOspfInternalRoute(message);
+      case SUBTYPE_NOT_SET:
+      default:
+        throw new BatfishException(
+            String.format("Invalid subType: %s", message.getOspfRoute().getSubtypeCase()));
+    }
   }
 }

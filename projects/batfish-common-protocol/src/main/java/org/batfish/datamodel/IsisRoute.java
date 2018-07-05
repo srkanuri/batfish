@@ -290,6 +290,33 @@ public class IsisRoute extends AbstractRoute {
   @Override
   protected RouteOuterClass.Route completeMessage(
       @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
-    return routeBuilder.setIsisRoute(IsisRouteOuterClass.IsisRoute.newBuilder().build()).build();
+    return routeBuilder
+        .setIsisRoute(
+            IsisRouteOuterClass.IsisRoute.newBuilder()
+                .setAdministrativeDistance(_administrativeCost)
+                .setArea(_area)
+                .setAttach(_attach)
+                .setDown(_down)
+                .setLevel(_level.toProtocolMessageEnum())
+                .setMetric(_metric)
+                .setNextHopIp(_nextHopIp.toString())
+                .setProtocol(_protocol.toProtocolMessageEnum())
+                .setSystemId(_systemId)
+                .build())
+        .build();
+  }
+
+  public static Builder fromIsisRoute(RouteOuterClass.Route message) {
+    IsisRouteOuterClass.IsisRoute isisRoute = message.getIsisRoute();
+    return new Builder()
+        .setAdmin(isisRoute.getAdministrativeDistance())
+        .setArea(isisRoute.getArea())
+        .setAttach(isisRoute.getAttach())
+        .setDown(isisRoute.getDown())
+        .setLevel(IsisLevel.fromProtocolMessageEnum(isisRoute.getLevel()))
+        .setMetric(isisRoute.getMetric())
+        .setNextHopIp(new Ip(isisRoute.getNextHopIp()))
+        .setProtocol(RoutingProtocol.fromProtocolMessageEnum(isisRoute.getProtocol()))
+        .setSystemId(isisRoute.getSystemId());
   }
 }

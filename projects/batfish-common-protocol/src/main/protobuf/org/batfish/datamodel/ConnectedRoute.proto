@@ -3,4 +3,5 @@ syntax = "proto3";
 package org.batfish.datamodel;
 
 message ConnectedRoute {
+  string next_hop_interface = 1;
 }

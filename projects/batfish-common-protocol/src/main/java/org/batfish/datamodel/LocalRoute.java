@@ -1,6 +1,7 @@
 package org.batfish.datamodel;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
+import static java.util.Objects.requireNonNull;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -10,9 +11,44 @@ import javax.annotation.Nonnull;
 
 public class LocalRoute extends AbstractRoute {
 
+  public static class Builder extends AbstractRouteBuilder<Builder, LocalRoute> {
+
+    private String _nextHopInterface;
+
+    private Integer _sourcePrefixLength;
+
+    @Override
+    public LocalRoute build() {
+      return new LocalRoute(
+          getNetwork(), requireNonNull(_nextHopInterface), requireNonNull(_sourcePrefixLength));
+    }
+
+    @Override
+    protected Builder getThis() {
+      return this;
+    }
+
+    public @Nonnull Builder setNextHopInterface(@Nonnull String nextHopInterface) {
+      _nextHopInterface = nextHopInterface;
+      return this;
+    }
+
+    public @Nonnull Builder setSourcePrefixLength(int sourcePrefixLength) {
+      _sourcePrefixLength = sourcePrefixLength;
+      return this;
+    }
+  }
+
   private static final String PROP_SOURCE_PREFIX_LENGTH = "sourcePrefixLength";
 
   private static final long serialVersionUID = 1L;
+
+  public static Builder fromLocalRoute(RouteOuterClass.Route message) {
+    LocalRouteOuterClass.LocalRoute localRoute = message.getLocalRoute();
+    return new Builder()
+        .setNextHopInterface(localRoute.getNextHopInterface())
+        .setSourcePrefixLength(localRoute.getSourcePrefixLength());
+  }
 
   private final String _nextHopInterface;
 
@@ -33,6 +69,18 @@ public class LocalRoute extends AbstractRoute {
     super(network);
     _nextHopInterface = firstNonNull(nextHopInterface, Route.UNSET_NEXT_HOP_INTERFACE);
     _sourcePrefixLength = sourcePrefixLength;
+  }
+
+  @Override
+  protected RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
+        .setLocalRoute(
+            LocalRouteOuterClass.LocalRoute.newBuilder()
+                .setNextHopInterface(_nextHopInterface)
+                .setSourcePrefixLength(_sourcePrefixLength)
+                .build())
+        .build();
   }
 
   @Override
@@ -103,11 +151,5 @@ public class LocalRoute extends AbstractRoute {
       return 0;
     }
     return Integer.compare(_sourcePrefixLength, ((LocalRoute) rhs)._sourcePrefixLength);
-  }
-
-  @Override
-  protected RouteOuterClass.Route completeMessage(
-      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
-    return routeBuilder.setLocalRoute(LocalRouteOuterClass.LocalRoute.newBuilder().build()).build();
   }
 }

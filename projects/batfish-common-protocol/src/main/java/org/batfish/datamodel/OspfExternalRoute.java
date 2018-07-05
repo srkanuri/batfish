@@ -67,24 +67,29 @@ public abstract class OspfExternalRoute extends OspfRoute {
       return this;
     }
 
-    public void setAdvertiser(String advertiser) {
+    public Builder setAdvertiser(String advertiser) {
       _advertiser = advertiser;
+      return this;
     }
 
-    public void setArea(long area) {
+    public Builder setArea(long area) {
       _area = area;
+      return this;
     }
 
-    public void setCostToAdvertiser(long costToAdvertiser) {
+    public Builder setCostToAdvertiser(long costToAdvertiser) {
       _costToAdvertiser = costToAdvertiser;
+      return this;
     }
 
-    public void setLsaMetric(long lsaMetric) {
+    public Builder setLsaMetric(long lsaMetric) {
       _lsaMetric = lsaMetric;
+      return this;
     }
 
-    public void setOspfMetricType(OspfMetricType ospfMetricType) {
+    public Builder setOspfMetricType(OspfMetricType ospfMetricType) {
       _ospfMetricType = ospfMetricType;
+      return this;
     }
   }
 
@@ -212,5 +217,40 @@ public abstract class OspfExternalRoute extends OspfRoute {
         + " advertiser:"
         + _advertiser
         + ospfExternalRouteString();
+  }
+
+  public static @Nonnull Builder fromOspfExternalRoute(@Nonnull RouteOuterClass.Route message) {
+    OspfRouteOuterClass.OspfRoute ospfRoute = message.getOspfRoute();
+    OspfExternalRouteOuterClass.OspfExternalRoute external = message.getOspfRoute().getExternal();
+    return new Builder()
+        .setAdmin(ospfRoute.getAdministrativeDistance())
+        .setAdvertiser(external.getAdvertiser())
+        .setArea(ospfRoute.getArea())
+        .setCostToAdvertiser(external.getCostToAdvertiser())
+        .setLsaMetric(external.getLsaMetric())
+        .setMetric(ospfRoute.getMetric())
+        .setNextHopIp(new Ip(ospfRoute.getNextHopIp()))
+        .setOspfMetricType(OspfMetricType.fromProtocolMessageEnum(external.getMetricType()));
+  }
+
+  @Override
+  protected final RouteOuterClass.Route completeMessage(
+      @Nonnull RouteOuterClass.Route.Builder routeBuilder) {
+    return routeBuilder
+        .setOspfRoute(
+            OspfRouteOuterClass.OspfRoute.newBuilder()
+                .setAdministrativeDistance(_admin)
+                .setArea(_area)
+                .setExternal(
+                    OspfExternalRouteOuterClass.OspfExternalRoute.newBuilder()
+                        .setAdvertiser(getAdvertiser())
+                        .setCostToAdvertiser(getCostToAdvertiser())
+                        .setLsaMetric(getLsaMetric())
+                        .setMetricType(getOspfMetricType().toProtocolMessageEnum())
+                        .build())
+                .setMetric(_metric)
+                .setNextHopIp(_nextHopIp.toString())
+                .build())
+        .build();
   }
 }

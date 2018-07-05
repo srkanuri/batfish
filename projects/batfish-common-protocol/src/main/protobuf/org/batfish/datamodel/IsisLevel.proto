@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package org.batfish.datamodel;
+
+enum IsisLevel {
+  IsisLevel_LEVEL_1 = 0;
+  IsisLevel_LEVEL_1_2 = 1;
+  IsisLevel_LEVEL_2 = 2;
+}
