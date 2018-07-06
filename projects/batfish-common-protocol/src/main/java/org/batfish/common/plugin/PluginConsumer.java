@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
 import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.util.JsonFormat.TypeRegistry;
 import com.thoughtworks.xstream.XStream;
@@ -31,10 +32,12 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 import net.jpountz.lz4.LZ4FrameInputStream;
 import net.jpountz.lz4.LZ4FrameOutputStream;
 import org.batfish.common.BatfishException;
+import org.batfish.common.SerializableAsMessage;
 import org.batfish.common.util.BatfishObjectInputStream;
 
 public abstract class PluginConsumer implements IPluginConsumer {
@@ -69,9 +72,13 @@ public abstract class PluginConsumer implements IPluginConsumer {
 
   private final Map<String, Descriptor> _descriptors;
 
+  private final Map<String, Function<Message, SerializableAsMessage<? extends Message>>>
+      _converters;
+
   private final boolean _serializeToText;
 
   public PluginConsumer(boolean serializeToText) {
+    _converters = new HashMap<>();
     _currentClassLoader = Thread.currentThread().getContextClassLoader();
     _descriptors = new HashMap<>();
     _serializeToText = serializeToText;
@@ -178,6 +185,10 @@ public abstract class PluginConsumer implements IPluginConsumer {
 
   public ClassLoader getCurrentClassLoader() {
     return _currentClassLoader;
+  }
+
+  public Map<String, Function<Message, SerializableAsMessage<? extends Message>>> getConverters() {
+    return _converters;
   }
 
   public Map<String, Descriptor> getDescriptors() {

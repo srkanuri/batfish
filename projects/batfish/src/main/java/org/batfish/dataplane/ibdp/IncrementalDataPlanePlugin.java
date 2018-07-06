@@ -4,6 +4,7 @@ import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.Message;
 import com.google.protobuf.Descriptors.Descriptor;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,7 +13,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.function.Function;
 import java.util.stream.Stream;
+import org.batfish.common.SerializableAsMessage;
 import org.batfish.common.plugin.DataPlanePlugin;
 import org.batfish.common.plugin.ITracerouteEngine;
 import org.batfish.common.plugin.Plugin;
@@ -99,6 +102,13 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
     return TracerouteEngineImpl.getInstance();
   }
 
+  @Override
+  public Map<String, Function<Message, SerializableAsMessage<? extends Message>>> getConverters() {
+    return ImmutableMap.of(
+        IncrementalDataPlaneOuterClass.IncrementalDataPlane.getDescriptor().getFullName(),
+        IncrementalDataPlane::fromMessage);
+  }
+  
   @Override
   public Map<String, Descriptor> getDescriptors() {
     return ImmutableMap.of(

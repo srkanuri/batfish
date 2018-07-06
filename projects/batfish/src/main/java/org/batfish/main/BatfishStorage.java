@@ -12,6 +12,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -20,28 +21,41 @@ import java.io.Serializable;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.jpountz.lz4.LZ4FrameInputStream;
 import net.jpountz.lz4.LZ4FrameOutputStream;
 import org.batfish.common.BatfishException;
 import org.batfish.common.BatfishLogger;
 import org.batfish.common.BfConsts;
+import org.batfish.common.SerializableAsMessage;
 import org.batfish.common.Version;
 import org.batfish.common.plugin.PluginConsumer.Format;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.datamodel.Configuration;
+import org.batfish.datamodel.DataPlane;
+import org.batfish.datamodel.DataPlaneOuterClass;
 import org.batfish.datamodel.answers.ConvertConfigurationAnswerElement;
 
 /** A utility class that abstracts the underlying file system storage used by {@link Batfish}. */
 final class BatfishStorage {
+
+  @FunctionalInterface
+  private interface ProtobufParserFunction<R> {
+    R apply(InputStream inputStream) throws IOException;
+  }
+
   private final BatfishLogger _logger;
   private final Path _containerDir;
   private final BiFunction<String, Integer, AtomicInteger> _newBatch;
@@ -288,6 +302,17 @@ final class BatfishStorage {
                     })));
   }
 
+  private static <M extends Message> M deserializeMessage(
+      ProtobufParserFunction<M> parser, Path inputPath) {
+    try (Closer closer = Closer.create()) {
+      InputStream fis = closer.register(Files.newInputStream(inputPath, StandardOpenOption.READ));
+      LZ4FrameInputStream lis = closer.register(new LZ4FrameInputStream(fis));
+      return parser.apply(lis);
+    } catch (IOException e) {
+      throw new BatfishException("Failed to deserialize message", e);
+    }
+  }
+
   /**
    * Writes a single object of the given class to the given file. Uses the {@link BatfishStorage}
    * default file encoding including serialization format and compression.
@@ -322,5 +347,31 @@ final class BatfishStorage {
 
   private Path getTestrigDir(String testrig) {
     return _containerDir.resolve(BfConsts.RELPATH_TESTRIGS_DIR).resolve(testrig);
+  }
+
+  public @Nonnull DataPlane loadDataPlane(
+      @Nonnull String testrig,
+      @Nonnull String environment,
+      boolean compressed,
+      @Nonnull
+          Map<String, Function<Message, SerializableAsMessage<? extends Message>>>
+              dataPlaneMessageParsers) {
+    Path path =
+        getTestrigDir(testrig)
+            .resolve(
+                Paths.get(
+                    BfConsts.RELPATH_ENVIRONMENTS_DIR,
+                    environment,
+                    compressed ? "compressed_dataplanemessage" : "dataplanemessage"));
+    DataPlaneOuterClass.DataPlane dataPlaneMessage =
+        deserializeMessage(DataPlaneOuterClass.DataPlane::parseFrom, path);
+    String descriptorFullName = dataPlaneMessage.getImpl().getTypeUrl();
+    Function<Message, SerializableAsMessage<? extends Message>> f =
+        dataPlaneMessageParsers.get(descriptorFullName);
+    if (f == null) {
+      throw new BatfishException(
+          String.format("No converter for message type: %s", descriptorFullName));
+    }
+    return (DataPlane) f.apply(dataPlaneMessage);
   }
 }

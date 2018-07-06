@@ -10,13 +10,16 @@ import com.google.common.collect.Table;
 import com.google.common.collect.TreeBasedTable;
 import com.google.common.graph.Network;
 import com.google.protobuf.Any;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import java.io.Serializable;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.TreeMap;
+import org.batfish.common.BatfishException;
 import org.batfish.datamodel.AbstractRoute;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpRoute;
@@ -32,6 +35,7 @@ import org.batfish.datamodel.GenericRib;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.Topology;
+import org.batfish.dataplane.rib.Rib;
 
 public final class IncrementalDataPlane implements Serializable, DataPlane {
 
@@ -287,20 +291,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
 
   @Override
   public DataPlaneOuterClass.DataPlane toMessage() {
-    IncrementalDataPlaneOuterClass.IncrementalDataPlane.Builder implBuilder =
-        IncrementalDataPlaneOuterClass.IncrementalDataPlane.newBuilder();
-    _ribs.forEach(
-        (hostname, ribsByVrf) ->
-            ribsByVrf.forEach(
-                (vrfName, rib) -> {
-                  RibOuterClass.Rib.Builder ribBuilder = RibOuterClass.Rib.newBuilder();
-                  ribBuilder.setHostname(hostname);
-                  ribBuilder.setVrfName(vrfName);
-                  rib.getRoutes().forEach(route -> ribBuilder.addRoutes(route.toMessage()));
-                  implBuilder.addMainRibs(ribBuilder.build());
-                }));
-    return DataPlaneOuterClass.DataPlane.newBuilder()
-        .setImpl(Any.pack(implBuilder.build()))
-        .build();
+    return new CompletedIncrementalDataPlane(this).toMessage();
   }
 }

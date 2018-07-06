@@ -1002,7 +1002,14 @@ public class Batfish extends PluginConsumer implements IBatfish {
         compressed
             ? _testrigSettings.getEnvironmentSettings().getCompressedDataPlanePath()
             : _testrigSettings.getEnvironmentSettings().getDataPlanePath();
-
+    Path dataPlaneMessagePath =
+        dataPlanePath
+            .getParent()
+            .resolve(compressed ? "compressed_dataplanemessage" : "dataplanemessage");
+    Path dataPlaneMessageJsonPath =
+        dataPlanePath
+            .getParent()
+            .resolve(compressed ? "compressed_dataplanemessage.json" : "dataplanemessage.json");
     Path answerElementPath =
         compressed
             ? _testrigSettings.getEnvironmentSettings().getCompressedDataPlaneAnswerPath()
@@ -1020,9 +1027,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
       assert writeDataplane != null; // avoid unused warning
       serializeObject(dataPlane, dataPlanePath);
       Message dpMessage = dataPlane.toMessage();
-      _storage.serializeMessage(dpMessage, dataPlanePath.getParent().resolve("dataplanemessage"));
-      _storage.serializeMessageAsJson(
-          dpMessage, dataPlanePath.getParent().resolve("dataplanemessage.json"), typeRegistry());
+      _storage.serializeMessage(dpMessage, dataPlaneMessagePath);
+      _storage.serializeMessageAsJson(dpMessage, dataPlaneMessageJsonPath, typeRegistry());
       serializeObject(answerElement, answerElementPath);
     }
     _logger.printElapsedTime();
@@ -2341,17 +2347,16 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
   @Override
   public DataPlane loadDataPlane() {
-    return loadDataPlane(false);
+    return loadDataPlane(false, true);
   }
 
   DataPlane loadDataPlane(boolean compressed) {
+    return loadDataPlane(compressed, true);
+  }
+
+  DataPlane loadDataPlane(boolean compressed, boolean message) {
     Cache<NetworkSnapshot, DataPlane> cache =
         compressed ? _cachedCompressedDataPlanes : _cachedDataPlanes;
-
-    Path path =
-        compressed
-            ? _testrigSettings.getEnvironmentSettings().getCompressedDataPlanePath()
-            : _testrigSettings.getEnvironmentSettings().getDataPlanePath();
 
     NetworkSnapshot snapshot = getNetworkSnapshot();
     DataPlane dp = cache.getIfPresent(snapshot);
@@ -2365,7 +2370,20 @@ public class Batfish extends PluginConsumer implements IBatfish {
       dp = cache.getIfPresent(_testrigSettings);
       if (dp == null) {
         newBatch("Loading data plane from disk", 0);
-        dp = deserializeObject(path, DataPlane.class);
+        if (message) {
+          dp =
+              _storage.loadDataPlane(
+                  _testrigSettings.getName(),
+                  _testrigSettings.getEnvironmentSettings().getName(),
+                  compressed,
+                  getConverters());
+        } else {
+          Path path =
+              compressed
+                  ? _testrigSettings.getEnvironmentSettings().getCompressedDataPlanePath()
+                  : _testrigSettings.getEnvironmentSettings().getDataPlanePath();
+          dp = deserializeObject(path, DataPlane.class);
+        }
         cache.put(snapshot, dp);
       }
     }
