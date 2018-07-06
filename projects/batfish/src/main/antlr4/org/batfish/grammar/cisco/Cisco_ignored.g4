@@ -495,7 +495,6 @@ null_inner
       | SINGLE_ROUTER_MODE
       | SLOT
       | SORT_BY
-      | SPEED
       | SPLIT_TUNNEL_NETWORK_LIST
       | SPLIT_TUNNEL_POLICY
       | SSH_KEYDIR
@@ -714,6 +713,7 @@ null_single
             | VERIFY
          )
       )
+      | ( NO IP (NAME_SERVER))
       | IP_ADDRESS_LITERAL
       | IP_FLOW_EXPORT_PROFILE
       |
@@ -881,10 +881,10 @@ null_single
       | SHELL
       | SMTP_SERVER
       | SNMP
+      | (NO SNMP_SERVER)
       | SOFTWARE
       | SPD
       | SPE
-      | SPEED
       | STOPBITS
       | SSL
       | STATIC

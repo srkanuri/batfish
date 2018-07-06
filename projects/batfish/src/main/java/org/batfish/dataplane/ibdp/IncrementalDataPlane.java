@@ -6,6 +6,8 @@ import static org.batfish.common.util.CommonUtil.toImmutableSortedMap;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Table;
+import com.google.common.collect.TreeBasedTable;
 import com.google.common.graph.Network;
 import java.io.Serializable;
 import java.util.Map;
@@ -15,6 +17,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import org.batfish.datamodel.AbstractRoute;
 import org.batfish.datamodel.BgpPeerConfig;
+import org.batfish.datamodel.BgpRoute;
 import org.batfish.datamodel.BgpSession;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.DataPlane;
@@ -37,8 +40,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
 
     private Map<Ip, Set<String>> _ipOwners;
 
-    private Map<Ip, String> _ipOwnersSimple;
-
     private Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
 
     private Map<String, Node> _nodes;
@@ -52,11 +53,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
 
     public Builder setIpOwners(Map<Ip, Set<String>> ipOwners) {
       _ipOwners = ImmutableMap.copyOf(ipOwners);
-      return this;
-    }
-
-    public Builder setIpOwnersSimple(Map<Ip, String> ipOwnersSimple) {
-      _ipOwnersSimple = ImmutableMap.copyOf(ipOwnersSimple);
       return this;
     }
 
@@ -130,8 +126,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
 
   private final Map<Ip, Set<String>> _ipOwners;
 
-  private final Map<Ip, String> _ipOwnersSimple;
-
   private final Map<Ip, Map<String, Set<String>>> _ipVrfOwners;
 
   private final Map<String, Node> _nodes;
@@ -143,7 +137,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
   private IncrementalDataPlane(Builder builder) {
     _bgpTopology = builder._bgpTopology;
     _ipOwners = builder._ipOwners;
-    _ipOwnersSimple = builder._ipOwnersSimple;
     _ipVrfOwners = builder._ipVrfOwners;
     _nodes = builder._nodes;
     _topology = builder._topology;
@@ -183,6 +176,25 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
   }
 
   @Override
+  public Table<String, String, Set<BgpRoute>> getBgpRoutes(boolean multipath) {
+    Table<String, String, Set<BgpRoute>> table = TreeBasedTable.create();
+
+    _nodes.forEach(
+        (hostname, node) ->
+            node.getVirtualRouters()
+                .forEach(
+                    (vrfName, vr) -> {
+                      table.put(
+                          hostname,
+                          vrfName,
+                          multipath
+                              ? vr.getBgpMultipathRib().getRoutes()
+                              : vr.getBgpBestPathRib().getRoutes());
+                    }));
+    return table;
+  }
+
+  @Override
   public Network<BgpPeerConfig, BgpSession> getBgpTopology() {
     return _bgpTopology;
   }
@@ -210,10 +222,6 @@ public final class IncrementalDataPlane implements Serializable, DataPlane {
   @Override
   public Map<Ip, Map<String, Set<String>>> getIpVrfOwners() {
     return _ipVrfOwners;
-  }
-
-  public Map<Ip, String> getIpOwnersSimple() {
-    return _ipOwnersSimple;
   }
 
   public Map<String, Node> getNodes() {

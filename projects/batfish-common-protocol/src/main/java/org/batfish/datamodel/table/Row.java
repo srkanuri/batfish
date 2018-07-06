@@ -9,7 +9,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -74,7 +73,7 @@ public class Row implements Comparable<Row> {
      *
      * <p>Any existing values for the column are overwritten
      */
-    public RowBuilder put(String column, Object value) {
+    public RowBuilder put(String column, @Nullable Object value) {
       _data.set(column, BatfishObjectMapper.mapper().valueToTree(value));
       return this;
     }
@@ -100,7 +99,6 @@ public class Row implements Comparable<Row> {
     Map<String, ColumnMetadata> _columns;
 
     private TypedRowBuilder(Map<String, ColumnMetadata> columns) {
-      checkArgument(columns != null, "Columns cannot be null to instantiate TypedRowBuilder");
       _columns = columns;
     }
 
@@ -183,26 +181,9 @@ public class Row implements Comparable<Row> {
     }
   }
 
-  /**
-   * Converts {@code jsonNode} to class of {@code valueType}
-   *
-   * @return The converted object
-   * @throws ClassCastException if the conversion fails
-   */
-  private <T> T convertType(JsonNode jsonNode, Class<T> valueType) {
-    try {
-      return BatfishObjectMapper.mapper().treeToValue(jsonNode, valueType);
-    } catch (JsonProcessingException e) {
-      throw new ClassCastException(
-          String.format(
-              "Cannot recover object of type %s from json %s: %s\n%s",
-              valueType.getName(), jsonNode, e.getMessage(), Throwables.getStackTraceAsString(e)));
-    }
-  }
-
   @Override
   public boolean equals(Object o) {
-    if (o == null || !(o instanceof Row)) {
+    if (!(o instanceof Row)) {
       return false;
     }
     return _data.equals(((Row) o)._data);
@@ -213,7 +194,7 @@ public class Row implements Comparable<Row> {
    *
    * @param columnName The column to fetch
    * @return The {@link JsonNode} object that represents the stored object
-   * @throws {@link NoSuchElementException} if this column does not exist
+   * @throws NoSuchElementException if this column does not exist
    */
   public JsonNode get(String columnName) {
     if (!_data.has(columnName)) {
@@ -251,7 +232,7 @@ public class Row implements Comparable<Row> {
    */
   public Set<String> getColumnNames() {
     HashSet<String> columns = new HashSet<>();
-    _data.fieldNames().forEachRemaining(column -> columns.add(column));
+    _data.fieldNames().forEachRemaining(columns::add);
     return columns;
   }
 

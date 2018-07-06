@@ -418,6 +418,88 @@
             "localAddress" : "172.16.1.2"
           }
         },
+        "ikePhase1Keys" : {
+          "keyring-vpn-ba2e34a8-0" : {
+            "keyHash" : "7db2fd6e9dcffcf826743b57bc0518cfcbca8f4db0b80a7a2c3f0c3b09deb49a",
+            "keyType" : "PRE_SHARED_KEY",
+            "localInterface" : "GigabitEthernet2/0",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "52.27.166.152"
+            }
+          },
+          "keyring-vpn-ba2e34a8-1" : {
+            "keyHash" : "84d71e5f49cce153c80a1f13b47989d25f2aa29d9bbc75624ab73435db792f87",
+            "keyType" : "PRE_SHARED_KEY",
+            "localInterface" : "GigabitEthernet2/0",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "52.39.121.126"
+            }
+          }
+        },
+        "ikePhase1Policies" : {
+          "isakmp-vpn-ba2e34a8-0" : {
+            "name" : "isakmp-vpn-ba2e34a8-0",
+            "ikePhase1Key" : {
+              "keyHash" : "7db2fd6e9dcffcf826743b57bc0518cfcbca8f4db0b80a7a2c3f0c3b09deb49a",
+              "keyType" : "PRE_SHARED_KEY",
+              "localInterface" : "GigabitEthernet2/0",
+              "remoteIdentity" : {
+                "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+                "ipWildcard" : "52.27.166.152"
+              }
+            },
+            "ikePhase1Proposals" : [
+              "200",
+              "201"
+            ],
+            "localInterface" : "GigabitEthernet2/0",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "52.27.166.152"
+            }
+          },
+          "isakmp-vpn-ba2e34a8-1" : {
+            "name" : "isakmp-vpn-ba2e34a8-1",
+            "ikePhase1Key" : {
+              "keyHash" : "84d71e5f49cce153c80a1f13b47989d25f2aa29d9bbc75624ab73435db792f87",
+              "keyType" : "PRE_SHARED_KEY",
+              "localInterface" : "GigabitEthernet2/0",
+              "remoteIdentity" : {
+                "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+                "ipWildcard" : "52.39.121.126"
+              }
+            },
+            "ikePhase1Proposals" : [
+              "200",
+              "201"
+            ],
+            "localInterface" : "GigabitEthernet2/0",
+            "remoteIdentity" : {
+              "class" : "org.batfish.datamodel.IpWildcardIpSpace",
+              "ipWildcard" : "52.39.121.126"
+            }
+          }
+        },
+        "ikePhase1Proposals" : {
+          "200" : {
+            "name" : "200",
+            "authenticationMethod" : "PRE_SHARED_KEYS",
+            "diffieHellmanGroup" : "GROUP2",
+            "encryptionAlgorithm" : "AES_128_CBC",
+            "hashingAlgorithm" : "SHA1",
+            "lifetimeSeconds" : 28800
+          },
+          "201" : {
+            "name" : "201",
+            "authenticationMethod" : "PRE_SHARED_KEYS",
+            "diffieHellmanGroup" : "GROUP2",
+            "encryptionAlgorithm" : "AES_128_CBC",
+            "hashingAlgorithm" : "SHA1",
+            "lifetimeSeconds" : 28800
+          }
+        },
         "ikePolicies" : {
           "isakmp-vpn-ba2e34a8-0" : {
             "name" : "isakmp-vpn-ba2e34a8-0",
@@ -1662,7 +1744,7 @@
               "multipathIbgp" : false,
               "neighbors" : {
                 "10.10.10.37/32" : {
-                  "name" : "10.10.10.37/32",
+                  "remotePrefix" : "10.10.10.37/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1685,13 +1767,12 @@
                   "localAs" : 65301,
                   "localIp" : "10.10.10.38",
                   "remoteAs" : 65201,
-                  "remotePrefix" : "10.10.10.37/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "10.10.10.45/32" : {
-                  "name" : "10.10.10.45/32",
+                  "remotePrefix" : "10.10.10.45/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1710,13 +1791,12 @@
                   "localAs" : 65301,
                   "localIp" : "10.10.10.46",
                   "remoteAs" : 65202,
-                  "remotePrefix" : "10.10.10.45/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "10.10.30.2/32" : {
-                  "name" : "10.10.30.2/32",
+                  "remotePrefix" : "10.10.30.2/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1738,13 +1818,12 @@
                   "localAs" : 65301,
                   "localIp" : "10.10.30.1",
                   "remoteAs" : 65331,
-                  "remotePrefix" : "10.10.30.2/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "10.10.255.7/32" : {
-                  "name" : "10.10.255.7/32",
+                  "remotePrefix" : "10.10.255.7/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1762,13 +1841,12 @@
                   "localAs" : 65301,
                   "localIp" : "10.10.255.8",
                   "remoteAs" : 65301,
-                  "remotePrefix" : "10.10.255.7/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "169.254.13.237/32" : {
-                  "name" : "169.254.13.237/32",
+                  "remotePrefix" : "169.254.13.237/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1802,13 +1880,12 @@
                   "localAs" : 65301,
                   "localIp" : "169.254.13.238",
                   "remoteAs" : 65401,
-                  "remotePrefix" : "169.254.13.237/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "169.254.15.193/32" : {
-                  "name" : "169.254.15.193/32",
+                  "remotePrefix" : "169.254.15.193/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -1842,7 +1919,6 @@
                   "localAs" : 65301,
                   "localIp" : "169.254.15.194",
                   "remoteAs" : 65401,
-                  "remotePrefix" : "169.254.15.193/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
@@ -3978,7 +4054,7 @@
               "multipathIbgp" : false,
               "neighbors" : {
                 "169.254.13.238/32" : {
-                  "name" : "169.254.13.238/32",
+                  "remotePrefix" : "169.254.13.238/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -3995,13 +4071,12 @@
                   "localAs" : 65401,
                   "localIp" : "169.254.13.237",
                   "remoteAs" : 65301,
-                  "remotePrefix" : "169.254.13.238/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "169.254.15.194/32" : {
-                  "name" : "169.254.15.194/32",
+                  "remotePrefix" : "169.254.15.194/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -4018,13 +4093,12 @@
                   "localAs" : 65401,
                   "localIp" : "169.254.15.193",
                   "remoteAs" : 65301,
-                  "remotePrefix" : "169.254.15.194/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : false,
                   "vrf" : "default"
                 },
                 "240.0.0.7/32" : {
-                  "name" : "240.0.0.7/32",
+                  "remotePrefix" : "240.0.0.7/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -4042,7 +4116,6 @@
                   "localAs" : 65401,
                   "localIp" : "240.0.0.6",
                   "remoteAs" : 65401,
-                  "remotePrefix" : "240.0.0.7/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : true,
                   "vrf" : "default"
@@ -4136,7 +4209,7 @@
               "multipathIbgp" : false,
               "neighbors" : {
                 "240.0.0.6/32" : {
-                  "name" : "240.0.0.6/32",
+                  "remotePrefix" : "240.0.0.6/32",
                   "additionalPathsReceive" : false,
                   "additionalPathsSelectAll" : false,
                   "additionalPathsSend" : false,
@@ -4154,7 +4227,6 @@
                   "localAs" : 65401,
                   "localIp" : "240.0.0.7",
                   "remoteAs" : 65401,
-                  "remotePrefix" : "240.0.0.6/32",
                   "routeReflectorClient" : false,
                   "sendCommunity" : true,
                   "vrf" : "default"

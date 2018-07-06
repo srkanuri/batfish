@@ -152,7 +152,9 @@ public class WorkMgrService {
 
   private void checkContainerAccessibility(String apiKey, String containerName) {
     if (!Main.getAuthorizer().isAccessibleContainer(apiKey, containerName, true)) {
-      throw new AccessControlException("container is not accessible by the api key");
+      throw new AccessControlException(
+          String.format(
+              "container '%s' is not accessible by the api key '%s", containerName, apiKey));
     }
   }
 
@@ -1707,7 +1709,7 @@ public class WorkMgrService {
    * @param containerName The name of the container under which the testrig resides
    * @param testrigName The name of the testrig about which to ask the question
    * @param qName The name of the question
-   * @param fileStream The stream from which the question is read
+   * @param questionJson The JSON form of the question
    * @return TODO: document JSON response
    */
   @POST

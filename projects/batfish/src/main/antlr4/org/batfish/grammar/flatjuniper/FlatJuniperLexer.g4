@@ -3354,6 +3354,11 @@ NATIVE_VLAN_ID
    'native-vlan-id'
 ;
 
+NEAREST
+:
+   'nearest'
+;
+
 NEIGHBOR
 :
    'neighbor'
@@ -3479,6 +3484,11 @@ NO_ADJACENCY_DOWN_NOTIFICATION
    'no-adjacency-down-notification'
 ;
 
+NO_ADVERTISE
+:
+   'no-advertise'
+;
+
 NO_ANTI_REPLAY
 :
    'no-anti-replay'
@@ -3537,6 +3547,11 @@ NO_NEIGHBOR_DOWN_NOTIFICATION
 NO_NEXTHOP_CHANGE
 :
    'no-nexthop-change'
+;
+
+NO_PEER_LOOP_CHECK
+:
+   'no-peer-loop-check'
 ;
 
 NO_READVERTISE
@@ -4197,6 +4212,11 @@ REMOVE_PRIVATE
 REMOVED
 :
    'Removed'
+;
+
+REPLACE
+:
+   'replace'
 ;
 
 REQUIRED_OPTION_MISSING
@@ -5276,6 +5296,11 @@ ASTERISK
    '*'
 ;
 
+BACKSLASH
+:
+   '\\'
+;
+
 CARAT
 :
    '^'
@@ -5346,6 +5371,7 @@ FLOAT
    )
 ;
 */
+
 FORWARD_SLASH
 :
    '/'
@@ -5482,6 +5508,11 @@ PERIOD
 PLUS
 :
    '+'
+;
+
+QUESTION_MARK
+:
+   '?'
 ;
 
 SEMICOLON
@@ -5926,6 +5957,11 @@ M_Members_ASTERISK
    '*' -> type ( ASTERISK )
 ;
 
+M_Members_BACKSLASH
+:
+   '\\' -> type (BACKSLASH)
+;
+
 M_Members_CARAT
 :
    '^' -> type ( CARAT )
@@ -5989,9 +6025,9 @@ M_Members_NEWLINE
    -> type ( NEWLINE ) , popMode
 ;
 
-NO_ADVERTISE
+M_Members_NO_ADVERTISE
 :
-   'no-advertise'
+   'no-advertise' -> type ( NO_ADVERTISE )
 ;
 
 M_Members_NO_EXPORT
@@ -6024,14 +6060,29 @@ M_Members_PERIOD
    '.' -> type ( PERIOD )
 ;
 
+M_Members_PLUS
+:
+   '+' -> type ( PLUS )
+;
+
 M_Members_PIPE
 :
    '|' -> type ( PIPE )
 ;
 
+M_Members_QUESTION_MARK
+:
+   '?' -> type ( QUESTION_MARK )
+;
+
 M_Members_TARGET
 :
    'target' -> type ( TARGET )
+;
+
+M_Members_UNDERSCORE
+:
+   '_' -> type ( UNDERSCORE )
 ;
 
 M_Members_WS
