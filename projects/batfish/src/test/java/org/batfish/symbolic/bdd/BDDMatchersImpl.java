@@ -5,6 +5,42 @@ import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 
 final class BDDMatchersImpl {
+  static final class Intersects extends BaseMatcher<BDD> {
+    private final BDD _other;
+
+    Intersects(BDD other) {
+      _other = other;
+    }
+
+    @Override
+    public boolean matches(Object o) {
+      return !((BDD) o).and(_other).isZero();
+    }
+
+    @Override
+    public void describeTo(Description description) {
+      description.appendText("BDD intersects other");
+    }
+  }
+
+  static final class IsEquivalentTo extends BaseMatcher<BDD> {
+    private final BDD _other;
+
+    IsEquivalentTo(BDD other) {
+      _other = other;
+    }
+
+    @Override
+    public boolean matches(Object o) {
+      return ((BDD) o).biimp(_other).isOne();
+    }
+
+    @Override
+    public void describeTo(Description description) {
+      description.appendText("BDD is equivalent to other");
+    }
+  }
+
   static final class IsOne extends BaseMatcher<BDD> {
     @Override
     public boolean matches(Object o) {
