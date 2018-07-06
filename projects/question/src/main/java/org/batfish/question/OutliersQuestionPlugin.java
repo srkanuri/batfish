@@ -248,7 +248,8 @@ public class OutliersQuestionPlugin extends QuestionPlugin {
 
         Set<String> rowValueDefTree = new TreeSet<String>(rowValueDefHash);
 
-        SortedSet<String> matchingNodesTemp = equivSetsT.getOrDefault(rowValueDef, new TreeSet<>());
+        SortedSet<String> matchingNodesTemp =
+            equivSetsT.getOrDefault(rowValueDefTree, new TreeSet<>());
         matchingNodesTemp.add(rowNodeName);
         equivSetsT.put((T) rowValueDefTree, matchingNodesTemp);
       }

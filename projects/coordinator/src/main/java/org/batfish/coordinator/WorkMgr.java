@@ -74,6 +74,7 @@ import org.batfish.datamodel.answers.AutocompleteSuggestion;
 import org.batfish.datamodel.answers.AutocompleteSuggestion.CompletionType;
 import org.batfish.datamodel.answers.ParseVendorConfigurationAnswerElement;
 import org.batfish.datamodel.pojo.Topology;
+import org.batfish.datamodel.questions.HypothesisPropertySpecifier;
 import org.batfish.datamodel.questions.InterfacePropertySpecifier;
 import org.batfish.datamodel.questions.NodePropertySpecifier;
 import org.batfish.datamodel.questions.NodesSpecifier;
@@ -313,6 +314,12 @@ public class WorkMgr extends AbstractCoordinator {
       case NODE_PROPERTY:
         {
           List<AutocompleteSuggestion> suggestions = NodePropertySpecifier.autoComplete(query);
+          return suggestions.subList(0, Integer.min(suggestions.size(), maxSuggestions));
+        }
+      case HYPOTHESIS_PROPERTY:
+        {
+          List<AutocompleteSuggestion> suggestions =
+              HypothesisPropertySpecifier.autoComplete(query);
           return suggestions.subList(0, Integer.min(suggestions.size(), maxSuggestions));
         }
       default:

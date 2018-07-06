@@ -13,7 +13,7 @@ import org.batfish.datamodel.answers.AutocompleteSuggestion;
 import org.batfish.datamodel.answers.Schema;
 
 /**
- * Enables specification a set of node properties.
+ * Enables specification a set of hypothesis properties specific to "sameServers" hypothesis.
  *
  * <p>Currently supported example specifier:
  *

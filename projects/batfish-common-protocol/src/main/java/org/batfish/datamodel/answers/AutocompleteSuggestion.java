@@ -11,7 +11,8 @@ public class AutocompleteSuggestion {
   public enum CompletionType {
     INTERFACE_PROPERTY,
     NODE,
-    NODE_PROPERTY
+    NODE_PROPERTY,
+    HYPOTHESIS_PROPERTY
   }
 
   @Nullable private final String _description;
