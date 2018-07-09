@@ -4,6 +4,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.sf.javabdd.BDD;
+import org.batfish.symbolic.bdd.BDDPacket;
 import org.batfish.z3.expr.StateExpr;
 
 final class Edge {
@@ -22,9 +23,8 @@ final class Edge {
   Edge(
       @Nonnull StateExpr preState,
       @Nonnull StateExpr postState,
-      @Nonnull BDD constraint,
       @Nullable List<BDDSourceNat> sourceNats) {
-    _constraint = constraint;
+    _constraint = BDDPacket.factory.one();
     _postState = postState;
     _preState = preState;
     _sourceNats = sourceNats;

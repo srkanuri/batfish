@@ -1,12 +1,16 @@
 package org.batfish.bddreachability;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.batfish.common.util.CommonUtil.toImmutableMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -101,6 +104,15 @@ public class BDDReachabilityAnalysis {
     _srcIpVars = new BDDOps(BDDPacket.factory).and(_bddPacket.getSrcIp().getBitvec());
   }
 
+  Map<StateExpr, Map<StateExpr, BDD>> getStatesReachableFromRoot(StateExpr root) {
+    return _reachableStates
+        .get()
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getValue().containsKey(root))
+        .collect(ImmutableMap.toImmutableMap(Entry::getKey, Entry::getValue));
+  }
+
   /* backward-propagate nat roots to a fixed point */
   private void backwardPropagateNatRoots(Map<StateExpr, Map<StateExpr, BDD>> rootToLeafBDDs) {
     Set<StateExpr> natRootsWorkList = _natRootPositions.keySet();
@@ -113,15 +125,23 @@ public class BDDReachabilityAnalysis {
         List<BDDSourceNat> sourceNats = natRootPosition._sourceNats;
         BDD reachNatBDD = reachableStates.get(natRootPosition._natPosition).get(originalRoot);
         Map<StateExpr, BDD> natRootLeafBDDs = rootToLeafBDDs.get(natRoot);
+
+        if (natRootLeafBDDs == null) {
+          Map<StateExpr, Map<StateExpr, BDD>> statesReachableFromRoot =
+              getStatesReachableFromRoot(natRoot);
+          break;
+        }
+        checkNotNull(natRootLeafBDDs, "natRoot %s missing rootToLeafBDDs entry", natRoot);
+
         natRootLeafBDDs.forEach(
             (leaf, bdd) -> {
+              BDD bddExistSrcIp = bdd.exist(_srcIpVars);
               BDD preNatBDD = bdd.getFactory().zero();
               for (BDDSourceNat sourceNat : sourceNats) {
                 if (!bdd.and(sourceNat._updateSrcIp).isZero()) {
                   // this could be the NAT rule that was applied
                   preNatBDD =
-                      preNatBDD.or(
-                          reachNatBDD.and(sourceNat._condition).and(bdd.exist(_srcIpVars)));
+                      preNatBDD.or(reachNatBDD.and(sourceNat._condition).and(bddExistSrcIp));
                 }
               }
               assert !preNatBDD.isZero();
@@ -143,21 +163,17 @@ public class BDDReachabilityAnalysis {
    */
   private Map<StateExpr, Map<StateExpr, BDD>> computeReachableStates() {
     Map<StateExpr, Map<StateExpr, BDD>> reachableStates = new HashMap<>();
-    _graphRoots.forEach(
-        (root, bdd) -> reachableStates.computeIfAbsent(root, k -> new HashMap<>()).put(root, bdd));
-
-    // each iteration, only process (root, reached node) entries that we need to.
-    Map<StateExpr, StateExpr> dirty =
-        _graphRoots
-            .keySet()
-            .stream()
-            .collect(ImmutableMap.toImmutableMap(Function.identity(), Function.identity()));
+    Multimap<StateExpr, StateExpr> dirty = HashMultimap.create();
+    for (StateExpr root : _graphRoots.keySet()) {
+      reachableStates.put(root, new HashMap<>()).put(root, _graphRoots.get(root));
+      dirty.put(root, root);
+    }
 
     List<Long> roundTimes = new LinkedList<>();
     List<Integer> roundDirties = new LinkedList<>();
 
     while (!dirty.isEmpty()) {
-      Map<StateExpr, StateExpr> newDirty = new HashMap<>();
+      Multimap<StateExpr, StateExpr> newDirty = HashMultimap.create();
       long time = System.currentTimeMillis();
 
       dirty.forEach(
@@ -176,26 +192,30 @@ public class BDDReachabilityAnalysis {
                     return;
                   }
 
+                  // apply source nat
                   List<BDDSourceNat> sourceNats = edge.getSourceNats();
                   boolean natted = false;
                   if (sourceNats != null) {
-                    BDD existSrcIp = result.exist(_srcIpVars);
                     BDD orig = result;
-                    result = orig.getFactory().zero();
-                    for (BDDSourceNat sourceNat : sourceNats) {
-                      BDD match = orig.and(sourceNat._condition);
-                      if (!match.isZero()) {
-                        natted = true;
-                        result = result.or(existSrcIp.and(sourceNat._updateSrcIp));
-                        orig = orig.and(sourceNat._condition.not());
-                      }
+                    result = BDDPacket.factory.zero();
+                    BDD reachLine = BDDPacket.factory.one();
+                    for (BDDSourceNat sourceNat : Lists.reverse(sourceNats)) {
+                      BDD matchLine = reachLine.and(sourceNat._condition);
+                      result =
+                          result.or(
+                              orig.and(matchLine).exist(_srcIpVars).and(sourceNat._updateSrcIp));
+                      reachLine = reachLine.and(sourceNat._condition.not());
                     }
-                    result = result.or(orig);
+                    result = result.or(orig.and(reachLine));
+                    natted = !result.equals(orig);
                   }
 
-                  // we want to remember the source BDD, but NAT is destructive. So we're going
-                  // to map back to it. We'll create a new dummy state for each combination of
-                  // postState/root.
+                  /*
+                   * We want to remember the original source IP, but NAT is destructive. So we
+                   * introduce a new "root" state and map it to a new NatRootPosition, which
+                   * has the information needed to recover the original source IP and original
+                   * root.
+                   */
                   StateExpr logicalRoot;
                   if (natted) {
                     logicalRoot =
@@ -208,7 +228,7 @@ public class BDDReachabilityAnalysis {
                     logicalRoot = root;
                   }
 
-                  // update postState BDD reachable from source
+                  // update postState BDD reachable from root
                   Map<StateExpr, BDD> reachPostState =
                       reachableStates.computeIfAbsent(postState, k -> new HashMap<>());
                   BDD oldReach = reachPostState.get(logicalRoot);
@@ -235,7 +255,7 @@ public class BDDReachabilityAnalysis {
   }
 
   private Map<StateExpr, Map<StateExpr, BDD>> computeRootToLeafBDDs() {
-    // root --> terminal state --> BDD
+    // root --> leaf --> BDD
     Map<StateExpr, Map<StateExpr, BDD>> rootToLeafBDDs = new HashMap<>();
     _reachableStates
         .get()
@@ -276,80 +296,47 @@ public class BDDReachabilityAnalysis {
    */
   @VisibleForTesting
   List<MultipathInconsistency> computeMultipathInconsistencies() {
-    final class Candidate {
-      private StateExpr _root;
-      private StateExpr _leaf1;
-      private StateExpr _leaf2;
-      private BDD _leaf1BDD;
-      private BDD _leaf2BDD;
-
-      private Candidate(
-          StateExpr root, StateExpr leaf1, StateExpr leaf2, BDD leaf1BDD, BDD leaf2BDD) {
-        _root = root;
-        _leaf1 = leaf1;
-        _leaf2 = leaf2;
-        _leaf1BDD = leaf1BDD;
-        _leaf2BDD = leaf2BDD;
-      }
-    }
-
-    // generate candidates in parallel
-    List<Candidate> candidates =
-        _rootToLeafBDDs
-            .get()
-            .entrySet()
-            .parallelStream()
-            .flatMap(
-                entry -> {
-                  StateExpr root = entry.getKey();
-                  Map<StateExpr, BDD> leafBDDs = entry.getValue();
-                  return _leafStates
-                      .stream()
-                      .filter(leafBDDs::containsKey)
-                      .flatMap(
-                          leaf1 -> {
-                            BDD leaf1BDD = leafBDDs.get(leaf1);
-                            return _leafStates
-                                .stream()
-                                .filter(leaf2 -> leaf1 != leaf2)
-                                .filter(leafBDDs::containsKey)
-                                // avoid duplicate violations
-                                .filter(leaf2 -> leaf1.toString().compareTo(leaf2.toString()) < 1)
-                                .map(
-                                    leaf2 -> {
-                                      BDD leaf2BDD = leafBDDs.get(leaf2);
-                                      return new Candidate(root, leaf1, leaf2, leaf1BDD, leaf2BDD);
-                                    });
-                          });
-                })
-            .collect(Collectors.toList());
-
-    /*
-     * A candidate violation is real if the intersection of the BDDs at the leaves is
-     * non-empty. This step must be done sequentially.
-     */
-    return candidates
+    return _rootToLeafBDDs
+        .get()
+        .entrySet()
         .stream()
         .flatMap(
-            candidate -> {
-              BDD intersection = candidate._leaf1BDD.and(candidate._leaf2BDD);
-              return intersection.isZero()
-                  ? Stream.empty()
-                  : Stream.of(
-                      new MultipathInconsistency(
-                          candidate._root,
-                          ImmutableSet.of(candidate._leaf1, candidate._leaf2),
-                          intersection));
+            entry -> {
+              StateExpr root = entry.getKey();
+              Map<StateExpr, BDD> leafBDDs = entry.getValue();
+              return _leafStates
+                  .stream()
+                  .filter(leafBDDs::containsKey)
+                  .flatMap(
+                      leaf1 -> {
+                        BDD leaf1BDD = leafBDDs.get(leaf1);
+                        return _leafStates
+                            .stream()
+                            .filter(leaf2 -> leaf1 != leaf2)
+                            .filter(leafBDDs::containsKey)
+                            // avoid duplicate violations
+                            .filter(leaf2 -> leaf1.toString().compareTo(leaf2.toString()) < 1)
+                            .flatMap(
+                                leaf2 -> {
+                                  BDD leaf2BDD = leafBDDs.get(leaf2);
+                                  BDD intersection = leaf1BDD.and(leaf2BDD);
+                                  return intersection.isZero()
+                                      ? Stream.empty()
+                                      : Stream.of(
+                                          new MultipathInconsistency(
+                                              root, ImmutableSet.of(leaf1, leaf2), intersection));
+                                });
+                      });
             })
         .collect(ImmutableList.toImmutableList());
   }
 
   /** Return a list of flows exhibiting multipath inconsistencies in the network. */
-  public List<Flow> multipathInconsistencies(String flowTag) {
+  public Set<Flow> multipathInconsistencies(String flowTag) {
     return computeMultipathInconsistencies()
         .stream()
         .map(inconsistency -> multipathInconsistencyToFlow(inconsistency, flowTag))
-        .collect(ImmutableList.toImmutableList());
+        .collect(ImmutableSet.toImmutableSet());
   }
 
   Set<StateExpr> getLeafStates() {

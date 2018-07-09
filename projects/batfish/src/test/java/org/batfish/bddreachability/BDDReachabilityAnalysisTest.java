@@ -121,7 +121,7 @@ public final class BDDReachabilityAnalysisTest {
                 new InterfaceLocation(NET._srcNode.getName(), NET._link1Src.getName()),
                 UniverseIpSpace.INSTANCE)
             .build();
-    GRAPH = GRAPH_FACTORY.bddNetworkGraph(assignment);
+    GRAPH = GRAPH_FACTORY.bddReachabilityAnalysis(assignment);
   }
 
   @Before
@@ -375,7 +375,7 @@ public final class BDDReachabilityAnalysisTest {
             .build();
 
     BDDReachabilityAnalysis graph =
-        GRAPH_FACTORY.bddNetworkGraph(assignment, _dstIface2Ip.toIpSpace());
+        GRAPH_FACTORY.bddReachabilityAnalysis(assignment, _dstIface2Ip.toIpSpace());
 
     BDD dstIpBDD = GRAPH_FACTORY.getIpSpaceToBDD().toBDD(_dstIface2Ip);
     BDD natPoolIpBDD = srcIpBDD(SOURCE_NAT_POOL_IP);
@@ -442,7 +442,7 @@ public final class BDDReachabilityAnalysisTest {
             .build();
 
     BDDReachabilityAnalysis graph =
-        GRAPH_FACTORY.bddNetworkGraph(assignment, _dstIface2Ip.toIpSpace());
+        GRAPH_FACTORY.bddReachabilityAnalysis(assignment, _dstIface2Ip.toIpSpace());
 
     BDD dstIpBDD = GRAPH_FACTORY.getIpSpaceToBDD().toBDD(_dstIface2Ip);
     BDD srcIpBDD = srcIpBDD(Ip.MAX);

@@ -509,8 +509,7 @@ public final class BDDReachabilityAnalysisFactory {
                 bddSourceNats = bddSourceNatBuilder.build();
               }
 
-              return new Edge(
-                  preOutEdge, preOutEdgePostNat, BDDPacket.factory.one(), bddSourceNats);
+              return new Edge(preOutEdge, preOutEdgePostNat, bddSourceNats);
             });
   }
 
@@ -675,11 +674,11 @@ public final class BDDReachabilityAnalysisFactory {
     };
   }
 
-  public BDDReachabilityAnalysis bddNetworkGraph(IpSpaceAssignment srcIpSpaceAssignment) {
-    return bddNetworkGraph(srcIpSpaceAssignment, UniverseIpSpace.INSTANCE);
+  public BDDReachabilityAnalysis bddReachabilityAnalysis(IpSpaceAssignment srcIpSpaceAssignment) {
+    return bddReachabilityAnalysis(srcIpSpaceAssignment, UniverseIpSpace.INSTANCE);
   }
 
-  public BDDReachabilityAnalysis bddNetworkGraph(
+  public BDDReachabilityAnalysis bddReachabilityAnalysis(
       IpSpaceAssignment srcIpSpaceAssignment, IpSpace dstIpSpace) {
     Map<StateExpr, BDD> roots = new HashMap<>();
     BDDPacket pkt = new BDDPacket();
