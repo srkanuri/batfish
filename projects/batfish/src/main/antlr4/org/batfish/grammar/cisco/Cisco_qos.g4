@@ -608,6 +608,16 @@ pm_event_class
    )*
 ;
 
+pm_ios_control_subscriber
+:
+  CONTROL SUBSCRIBER name = variable_permissive NEWLINE pm_ioscs_null*
+;
+
+pm_ioscs_null
+:
+  MATCH null_rest_of_line
+;
+
 pm_ios_inspect
 :
    INSPECT name = variable_permissive NEWLINE
@@ -839,7 +849,11 @@ s_policy_map
 
 s_policy_map_ios
 :
-   POLICY_MAP TYPE pm_ios_inspect
+  POLICY_MAP TYPE
+  (
+    pm_ios_control_subscriber
+    | pm_ios_inspect
+  )
 ;
 
 s_qos_mapping

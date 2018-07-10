@@ -1,0 +1,5 @@
+!
+hostname ios_policy_map
+!
+policy-map type control subscriber match-any
+!
