@@ -10269,6 +10269,11 @@ SELF
    'self'
 ;
 
+SELF_IDENTITY
+:
+   'self-identity'
+;
+
 SEND
 :
    'send'
@@ -12189,6 +12194,11 @@ UNREACHABLES
 UNSUPPRESS_MAP
 :
    'unsuppress-map'
+;
+
+UNSUPPRESS_ROUTE
+:
+   'unsuppress-route'
 ;
 
 UNICAST

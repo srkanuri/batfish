@@ -4,6 +4,7 @@ import static com.google.common.base.MoreObjects.firstNonNull;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,14 +31,19 @@ import org.batfish.datamodel.AclIpSpace;
 import org.batfish.datamodel.AclIpSpaceLine;
 import org.batfish.datamodel.AuthenticationKey;
 import org.batfish.datamodel.AuthenticationKeyChain;
+import org.batfish.datamodel.BgpActivePeerConfig;
 import org.batfish.datamodel.BgpAuthenticationAlgorithm;
 import org.batfish.datamodel.BgpAuthenticationSettings;
+import org.batfish.datamodel.BgpPassivePeerConfig;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpProcess;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.HeaderSpace;
-import org.batfish.datamodel.IkeProposal;
+import org.batfish.datamodel.IkeKeyType;
+import org.batfish.datamodel.IkePhase1Key;
+import org.batfish.datamodel.IkePhase1Policy;
+import org.batfish.datamodel.IkePhase1Proposal;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.IpAccessList;
@@ -319,8 +325,17 @@ public final class JuniperConfiguration extends VendorConfiguration {
     for (Entry<Prefix, IpBgpGroup> e : routingInstance.getIpBgpGroups().entrySet()) {
       Prefix prefix = e.getKey();
       IpBgpGroup ig = e.getValue();
-      BgpPeerConfig neighbor = new BgpPeerConfig(prefix, _c, ig.getDynamic());
-      neighbor.setVrf(vrfName);
+      BgpPeerConfig.Builder<?, ?> neighbor;
+      Long remoteAs = ig.getType() == BgpGroupType.INTERNAL ? ig.getLocalAs() : ig.getPeerAs();
+      if (ig.getDynamic()) {
+        neighbor =
+            BgpPassivePeerConfig.builder()
+                .setPeerPrefix(prefix)
+                .setRemoteAs(ImmutableList.of(remoteAs));
+      } else {
+        neighbor =
+            BgpActivePeerConfig.builder().setPeerAddress(prefix.getStartIp()).setRemoteAs(remoteAs);
+      }
 
       // route reflection
       Ip declaredClusterId = ig.getClusterId();
@@ -460,7 +475,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
 
       // inherit local-as
       neighbor.setLocalAs(ig.getLocalAs());
-      if (neighbor.getLocalAs() == null) {
+      if (ig.getLocalAs() == null) {
         _w.redFlag("Missing local-as for neighbor: " + ig.getRemoteAddress());
         continue;
       }
@@ -471,7 +486,6 @@ public final class JuniperConfiguration extends VendorConfiguration {
        * Also set multipath
        */
       if (ig.getType() == BgpGroupType.INTERNAL) {
-        neighbor.setRemoteAs(ig.getLocalAs());
         boolean currentGroupMultipathIbgp = ig.getMultipath();
         if (multipathIbgpSet && currentGroupMultipathIbgp != multipathIbgp) {
           _w.redFlag(
@@ -483,7 +497,6 @@ public final class JuniperConfiguration extends VendorConfiguration {
           multipathIbgpSet = true;
         }
       } else {
-        neighbor.setRemoteAs(ig.getPeerAs());
         boolean currentGroupMultipathEbgp = ig.getMultipath();
         if (multipathEbgpSet && currentGroupMultipathEbgp != multipathEbgp) {
           _w.redFlag(
@@ -528,7 +541,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
         }
       }
       if (localIp == null) {
-        if (neighbor.getDynamic()) {
+        if (ig.getDynamic()) {
           _w.redFlag(
               "Could not determine local ip for bgp peering with neighbor prefix: " + prefix);
         } else {
@@ -539,7 +552,8 @@ public final class JuniperConfiguration extends VendorConfiguration {
       } else {
         neighbor.setLocalIp(localIp);
       }
-      proc.getNeighbors().put(neighbor.getPrefix(), neighbor);
+      neighbor.setBgpProcess(proc);
+      neighbor.build();
     }
     proc.setMultipathEbgp(multipathEbgpSet);
     proc.setMultipathIbgp(multipathIbgp);
@@ -1162,13 +1176,60 @@ public final class JuniperConfiguration extends VendorConfiguration {
         .getProposals()
         .forEach(
             ikeProposalName -> {
-              IkeProposal ikeProposal = _c.getIkeProposals().get(ikeProposalName);
+              org.batfish.datamodel.IkeProposal ikeProposal =
+                  _c.getIkeProposals().get(ikeProposalName);
               if (ikeProposal != null) {
                 newIkePolicy.getProposals().put(ikeProposalName, ikeProposal);
               }
             });
 
     return newIkePolicy;
+  }
+
+  /**
+   * Converts {@link IkePolicy} to {@link IkePhase1Policy} and puts the used pre-shared key as a
+   * {@link IkePhase1Key} in the passed-in {@code ikePhase1Keys}
+   */
+  private static IkePhase1Policy toIkePhase1Policy(
+      IkePolicy ikePolicy, ImmutableSortedMap.Builder<String, IkePhase1Key> ikePhase1Keys) {
+    String name = ikePolicy.getName();
+    IkePhase1Policy ikePhase1Policy = new IkePhase1Policy(name);
+
+    // pre-shared-key
+    IkePhase1Key ikePhase1Key = new IkePhase1Key();
+    ikePhase1Key.setKeyType(IkeKeyType.PRE_SHARED_KEY);
+    ikePhase1Key.setKeyHash(ikePolicy.getPreSharedKeyHash());
+
+    ikePhase1Keys.put(String.format("~IKE_PHASE1_KEY_%s~", ikePolicy.getName()), ikePhase1Key);
+
+    ikePhase1Policy.setIkePhase1Key(ikePhase1Key);
+    ImmutableList.Builder<String> ikePhase1ProposalBuilder = ImmutableList.builder();
+    // ike proposals
+    ikePolicy.getProposals().forEach(ikePhase1ProposalBuilder::add);
+    ikePhase1Policy.setIkePhase1Proposals(ikePhase1ProposalBuilder.build());
+
+    return ikePhase1Policy;
+  }
+
+  private org.batfish.datamodel.IkeProposal toIkeProposal(IkeProposal ikeProposal) {
+    org.batfish.datamodel.IkeProposal newIkeProposal =
+        new org.batfish.datamodel.IkeProposal(ikeProposal.getName());
+    newIkeProposal.setDiffieHellmanGroup(ikeProposal.getDiffieHellmanGroup());
+    newIkeProposal.setAuthenticationMethod(ikeProposal.getAuthenticationMethod());
+    newIkeProposal.setEncryptionAlgorithm(ikeProposal.getEncryptionAlgorithm());
+    newIkeProposal.setLifetimeSeconds(ikeProposal.getLifetimeSeconds());
+    newIkeProposal.setAuthenticationAlgorithm(ikeProposal.getAuthenticationAlgorithm());
+    return newIkeProposal;
+  }
+
+  private IkePhase1Proposal toIkePhase1Proposal(IkeProposal ikeProposal) {
+    IkePhase1Proposal ikePhase1Proposal = new IkePhase1Proposal(ikeProposal.getName());
+    ikePhase1Proposal.setDiffieHellmanGroup(ikeProposal.getDiffieHellmanGroup());
+    ikePhase1Proposal.setAuthenticationMethod(ikeProposal.getAuthenticationMethod());
+    ikePhase1Proposal.setEncryptionAlgorithm(ikeProposal.getEncryptionAlgorithm());
+    ikePhase1Proposal.setLifetimeSeconds(ikeProposal.getLifetimeSeconds());
+    ikePhase1Proposal.setHashingAlgorithm(ikeProposal.getAuthenticationAlgorithm());
+    return ikePhase1Proposal;
   }
 
   private org.batfish.datamodel.Interface toInterface(Interface iface) {
@@ -1651,8 +1712,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
     List<Statement> statements = routingPolicy.getStatements();
     boolean hasDefaultTerm =
         ps.getDefaultTerm().getFroms().size() > 0 || ps.getDefaultTerm().getThens().size() > 0;
-    List<PsTerm> terms = new ArrayList<>();
-    terms.addAll(ps.getTerms().values());
+    List<PsTerm> terms = new ArrayList<>(ps.getTerms().values());
     if (hasDefaultTerm) {
       terms.add(ps.getDefaultTerm());
     }
@@ -1812,8 +1872,7 @@ public final class JuniperConfiguration extends VendorConfiguration {
     }
 
     // remove empty firewall filters (ipv6-only filters)
-    Map<String, FirewallFilter> allFilters = new LinkedHashMap<>();
-    allFilters.putAll(_filters);
+    Map<String, FirewallFilter> allFilters = new LinkedHashMap<>(_filters);
     for (Entry<String, FirewallFilter> e : allFilters.entrySet()) {
       String name = e.getKey();
       FirewallFilter filter = e.getValue();
@@ -1929,8 +1988,22 @@ public final class JuniperConfiguration extends VendorConfiguration {
       }
     }
 
-    // copy ike proposals
-    _c.getIkeProposals().putAll(_ikeProposals);
+    // convert IKE proposals
+    _ikeProposals
+        .values()
+        .forEach(
+            ikeProposal ->
+                _c.getIkeProposals().put(ikeProposal.getName(), toIkeProposal(ikeProposal)));
+
+    _ikeProposals
+        .values()
+        .forEach(
+            ikeProposal ->
+                _c.getIkePhase1Proposals()
+                    .put(ikeProposal.getName(), toIkePhase1Proposal(ikeProposal)));
+
+    ImmutableSortedMap.Builder<String, IkePhase1Key> ikePhase1KeysBuilder =
+        ImmutableSortedMap.naturalOrder();
 
     // convert ike policies
     for (Entry<String, IkePolicy> e : _ikePolicies.entrySet()) {
@@ -1938,7 +2011,11 @@ public final class JuniperConfiguration extends VendorConfiguration {
       IkePolicy oldIkePolicy = e.getValue();
       org.batfish.datamodel.IkePolicy newPolicy = toIkePolicy(oldIkePolicy);
       _c.getIkePolicies().put(name, newPolicy);
+      // storing IKE phase 1 policy
+      _c.getIkePhase1Policies().put(name, toIkePhase1Policy(oldIkePolicy, ikePhase1KeysBuilder));
     }
+
+    _c.setIkePhase1Keys(ikePhase1KeysBuilder.build());
 
     // convert ike gateways
     for (Entry<String, IkeGateway> e : _ikeGateways.entrySet()) {

@@ -1306,22 +1306,30 @@ public class Batfish extends PluginConsumer implements IBatfish {
     CommonUtil.initRemoteIpsecVpns(configurations);
     for (Configuration c : configurations.values()) {
       for (IpsecVpn vpn : c.getIpsecVpns().values()) {
+        Interface bindInterface = vpn.getBindInterface();
+        if (bindInterface == null) {
+          // Nothing to disable.
+          continue;
+        }
+
+        if (bindInterface.getInterfaceType() == InterfaceType.PHYSICAL) {
+          // Skip tunnels bound to physical interfaces (aka, Cisco interface crypto-map).
+          continue;
+        }
+
         IpsecVpn remoteVpn = vpn.getRemoteIpsecVpn();
         if (remoteVpn == null
             || !vpn.compatibleIkeProposals(remoteVpn)
             || !vpn.compatibleIpsecProposals(remoteVpn)
             || !vpn.compatiblePreSharedKey(remoteVpn)) {
           String hostname = c.getHostname();
-          Interface bindInterface = vpn.getBindInterface();
-          if (bindInterface != null) {
-            bindInterface.setActive(false);
-            bindInterface.setBlacklisted(true);
-            String bindInterfaceName = bindInterface.getName();
-            _logger.warnf(
-                "WARNING: Disabling unusable vpn interface because we cannot determine remote "
-                    + "endpoint: \"%s:%s\"\n",
-                hostname, bindInterfaceName);
-          }
+          bindInterface.setActive(false);
+          bindInterface.setBlacklisted(true);
+          String bindInterfaceName = bindInterface.getName();
+          _logger.warnf(
+              "WARNING: Disabling unusable vpn interface because we cannot determine remote "
+                  + "endpoint: \"%s:%s\"\n",
+              hostname, bindInterfaceName);
         }
       }
     }
@@ -2551,9 +2559,8 @@ public class Batfish extends PluginConsumer implements IBatfish {
         initStepAnswerElement
             .getErrors()
             .forEach(
-                (hostname, initStepErrors) -> {
-                  errors.computeIfAbsent(hostname, k -> new ArrayList<>()).add(initStepErrors);
-                });
+                (hostname, initStepErrors) ->
+                    errors.computeIfAbsent(hostname, k -> new ArrayList<>()).add(initStepErrors));
       }
       SortedMap<String, Warnings> warnings = initInfoAnswerElement.getWarnings();
       initStepAnswerElement
@@ -3089,8 +3096,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     Map<String, Configuration> configs = loadConfigurations();
     SortedSet<Edge> edges = CommonUtil.synthesizeTopology(configs).getEdges();
     Set<Edge> symmetricEdgePairs = getSymmetricEdgePairs(edges);
-    List<Edge> edgeList = new ArrayList<>();
-    edgeList.addAll(symmetricEdgePairs);
+    List<Edge> edgeList = new ArrayList<>(symmetricEdgePairs);
     for (int i = 0; i < edgeList.size() / 2; i++) {
       Edge edge1 = edgeList.get(2 * i);
       Edge edge2 = edgeList.get(2 * i + 1);
@@ -4029,9 +4035,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
 
     // warn about unused overlays
     overlayHostConfigurations.forEach(
-        (name, overlay) -> {
-          answerElement.getParseStatus().put(name, ParseStatus.ORPHANED);
-        });
+        (name, overlay) -> answerElement.getParseStatus().put(name, ParseStatus.ORPHANED));
 
     serializeObjects(output);
     _logger.printElapsedTime();

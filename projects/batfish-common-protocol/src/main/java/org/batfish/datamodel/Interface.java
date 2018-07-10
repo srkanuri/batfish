@@ -292,6 +292,10 @@ public final class Interface extends ComparableStructure<String> {
 
   public static final String NULL_INTERFACE_NAME = "null_interface";
 
+  public static final String UNSET_LOCAL_INTERFACE = "unset_local_interface";
+
+  public static final String INVALID_LOCAL_INTERFACE = "invalid_local_interface";
+
   private static final String PROP_ACCESS_VLAN = "accessVlan";
 
   private static final String PROP_ACTIVE = "active";
@@ -713,7 +717,7 @@ public final class Interface extends ComparableStructure<String> {
     if (!Objects.equals(_bandwidth, other._bandwidth)) {
       return false;
     }
-    if (_cryptoMap != other._cryptoMap) {
+    if (!Objects.equals(_cryptoMap, other._cryptoMap)) {
       return false;
     }
     // we check ACLs for name match only -- full ACL diff can be done

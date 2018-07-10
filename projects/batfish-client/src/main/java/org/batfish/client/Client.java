@@ -23,7 +23,6 @@ import io.opentracing.ActiveSpan;
 import io.opentracing.util.GlobalTracer;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -97,6 +96,9 @@ import org.batfish.datamodel.answers.AnswerStatus;
 import org.batfish.datamodel.answers.AutocompleteSuggestion.CompletionType;
 import org.batfish.datamodel.collections.NodeInterfacePair;
 import org.batfish.datamodel.pojo.WorkStatus;
+import org.batfish.datamodel.questions.InterfacePropertySpecifier;
+import org.batfish.datamodel.questions.NodePropertySpecifier;
+import org.batfish.datamodel.questions.NodesSpecifier;
 import org.batfish.datamodel.questions.Question;
 import org.batfish.datamodel.questions.Question.InstanceData;
 import org.batfish.datamodel.questions.Question.InstanceData.Variable;
@@ -346,11 +348,12 @@ public class Client extends AbstractClient implements IClient {
               String.format("It is not a valid JSON %s value", expectedType.getName()));
         }
         break;
-      case LONG:
-        if (!value.isLong()) {
+      case INTERFACE_PROPERTY_SPEC:
+        if (!(value.isTextual())) {
           throw new BatfishException(
-              String.format("It is not a valid JSON %s value", expectedType.getName()));
+              String.format("A Batfish %s must be a JSON string", expectedType.getName()));
         }
+        new InterfacePropertySpecifier(value.textValue());
         break;
       case IP:
         // TODO: Need to double check isInetAddress()
@@ -396,6 +399,26 @@ public class Client extends AbstractClient implements IClient {
               String.format("A Batfish %s must be a JSON string", expectedType.getName()));
         }
         validateJsonPathRegex(value.textValue());
+        break;
+      case LONG:
+        if (!value.isLong()) {
+          throw new BatfishException(
+              String.format("It is not a valid JSON %s value", expectedType.getName()));
+        }
+        break;
+      case NODE_PROPERTY_SPEC:
+        if (!(value.isTextual())) {
+          throw new BatfishException(
+              String.format("A Batfish %s must be a JSON string", expectedType.getName()));
+        }
+        new NodePropertySpecifier(value.textValue());
+        break;
+      case NODE_SPEC:
+        if (!(value.isTextual())) {
+          throw new BatfishException(
+              String.format("A Batfish %s must be a JSON string", expectedType.getName()));
+        }
+        new NodesSpecifier(value.textValue());
         break;
       case PREFIX:
         if (!value.isTextual()) {
@@ -539,7 +562,7 @@ public class Client extends AbstractClient implements IClient {
     }
   }
 
-  public Client(String[] args) throws Exception {
+  public Client(String[] args) {
     this(new Settings(args));
   }
 
@@ -606,9 +629,7 @@ public class Client extends AbstractClient implements IClient {
     }
     _logger.debug("Uploaded question. Answering now.\n");
     // delete the temporary params file
-    if (questionFile != null) {
-      CommonUtil.deleteIfExists(questionFile);
-    }
+    CommonUtil.deleteIfExists(questionFile);
     // answer the question
     WorkItem wItemAs =
         WorkItemBuilder.getWorkItemAnswerQuestion(
@@ -693,7 +714,7 @@ public class Client extends AbstractClient implements IClient {
         String parameterValue = e.getValue().toString();
         Object parameterObj;
         try {
-          parameterObj = new JSONTokener(parameterValue.toString()).nextValue();
+          parameterObj = new JSONTokener(parameterValue).nextValue();
           questionJson.put(parameterName, parameterObj);
         } catch (JSONException e1) {
           throw new BatfishException(
@@ -756,7 +777,7 @@ public class Client extends AbstractClient implements IClient {
     return true;
   }
 
-  private boolean cat(String[] words) throws IOException, FileNotFoundException {
+  private boolean cat(String[] words) throws IOException {
     if (words.length != 2) {
       _logger.errorf("Invalid arguments: %s\n", Arrays.toString(words));
       printUsage(Command.CAT);
@@ -783,7 +804,7 @@ public class Client extends AbstractClient implements IClient {
     return true;
   }
 
-  private boolean clearScreen(List<String> options, List<String> parameters) throws IOException {
+  private boolean clearScreen(List<String> options, List<String> parameters) {
     if (!isValidArgument(options, parameters, 0, 0, 0, Command.CLEAR_SCREEN)) {
       return false;
     }
@@ -1624,11 +1645,7 @@ public class Client extends AbstractClient implements IClient {
     WorkItem wItemProcessEnv =
         WorkItemBuilder.getWorkItemProcessEnvironment(
             _currContainerName, _currDeltaTestrig, _currDeltaEnv);
-    if (!execute(wItemProcessEnv, outWriter)) {
-      return false;
-    }
-
-    return true;
+    return execute(wItemProcessEnv, outWriter);
   }
 
   private boolean initEnvironment(
@@ -2235,9 +2252,8 @@ public class Client extends AbstractClient implements IClient {
       sourceMap
           .get(questionName)
           .forEach(
-              questionContent -> {
-                updateLoadedQuestionsInfo(questionName, questionContent, destinationMap, ae);
-              });
+              questionContent ->
+                  updateLoadedQuestionsInfo(questionName, questionContent, destinationMap, ae));
     }
   }
 
@@ -2740,11 +2756,7 @@ public class Client extends AbstractClient implements IClient {
 
     WorkItem wItemParse = WorkItemBuilder.getWorkItemParse(_currContainerName, testrig);
 
-    if (!execute(wItemParse, outWriter)) {
-      return false;
-    }
-
-    return true;
+    return execute(wItemParse, outWriter);
   }
 
   public void run(List<String> initialCommands) {

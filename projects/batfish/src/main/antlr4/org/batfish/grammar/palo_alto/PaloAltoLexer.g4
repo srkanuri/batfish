@@ -200,6 +200,16 @@ SYSTEM
     'system'
 ;
 
+TAG
+:
+    'tag'
+;
+
+UNITS
+:
+    'units'
+;
+
 UP
 :
     'up'
@@ -208,6 +218,16 @@ UP
 VIRTUAL_ROUTER
 :
     'virtual-router'
+;
+
+VSYS
+:
+    'vsys'
+;
+
+ZONE
+:
+    'zone'
 ;
 
 // Complex tokens

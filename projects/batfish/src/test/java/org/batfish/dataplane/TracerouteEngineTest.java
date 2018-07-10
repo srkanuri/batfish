@@ -197,7 +197,7 @@ public class TracerouteEngineTest {
    * if and only if iface1 and iface2 are in the same VRF.
    */
   @Test
-  public void testArpVrf() throws IOException {
+  public void testArpVrf() {
     // Construct interfaces
     NetworkFactory nf = new NetworkFactory();
     Interface.Builder ib = nf.interfaceBuilder();
@@ -343,5 +343,24 @@ public class TracerouteEngineTest {
 
     /* Flow should be blocked by ACL before ARP, which would otherwise result in unreachable neighbor */
     assertThat(trace.getDisposition(), equalTo(FlowDisposition.DENIED_OUT));
+  }
+
+  /** When ingress node is non-existent, don't crash with null-pointer. */
+  @Test(expected = BatfishException.class)
+  public void testTracerouteOutsideNetwork() throws IOException {
+    NetworkFactory nf = new NetworkFactory();
+    Configuration.Builder cb =
+        nf.configurationBuilder().setConfigurationFormat(ConfigurationFormat.CISCO_IOS);
+    Configuration c1 = cb.build();
+    Batfish batfish =
+        BatfishTestUtils.getBatfish(ImmutableSortedMap.of(c1.getName(), c1), _tempFolder);
+    batfish.computeDataPlane(false);
+    DataPlane dp = batfish.loadDataPlane();
+    TracerouteEngineImpl.getInstance()
+        .processFlows(
+            dp,
+            ImmutableSet.of(Flow.builder().setTag("tag").setIngressNode("missingNode").build()),
+            dp.getFibs(),
+            false);
   }
 }

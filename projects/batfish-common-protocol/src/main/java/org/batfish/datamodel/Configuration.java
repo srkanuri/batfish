@@ -6,7 +6,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Iterables;
 import com.kjetland.jackson.jsonSchema.annotations.JsonSchemaDescription;
 import java.util.Collections;
 import java.util.Comparator;
@@ -117,6 +119,12 @@ public final class Configuration extends ComparableStructure<String> {
 
   private static final String PROP_IKE_PROPOSALS = "ikeProposals";
 
+  private static final String PROP_IKE_PHASE1_KEYS = "ikePhase1Keys";
+
+  private static final String PROP_IKE_PHASE1_POLICIES = "ikePhase1Policies";
+
+  private static final String PROP_IKE_PHASE1_PROPOSALS = "ikePhase1Proposals";
+
   private static final String PROP_IP_ACCESS_LISTS = "ipAccessLists";
 
   private static final String PROP_IP_SPACES = "ipSpaces";
@@ -178,6 +186,12 @@ public final class Configuration extends ComparableStructure<String> {
   private NavigableMap<String, IkePolicy> _ikePolicies;
 
   private NavigableMap<String, IkeProposal> _ikeProposals;
+
+  private @Nonnull NavigableMap<String, IkePhase1Key> _ikePhase1keys;
+
+  private NavigableMap<String, IkePhase1Proposal> _ikePhase1Proposals;
+
+  private NavigableMap<String, IkePhase1Policy> _ikePhase1Policies;
 
   private NavigableMap<String, Interface> _interfaces;
 
@@ -261,6 +275,9 @@ public final class Configuration extends ComparableStructure<String> {
     _ikeGateways = new TreeMap<>();
     _ikePolicies = new TreeMap<>();
     _ikeProposals = new TreeMap<>();
+    _ikePhase1keys = ImmutableSortedMap.of();
+    _ikePhase1Policies = new TreeMap<>();
+    _ikePhase1Proposals = new TreeMap<>();
     _interfaces = new TreeMap<>();
     _ipAccessLists = new TreeMap<>();
     _ip6AccessLists = new TreeMap<>();
@@ -299,7 +316,10 @@ public final class Configuration extends ComparableStructure<String> {
     for (Vrf vrf : _vrfs.values()) {
       BgpProcess bgpProcess = vrf.getBgpProcess();
       if (bgpProcess != null) {
-        for (BgpPeerConfig neighbor : bgpProcess.getNeighbors().values()) {
+        for (BgpPeerConfig neighbor :
+            Iterables.concat(
+                bgpProcess.getActiveNeighbors().values(),
+                bgpProcess.getPassiveNeighbors().values())) {
           neighbor.setExportPolicySources(getRoutingPolicySources(neighbor.getExportPolicy()));
           neighbor.setImportPolicySources(getRoutingPolicySources(neighbor.getImportPolicy()));
         }
@@ -421,6 +441,24 @@ public final class Configuration extends ComparableStructure<String> {
   @JsonPropertyDescription("Dictionary of all IKE proposals for this node.")
   public NavigableMap<String, IkeProposal> getIkeProposals() {
     return _ikeProposals;
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_KEYS)
+  @JsonPropertyDescription("Dictionary of all IKE phase1 keys for this node.")
+  public NavigableMap<String, IkePhase1Key> getIkePhase1Keys() {
+    return _ikePhase1keys;
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_POLICIES)
+  @JsonPropertyDescription("Dictionary of all IKE phase1 policies for this node.")
+  public NavigableMap<String, IkePhase1Policy> getIkePhase1Policies() {
+    return _ikePhase1Policies;
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_PROPOSALS)
+  @JsonPropertyDescription("Dictionary of all IKE phase1 proposals for this node.")
+  public NavigableMap<String, IkePhase1Proposal> getIkePhase1Proposals() {
+    return _ikePhase1Proposals;
   }
 
   @JsonPropertyDescription("Dictionary of all interfaces across all VRFs for this node.")
@@ -669,6 +707,22 @@ public final class Configuration extends ComparableStructure<String> {
   @JsonProperty(PROP_IKE_POLICIES)
   public void setIkePolicies(NavigableMap<String, IkePolicy> ikePolicies) {
     _ikePolicies = ikePolicies;
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_KEYS)
+  public void setIkePhase1Keys(@Nullable NavigableMap<String, IkePhase1Key> ikePhase1Keys) {
+    _ikePhase1keys =
+        ikePhase1Keys == null ? ImmutableSortedMap.of() : ImmutableSortedMap.copyOf(ikePhase1Keys);
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_POLICIES)
+  public void setIkePhase1Policies(NavigableMap<String, IkePhase1Policy> ikePhase1Policies) {
+    _ikePhase1Policies = ikePhase1Policies;
+  }
+
+  @JsonProperty(PROP_IKE_PHASE1_PROPOSALS)
+  public void setIkePhase1Proposals(NavigableMap<String, IkePhase1Proposal> ikePhase1Proposals) {
+    _ikePhase1Proposals = ikePhase1Proposals;
   }
 
   @JsonProperty(PROP_IKE_PROPOSALS)

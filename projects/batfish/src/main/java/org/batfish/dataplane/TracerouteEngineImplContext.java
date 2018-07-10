@@ -199,6 +199,11 @@ class TracerouteEngineImplContext {
       Flow transformedFlow) {
     Ip dstIp = transformedFlow.getDstIp();
     Configuration currentConfiguration = _configurations.get(currentNodeName);
+    if (currentConfiguration == null) {
+      throw new BatfishException(
+          String.format(
+              "Node %s is not in the network, cannot perform traceroute", currentNodeName));
+    }
     if (_dataPlane
         .getIpVrfOwners()
         .getOrDefault(dstIp, ImmutableMap.of())
@@ -321,7 +326,7 @@ class TracerouteEngineImplContext {
               /*
                * Interface has no edges
                */
-              /** Check if denied out. If not, make standard neighbor-unreachable trace. */
+              /* Check if denied out. If not, make standard neighbor-unreachable trace. */
               IpAccessList outFilter = outgoingInterface.getOutgoingFilter();
               boolean denied = false;
               if (!_ignoreAcls && outFilter != null) {

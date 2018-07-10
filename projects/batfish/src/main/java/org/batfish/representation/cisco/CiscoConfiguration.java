@@ -2,10 +2,16 @@ package org.batfish.representation.cisco;
 
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 import static org.batfish.common.util.CommonUtil.toImmutableMap;
+import static org.batfish.datamodel.Interface.UNSET_LOCAL_INTERFACE;
 import static org.batfish.datamodel.MultipathEquivalentAsPathMatchMode.EXACT_PATH;
 import static org.batfish.datamodel.MultipathEquivalentAsPathMatchMode.PATH_LENGTH;
 import static org.batfish.representation.cisco.CiscoConversions.generateAggregateRoutePolicy;
+import static org.batfish.representation.cisco.CiscoConversions.resolveIsakmpProfileIfaceNames;
+import static org.batfish.representation.cisco.CiscoConversions.resolveKeyringIfaceNames;
 import static org.batfish.representation.cisco.CiscoConversions.suppressSummarizedPrefixes;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Key;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Policy;
+import static org.batfish.representation.cisco.CiscoConversions.toIkePhase1Proposal;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -39,6 +45,8 @@ import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.common.VendorConversionException;
 import org.batfish.datamodel.AsPathAccessList;
+import org.batfish.datamodel.BgpActivePeerConfig;
+import org.batfish.datamodel.BgpPassivePeerConfig;
 import org.batfish.datamodel.BgpPeerConfig;
 import org.batfish.datamodel.BgpTieBreaker;
 import org.batfish.datamodel.CommunityList;
@@ -49,7 +57,10 @@ import org.batfish.datamodel.GeneratedRoute;
 import org.batfish.datamodel.GeneratedRoute6;
 import org.batfish.datamodel.HeaderSpace;
 import org.batfish.datamodel.IkeGateway;
+import org.batfish.datamodel.IkePhase1Key;
+import org.batfish.datamodel.IkePhase1Proposal;
 import org.batfish.datamodel.IkePolicy;
+import org.batfish.datamodel.IkeProposal;
 import org.batfish.datamodel.InterfaceAddress;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Ip6AccessList;
@@ -277,6 +288,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return String.format("~PROTOCOL_OBJECT_GROUP~%s~", name);
   }
 
+  public static String computeServiceObjectAclName(String name) {
+    return String.format("~SERVICE_OBJECT~%s~", name);
+  }
+
   public static String computeServiceObjectGroupAclName(String name) {
     return String.format("~SERVICE_OBJECT_GROUP~%s~", name);
   }
@@ -374,7 +389,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   private final Map<String, IpsecTransformSet> _ipsecTransformSets;
 
-  private final Map<String, IsakmpPolicy> _isakmpPolicies;
+  private final Map<Integer, IsakmpPolicy> _isakmpPolicies;
 
   private final Map<String, IsakmpProfile> _isakmpProfiles;
 
@@ -385,6 +400,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
   private final Map<String, NatPool> _natPools;
 
   private final Map<String, NetworkObjectGroup> _networkObjectGroups;
+
+  private final Map<String, NetworkObject> _networkObjects;
 
   private String _ntpSourceInterface;
 
@@ -401,6 +418,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
   private final Map<String, RouteMap> _routeMaps;
 
   private final Map<String, RoutePolicy> _routePolicies;
+
+  private final Map<String, ServiceObject> _serviceObjects;
 
   private SnmpServer _snmpServer;
 
@@ -462,6 +481,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _macAccessLists = new TreeMap<>();
     _natPools = new TreeMap<>();
     _networkObjectGroups = new TreeMap<>();
+    _networkObjects = new TreeMap<>();
     _nxBgpGlobalConfiguration = new CiscoNxBgpGlobalConfiguration();
     _objectGroups = new TreeMap<>();
     _prefixLists = new TreeMap<>();
@@ -472,6 +492,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _securityZonePairs = new TreeMap<>();
     _securityZones = new TreeMap<>();
     _serviceObjectGroups = new TreeMap<>();
+    _serviceObjects = new TreeMap<>();
     _standardAccessLists = new TreeMap<>();
     _standardIpv6AccessLists = new TreeMap<>();
     _standardCommunityLists = new TreeMap<>();
@@ -747,7 +768,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return _ipsecTransformSets;
   }
 
-  public Map<String, IsakmpPolicy> getIsakmpPolicies() {
+  public Map<Integer, IsakmpPolicy> getIsakmpPolicies() {
     return _isakmpPolicies;
   }
 
@@ -1374,22 +1395,15 @@ public final class CiscoConfiguration extends VendorConfiguration {
     // Before we process any neighbors, execute the inheritance.
     nxBgpGlobal.doInherit(_w);
 
-    // This is ugly logic to handle the fact that BgpPeerConfig does not currently support
-    // separate tracking of active and passive neighbors.
-    SortedMap<Prefix, BgpPeerConfig> newNeighbors = new TreeMap<>();
     // Process active neighbors first.
-    Map<Ip, BgpPeerConfig> activeNeighbors =
+    Map<Prefix, BgpActivePeerConfig> activeNeighbors =
         CiscoNxConversions.getNeighbors(c, v, newBgpProcess, nxBgpGlobal, nxBgpVrf, _w);
-    activeNeighbors.forEach(
-        (key, value) -> newNeighbors.put(new Prefix(key, Prefix.MAX_PREFIX_LENGTH), value));
-    // Process passive neighbors next. Note that for now, a passive neighbor listening
-    // to a /32 will overwrite an active neighbor of the same IP.
-    // TODO(https://github.com/batfish/batfish/issues/1228)
-    Map<Prefix, BgpPeerConfig> passiveNeighbors =
-        CiscoNxConversions.getPassiveNeighbors(c, v, newBgpProcess, nxBgpGlobal, nxBgpVrf, _w);
-    newNeighbors.putAll(passiveNeighbors);
+    newBgpProcess.setNeighbors(ImmutableSortedMap.copyOf(activeNeighbors));
 
-    newBgpProcess.setNeighbors(ImmutableSortedMap.copyOf(newNeighbors));
+    // Process passive neighbors next
+    Map<Prefix, BgpPassivePeerConfig> passiveNeighbors =
+        CiscoNxConversions.getPassiveNeighbors(c, v, newBgpProcess, nxBgpGlobal, nxBgpVrf, _w);
+    newBgpProcess.setPassiveNeighbors(ImmutableSortedMap.copyOf(passiveNeighbors));
 
     return newBgpProcess;
   }
@@ -1420,7 +1434,6 @@ public final class CiscoConfiguration extends VendorConfiguration {
     newBgpProcess.setMultipathEbgp(multipathEbgp);
     newBgpProcess.setMultipathIbgp(multipathIbgp);
 
-    Map<Prefix, BgpPeerConfig> newBgpNeighbors = newBgpProcess.getNeighbors();
     int defaultMetric = proc.getDefaultMetric();
     Ip bgpRouterId = getBgpRouterId(c, vrfName, proc);
     newBgpProcess.setRouterId(bgpRouterId);
@@ -1870,47 +1883,51 @@ public final class CiscoConfiguration extends VendorConfiguration {
         }
         Long pgLocalAs = lpg.getLocalAs();
         long localAs = pgLocalAs != null ? pgLocalAs : proc.getName();
-        BgpPeerConfig newNeighbor;
+
+        BgpPeerConfig.Builder<?, ?> newNeighborBuilder;
         if (lpg instanceof IpBgpPeerGroup) {
           IpBgpPeerGroup ipg = (IpBgpPeerGroup) lpg;
-          Ip neighborAddress = ipg.getIp();
-          newNeighbor = new BgpPeerConfig(neighborAddress, c, false);
+          newNeighborBuilder =
+              BgpActivePeerConfig.builder()
+                  .setPeerAddress(ipg.getIp())
+                  .setRemoteAs(lpg.getRemoteAs());
         } else if (lpg instanceof DynamicIpBgpPeerGroup) {
           DynamicIpBgpPeerGroup dpg = (DynamicIpBgpPeerGroup) lpg;
-          Prefix neighborAddressRange = dpg.getPrefix();
-          newNeighbor = new BgpPeerConfig(neighborAddressRange, c, true);
+          newNeighborBuilder =
+              BgpPassivePeerConfig.builder()
+                  .setPeerPrefix(dpg.getPrefix())
+                  .setRemoteAs(ImmutableList.of(lpg.getRemoteAs()));
         } else if (lpg instanceof Ipv6BgpPeerGroup || lpg instanceof DynamicIpv6BgpPeerGroup) {
           // TODO: implement ipv6 bgp neighbors
           continue;
         } else {
           throw new VendorConversionException("Invalid BGP leaf neighbor type");
         }
-        newBgpNeighbors.put(newNeighbor.getPrefix(), newNeighbor);
+        newNeighborBuilder.setBgpProcess(newBgpProcess);
 
-        newNeighbor.setAdditionalPathsReceive(lpg.getAdditionalPathsReceive());
-        newNeighbor.setAdditionalPathsSelectAll(lpg.getAdditionalPathsSelectAll());
-        newNeighbor.setAdditionalPathsSend(lpg.getAdditionalPathsSend());
-        newNeighbor.setAdvertiseInactive(lpg.getAdvertiseInactive());
-        newNeighbor.setAllowLocalAsIn(lpg.getAllowAsIn());
-        newNeighbor.setAllowRemoteAsOut(lpg.getDisablePeerAsCheck());
-        newNeighbor.setRouteReflectorClient(lpg.getRouteReflectorClient());
-        newNeighbor.setClusterId(clusterId.asLong());
-        newNeighbor.setDefaultMetric(defaultMetric);
-        newNeighbor.setDescription(description);
-        newNeighbor.setEbgpMultihop(lpg.getEbgpMultihop());
+        newNeighborBuilder.setAdditionalPathsReceive(lpg.getAdditionalPathsReceive());
+        newNeighborBuilder.setAdditionalPathsSelectAll(lpg.getAdditionalPathsSelectAll());
+        newNeighborBuilder.setAdditionalPathsSend(lpg.getAdditionalPathsSend());
+        newNeighborBuilder.setAdvertiseInactive(lpg.getAdvertiseInactive());
+        newNeighborBuilder.setAllowLocalAsIn(lpg.getAllowAsIn());
+        newNeighborBuilder.setAllowRemoteAsOut(lpg.getDisablePeerAsCheck());
+        newNeighborBuilder.setRouteReflectorClient(lpg.getRouteReflectorClient());
+        newNeighborBuilder.setClusterId(clusterId.asLong());
+        newNeighborBuilder.setDefaultMetric(defaultMetric);
+        newNeighborBuilder.setDescription(description);
+        newNeighborBuilder.setEbgpMultihop(lpg.getEbgpMultihop());
         if (defaultRoute != null) {
-          newNeighbor.getGeneratedRoutes().add(defaultRoute.build());
+          newNeighborBuilder.setGeneratedRoutes(ImmutableSet.of(defaultRoute.build()));
         }
-        newNeighbor.setGroup(lpg.getGroupName());
+        newNeighborBuilder.setGroup(lpg.getGroupName());
         if (importPolicy != null) {
-          newNeighbor.setImportPolicy(inboundRouteMapName);
+          newNeighborBuilder.setImportPolicy(inboundRouteMapName);
         }
-        newNeighbor.setLocalAs(localAs);
-        newNeighbor.setLocalIp(updateSource);
-        newNeighbor.setExportPolicy(peerExportPolicyName);
-        newNeighbor.setRemoteAs(lpg.getRemoteAs());
-        newNeighbor.setSendCommunity(lpg.getSendCommunity());
-        newNeighbor.setVrf(vrfName);
+        newNeighborBuilder.setLocalAs(localAs);
+        newNeighborBuilder.setLocalIp(updateSource);
+        newNeighborBuilder.setExportPolicy(peerExportPolicyName);
+        newNeighborBuilder.setSendCommunity(lpg.getSendCommunity());
+        newNeighborBuilder.build();
       }
     }
     return newBgpProcess;
@@ -2008,6 +2025,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
    */
   private List<IpsecVpn> toIpsecVpns(
       Configuration c, CryptoMapEntry cryptoMapEntry, String ipsecVpnName, String cryptoMapName) {
+
     List<org.batfish.datamodel.Interface> referencingInterfaces =
         c.getInterfaces()
             .values()
@@ -2018,6 +2036,14 @@ public final class CiscoConfiguration extends VendorConfiguration {
     List<IpsecVpn> ipsecVpns = new ArrayList<>();
 
     for (org.batfish.datamodel.Interface iface : referencingInterfaces) {
+      // skipping interfaces with no ip-address
+      if (iface.getAddress() == null) {
+        _w.redFlag(
+            String.format(
+                "Interface %s with declared crypto-map %s has no ip-address",
+                iface.getName(), cryptoMapName));
+        continue;
+      }
       Ip bindingInterfaceIp = iface.getAddress().getIp();
       IkeGateway ikeGateway = null;
 
@@ -2157,6 +2183,16 @@ public final class CiscoConfiguration extends VendorConfiguration {
     }
 
     return iface.getMtu();
+  }
+
+  private static IkeProposal toIkeProposal(IsakmpPolicy isakmpPolicy) {
+    IkeProposal ikeProposal = new IkeProposal(isakmpPolicy.getName().toString());
+    ikeProposal.setDiffieHellmanGroup(isakmpPolicy.getDiffieHellmanGroup());
+    ikeProposal.setAuthenticationMethod(isakmpPolicy.getAuthenticationMethod());
+    ikeProposal.setEncryptionAlgorithm(isakmpPolicy.getEncryptionAlgorithm());
+    ikeProposal.setLifetimeSeconds(isakmpPolicy.getLifetimeSeconds());
+    ikeProposal.setAuthenticationAlgorithm(isakmpPolicy.getHashAlgorithm());
+    return ikeProposal;
   }
 
   private org.batfish.datamodel.Interface toInterface(
@@ -3107,10 +3143,12 @@ public final class CiscoConfiguration extends VendorConfiguration {
       c.getIpAccessLists().put(ipaList.getName(), ipaList);
     }
 
-    // convert each NetworkObjectGroup to IpSpace
+    // convert each NetworkObject and NetworkObjectGroup to IpSpace
     _networkObjectGroups.forEach(
         (name, networkObjectGroup) ->
             c.getIpSpaces().put(name, CiscoConversions.toIpSpace(networkObjectGroup)));
+    _networkObjects.forEach(
+        (name, networkObject) -> c.getIpSpaces().put(name, networkObject.getIpSpace()));
 
     // convert each ProtocolObjectGroup to IpAccessList
     _protocolObjectGroups.forEach(
@@ -3118,13 +3156,19 @@ public final class CiscoConfiguration extends VendorConfiguration {
             c.getIpAccessLists()
                 .put(computeProtocolObjectGroupAclName(name), toIpAccessList(protocolObjectGroup)));
 
-    // convert each ServiceObjectGroup to IpAccessList
+    // convert each ServiceObject and ServiceObjectGroup to IpAccessList
     _serviceObjectGroups.forEach(
         (name, serviceObjectGroup) ->
             c.getIpAccessLists()
                 .put(
                     computeServiceObjectGroupAclName(name),
                     CiscoConversions.toIpAccessList(serviceObjectGroup)));
+    _serviceObjects.forEach(
+        (name, serviceObject) ->
+            c.getIpAccessLists()
+                .put(
+                    computeServiceObjectAclName(name),
+                    CiscoConversions.toIpAccessList(serviceObject)));
 
     // convert standard/extended ipv6 access lists to ipv6 access lists or
     // route6 filter
@@ -3165,10 +3209,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
     createInspectPolicyMapAcls(c);
 
     // create zones
-    _securityZones.forEach(
-        (name, securityZone) -> {
-          c.getZones().put(name, new Zone(name));
-        });
+    _securityZones.forEach((name, securityZone) -> c.getZones().put(name, new Zone(name)));
 
     // populate zone interfaces
     _interfaces.forEach(
@@ -3204,13 +3245,38 @@ public final class CiscoConfiguration extends VendorConfiguration {
     // apply vrrp settings to interfaces
     applyVrrp(c);
 
-    // get IKE proposals
-    for (Entry<String, IsakmpPolicy> e : _isakmpPolicies.entrySet()) {
-      c.getIkeProposals().put(e.getKey(), e.getValue().getProposal());
+    // ISAKMP policies to IKE proposals
+    for (Entry<Integer, IsakmpPolicy> e : _isakmpPolicies.entrySet()) {
+      IkeProposal ikeProposal = toIkeProposal(e.getValue());
+      c.getIkeProposals().put(ikeProposal.getName(), ikeProposal);
+
+      IkePhase1Proposal ikePhase1Proposal = toIkePhase1Proposal(e.getValue());
+      c.getIkePhase1Proposals().put(ikePhase1Proposal.getName(), ikePhase1Proposal);
     }
     resolveKeyringIsakmpProfileAddresses();
     resolveTunnelSourceInterfaces();
+
+    resolveKeyringIfaceNames(_interfaces, _keyrings);
+    resolveIsakmpProfileIfaceNames(_interfaces, _isakmpProfiles);
+
     addIkePoliciesAndGateways(c);
+
+    // keyrings to IKE phase 1 keys
+    ImmutableSortedMap.Builder<String, IkePhase1Key> ikePhase1KeysBuilder =
+        ImmutableSortedMap.naturalOrder();
+    _keyrings
+        .values()
+        .forEach(keyring -> ikePhase1KeysBuilder.put(keyring.getName(), toIkePhase1Key(keyring)));
+
+    c.setIkePhase1Keys(ikePhase1KeysBuilder.build());
+
+    // ISAKMP profiles to IKE phase 1 policies
+    _isakmpProfiles
+        .values()
+        .forEach(
+            isakmpProfile ->
+                c.getIkePhase1Policies()
+                    .put(isakmpProfile.getName(), toIkePhase1Policy(isakmpProfile, this, c, _w)));
 
     // ipsec proposals
     for (Entry<String, IpsecTransformSet> e : _ipsecTransformSets.entrySet()) {
@@ -3506,13 +3572,18 @@ public final class CiscoConfiguration extends VendorConfiguration {
     markConcreteStructure(
         CiscoStructureType.NETWORK_OBJECT_GROUP,
         CiscoStructureUsage.EXTENDED_ACCESS_LIST_NETWORK_OBJECT_GROUP,
-        CiscoStructureUsage.NETWORK_OBJECT_GROUP_GROUP_OBJECT,
-        CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT);
+        CiscoStructureUsage.NETWORK_OBJECT_GROUP_GROUP_OBJECT);
     markAbstractStructure(
         CiscoStructureType.PROTOCOL_OR_SERVICE_OBJECT_GROUP,
         CiscoStructureUsage.EXTENDED_ACCESS_LIST_PROTOCOL_OR_SERVICE_OBJECT_GROUP,
         ImmutableList.of(
             CiscoStructureType.PROTOCOL_OBJECT_GROUP, CiscoStructureType.SERVICE_OBJECT_GROUP));
+
+    // objects
+    markConcreteStructure(
+        CiscoStructureType.NETWORK_OBJECT, CiscoStructureUsage.NETWORK_OBJECT_GROUP_NETWORK_OBJECT);
+    markConcreteStructure(
+        CiscoStructureType.SERVICE_OBJECT, CiscoStructureUsage.SERVICE_OBJECT_GROUP_SERVICE_OBJECT);
 
     // service template
     markConcreteStructure(
@@ -3842,8 +3913,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
       }
 
       Ip localAddress = isakmpProfile.getLocalAddress();
-      Prefix remotePrefix = isakmpProfile.getMatchIdentity();
-      if (localAddress == null || remotePrefix == null) {
+      IpWildcard remoteIdentity = isakmpProfile.getMatchIdentity();
+      if (localAddress == null || remoteIdentity == null) {
         _w.redFlag(
             String.format(
                 "Can't get IkeGateway: Local or remote address is not set for isakmpProfile %s",
@@ -3851,8 +3922,8 @@ public final class CiscoConfiguration extends VendorConfiguration {
       } else {
         IkeGateway ikeGateway = new IkeGateway(e.getKey());
         c.getIkeGateways().put(name, ikeGateway);
-        ikeGateway.setAddress(remotePrefix.getStartIp());
-        Interface oldIface = getInterfaceByTunnelAddresses(localAddress, remotePrefix);
+        ikeGateway.setAddress(remoteIdentity.toPrefix().getStartIp());
+        Interface oldIface = getInterfaceByTunnelAddresses(localAddress, remoteIdentity.toPrefix());
         if (oldIface != null) {
           ikeGateway.setExternalInterface(c.getInterfaces().get(oldIface.getName()));
         } else {
@@ -4050,23 +4121,23 @@ public final class CiscoConfiguration extends VendorConfiguration {
     _keyrings
         .values()
         .stream()
-        .filter(keyring -> keyring.getLocalInterfaceName() != null)
+        .filter(keyring -> !keyring.getLocalInterfaceName().equals(UNSET_LOCAL_INTERFACE))
         .forEach(
-            keyring -> {
-              keyring.setLocalAddress(
-                  firstNonNull(ifaceNameToPrimaryIp.get(keyring.getLocalInterfaceName()), Ip.AUTO));
-            });
+            keyring ->
+                keyring.setLocalAddress(
+                    firstNonNull(
+                        ifaceNameToPrimaryIp.get(keyring.getLocalInterfaceName()), Ip.AUTO)));
 
     _isakmpProfiles
         .values()
         .stream()
-        .filter(isakmpProfile -> isakmpProfile.getLocalInterfaceName() != null)
+        .filter(
+            isakmpProfile -> !isakmpProfile.getLocalInterfaceName().equals(UNSET_LOCAL_INTERFACE))
         .forEach(
-            isakmpProfile -> {
-              isakmpProfile.setLocalAddress(
-                  firstNonNull(
-                      ifaceNameToPrimaryIp.get(isakmpProfile.getLocalInterfaceName()), Ip.AUTO));
-            });
+            isakmpProfile ->
+                isakmpProfile.setLocalAddress(
+                    firstNonNull(
+                        ifaceNameToPrimaryIp.get(isakmpProfile.getLocalInterfaceName()), Ip.AUTO)));
   }
 
   /** Resolves the addresses of the interfaces used in sourceInterfaceName of Tunnel interfaces */
@@ -4085,6 +4156,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
     return _networkObjectGroups;
   }
 
+  public Map<String, NetworkObject> getNetworkObjects() {
+    return _networkObjects;
+  }
+
   public Map<String, ObjectGroup> getObjectGroups() {
     return _objectGroups;
   }
@@ -4095,6 +4170,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   public Map<String, ServiceObjectGroup> getServiceObjectGroups() {
     return _serviceObjectGroups;
+  }
+
+  public Map<String, ServiceObject> getServiceObjects() {
+    return _serviceObjects;
   }
 
   public Map<String, InspectClassMap> getInspectClassMaps() {
