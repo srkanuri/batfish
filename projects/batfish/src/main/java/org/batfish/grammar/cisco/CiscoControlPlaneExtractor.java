@@ -17,6 +17,7 @@ import static org.batfish.representation.cisco.CiscoStructureType.CLASS_MAP;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST_EXPANDED;
 import static org.batfish.representation.cisco.CiscoStructureType.COMMUNITY_LIST_STANDARD;
+import static org.batfish.representation.cisco.CiscoStructureType.CONTROL_SUBSCRIBER_CLASS_MAP;
 import static org.batfish.representation.cisco.CiscoStructureType.CONTROL_SUBSCRIBER_POLICY_MAP;
 import static org.batfish.representation.cisco.CiscoStructureType.CRYPTO_DYNAMIC_MAP_SET;
 import static org.batfish.representation.cisco.CiscoStructureType.CRYPTO_MAP_SET;
@@ -102,6 +103,10 @@ import static org.batfish.representation.cisco.CiscoStructureUsage.CLASS_MAP_ACT
 import static org.batfish.representation.cisco.CiscoStructureUsage.CLASS_MAP_SERVICE_TEMPLATE;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROLLER_DEPI_TUNNEL;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_PLANE_ACCESS_GROUP;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_ACTIVATED_SERVICE_TEMPLATE;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_SERVICE_TEMPLATE;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS;
+import static org.batfish.representation.cisco.CiscoStructureUsage.CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS_ACTIVATE_SERVICE_TEMPLATE;
 import static org.batfish.representation.cisco.CiscoStructureUsage.COPS_LISTENER_ACCESS_LIST;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_DYNAMIC_MAP_ACL;
 import static org.batfish.representation.cisco.CiscoStructureUsage.CRYPTO_DYNAMIC_MAP_ISAKMP_PROFILE;
@@ -432,7 +437,10 @@ import org.batfish.grammar.cisco.CiscoParser.Clb_docsis_policyContext;
 import org.batfish.grammar.cisco.CiscoParser.Clb_ruleContext;
 import org.batfish.grammar.cisco.CiscoParser.Clbdg_docsis_policyContext;
 import org.batfish.grammar.cisco.CiscoParser.Cluster_id_bgp_tailContext;
+import org.batfish.grammar.cisco.CiscoParser.Cm_ios_control_subscriberContext;
 import org.batfish.grammar.cisco.CiscoParser.Cm_ios_inspectContext;
+import org.batfish.grammar.cisco.CiscoParser.Cm_ioscsm_activated_service_templateContext;
+import org.batfish.grammar.cisco.CiscoParser.Cm_ioscsm_service_templateContext;
 import org.batfish.grammar.cisco.CiscoParser.Cm_iosi_matchContext;
 import org.batfish.grammar.cisco.CiscoParser.Cm_matchContext;
 import org.batfish.grammar.cisco.CiscoParser.Cmm_access_groupContext;
@@ -672,7 +680,10 @@ import org.batfish.grammar.cisco.CiscoParser.Pim_send_rp_announceContext;
 import org.batfish.grammar.cisco.CiscoParser.Pim_spt_thresholdContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_classContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_event_classContext;
+import org.batfish.grammar.cisco.CiscoParser.Pm_ios_control_subscriberContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_ios_inspectContext;
+import org.batfish.grammar.cisco.CiscoParser.Pm_ioscse_classContext;
+import org.batfish.grammar.cisco.CiscoParser.Pm_ioscsec_activateContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_iosi_class_type_inspectContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_iosict_dropContext;
 import org.batfish.grammar.cisco.CiscoParser.Pm_iosict_inspectContext;
@@ -4070,6 +4081,31 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
   }
 
   @Override
+  public void enterCm_ios_control_subscriber(Cm_ios_control_subscriberContext ctx) {
+    String name = ctx.name.getText();
+    defineStructure(CONTROL_SUBSCRIBER_CLASS_MAP, name, ctx);
+  }
+
+  @Override
+  public void exitCm_ioscsm_activated_service_template(
+      Cm_ioscsm_activated_service_templateContext ctx) {
+    _configuration.referenceStructure(
+        SERVICE_TEMPLATE,
+        ctx.name.getText(),
+        CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_ACTIVATED_SERVICE_TEMPLATE,
+        ctx.name.getStart().getLine());
+  }
+
+  @Override
+  public void exitCm_ioscsm_service_template(Cm_ioscsm_service_templateContext ctx) {
+    _configuration.referenceStructure(
+        SERVICE_TEMPLATE,
+        ctx.name.getText(),
+        CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_SERVICE_TEMPLATE,
+        ctx.name.getStart().getLine());
+  }
+
+  @Override
   public void enterCm_ios_inspect(Cm_ios_inspectContext ctx) {
     String name = ctx.name.getText();
     _currentInspectClassMap =
@@ -6545,6 +6581,31 @@ public class CiscoControlPlaneExtractor extends CiscoParserBaseListener
       int line = ctx.name.getStart().getLine();
       _configuration.referenceStructure(IPV4_ACCESS_LIST, name, PIM_SPT_THRESHOLD_ACL, line);
     }
+  }
+
+  @Override
+  public void enterPm_ios_control_subscriber(Pm_ios_control_subscriberContext ctx) {
+    defineStructure(CONTROL_SUBSCRIBER_POLICY_MAP, ctx.name.getText(), ctx);
+  }
+
+  @Override
+  public void exitPm_ioscse_class(Pm_ioscse_classContext ctx) {
+    if (ctx.name != null) {
+      _configuration.referenceStructure(
+          CONTROL_SUBSCRIBER_CLASS_MAP,
+          ctx.name.getText(),
+          CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS,
+          ctx.name.getStart().getLine());
+    }
+  }
+
+  @Override
+  public void exitPm_ioscsec_activate(Pm_ioscsec_activateContext ctx) {
+    _configuration.referenceStructure(
+        SERVICE_TEMPLATE,
+        ctx.name.getText(),
+        CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS_ACTIVATE_SERVICE_TEMPLATE,
+        ctx.name.getStart().getLine());
   }
 
   @Override

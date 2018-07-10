@@ -1,5 +1,67 @@
 !
-hostname ios_policy_map
+hostname ios_qos
 !
-policy-map type control subscriber match-any
+class-map type control subscriber match-all CMCS1
+ match activated-service-template ST1
+ match authorization-status authorized
+ match method mab
+ match result-type aaa-timeout
+ match result-type method dot1x authoritative
+ match result-type method dot1x agent-not-found
+ match result-type method mab authoritative
+ match service-template ST2
 !
+policy-map type control subscriber PMCS
+ event session-started match-all
+  10 class always do-until-failure
+   20 authenticate using dot1x priority 10
+ event authentication-failure match-first
+  5 class CMCS1 do-until-failure
+   10 activate service-template ST1
+   15 activate service-template ST2
+   20 authorize
+   30 pause reauthentication
+  10 class CMCS2 do-until-failure
+   10 pause reauthentication
+   20 authorize
+  20 class CMCS3 do-until-failure
+   10 terminate dot1x
+   30 authenticate using mab priority 10
+  30 class CMCS4 do-until-failure
+   10 terminate dot1x
+   20 authenticate using mab priority 10
+  40 class CMCS5 do-until-failure
+   10 terminate mab
+   30 authorize
+   40 authentication-restart 60
+  50 class always do-until-failure
+   10 terminate dot1x
+   20 terminate mab
+   30 authentication-restart 60
+ event agent-found match-all
+  10 class always do-until-failure
+   10 terminate mab
+   20 authenticate using dot1x priority 10
+ event aaa-available match-all
+  10 class CMCS6 do-until-failure
+   10 clear-session
+  20 class CMCS7 do-until-failure
+   10 resume reauthentication
+ event authentication-success match-all
+  10 class always do-until-failure
+   10 activate service-template ST3
+ event violation match-all
+  10 class always do-until-failure
+   10 restrict
+!
+service-template ST1
+ access-group ACL1
+ description BLAH
+ inactivity-timer 3600
+ linksec policy must-secure
+ linksec policy should-secure
+ voice vlan
+ tag FAIL_OPEN_ACL
+!
+!
+

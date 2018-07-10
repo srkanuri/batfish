@@ -15,6 +15,7 @@ public enum CiscoStructureType implements StructureType {
   COMMUNITY_LIST("community-list"),
   COMMUNITY_LIST_EXPANDED("expanded community-list"),
   COMMUNITY_LIST_STANDARD("standard community-list"),
+  CONTROL_SUBSCRIBER_CLASS_MAP("class-map type control subscriber"),
   CONTROL_SUBSCRIBER_POLICY_MAP("policy-map type control subscriber"),
   CRYPTO_DYNAMIC_MAP_SET("crypto-dynamic-map-set"),
   CRYPTO_MAP_SET("crypto-map-set"),

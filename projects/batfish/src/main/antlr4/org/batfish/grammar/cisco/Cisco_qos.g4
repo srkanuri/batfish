@@ -11,6 +11,40 @@ cm_end_class_map
    END_CLASS_MAP NEWLINE
 ;
 
+cm_ios_control_subscriber
+:
+  CONTROL SUBSCRIBER match_semantics? name = variable_permissive NEWLINE cm_ioscs_match*
+;
+
+cm_ioscs_match
+:
+  MATCH
+  (
+    cm_ioscsm_activated_service_template
+    | cm_ioscsm_null
+    | cm_ioscsm_service_template
+  )
+;
+
+cm_ioscsm_activated_service_template
+:
+  ACTIVATED_SERVICE_TEMPLATE name = variable_permissive NEWLINE
+;
+
+cm_ioscsm_null
+:
+  (
+    AUTHORIZATION_STATUS
+    | METHOD
+    | RESULT_TYPE
+  ) null_rest_of_line
+;
+
+cm_ioscsm_service_template
+:
+  SERVICE_TEMPLATE name = variable_permissive NEWLINE
+;
+
 cm_ios_inspect
 :
    INSPECT HTTP? match_semantics? name = variable_permissive NEWLINE
@@ -610,12 +644,46 @@ pm_event_class
 
 pm_ios_control_subscriber
 :
-  CONTROL SUBSCRIBER name = variable_permissive NEWLINE pm_ioscs_null*
+  CONTROL SUBSCRIBER name = variable_permissive NEWLINE pm_ioscs_event*
 ;
 
-pm_ioscs_null
+pm_ioscs_event
 :
-  MATCH null_rest_of_line
+  EVENT null_rest_of_line pm_ioscse_class*
+;
+
+pm_ioscse_class
+:
+  DEC CLASS
+  (
+    ALWAYS
+    | name = variable
+  ) null_rest_of_line
+  (
+    DEC
+    (
+      pm_ioscsec_activate
+      | pm_ioscsec_null
+    )
+  )*
+;
+
+pm_ioscsec_activate
+:
+  ACTIVATE SERVICE_TEMPLATE name = variable
+;
+
+pm_ioscsec_null
+:
+  (
+    AUTHENTICATE
+    | AUTHENTICATION_RESTART
+    | AUTHORIZE
+    | CLEAR_SESSION
+    | PAUSE
+    | RESUME
+    | TERMINATE
+  ) null_rest_of_line
 ;
 
 pm_ios_inspect
@@ -764,8 +832,7 @@ s_class_map
    (
       TYPE
       (
-         CONTROL SUBSCRIBER
-         | CONTROL_PLANE
+         CONTROL_PLANE
          | NETWORK_QOS
          | PBR
          | QOS
@@ -788,7 +855,11 @@ s_class_map
 
 s_class_map_ios
 :
-   CLASS_MAP TYPE cm_ios_inspect
+  CLASS_MAP TYPE
+  (
+    cm_ios_control_subscriber
+    | cm_ios_inspect
+  )
 ;
 
 s_object

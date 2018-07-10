@@ -3501,8 +3501,8 @@ stanza
    | s_call_home
    | s_callhome
    | s_call_manager_fallback
+   | s_class_map_ios // do not move below s_class_map
    | s_class_map
-   | s_class_map_ios
    | s_cluster
    | s_configure
    | s_control_plane
@@ -3606,8 +3606,8 @@ stanza
    | s_openflow
    | s_passwd
    | s_phone_proxy
+   | s_policy_map_ios // do not move below s_policy_map
    | s_policy_map
-   | s_policy_map_ios
    | s_privilege
    | s_process_max_time
    | s_qos_mapping

@@ -3576,6 +3576,10 @@ public final class CiscoConfiguration extends VendorConfiguration {
         CiscoStructureType.CONTROL_SUBSCRIBER_POLICY_MAP,
         CiscoStructureUsage.INTERFACE_SERVICE_POLICY_CONTROL_SUBSCRIBER);
 
+    markConcreteStructure(
+        CiscoStructureType.CONTROL_SUBSCRIBER_CLASS_MAP,
+        CiscoStructureUsage.CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS);
+
     // object-group
     markConcreteStructure(
         CiscoStructureType.NETWORK_OBJECT_GROUP,
@@ -3598,6 +3602,9 @@ public final class CiscoConfiguration extends VendorConfiguration {
         CiscoStructureType.SERVICE_TEMPLATE,
         CiscoStructureUsage.CLASS_MAP_SERVICE_TEMPLATE,
         CiscoStructureUsage.CLASS_MAP_ACTIVATED_SERVICE_TEMPLATE,
+        CiscoStructureUsage.CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_ACTIVATED_SERVICE_TEMPLATE,
+        CiscoStructureUsage.CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_SERVICE_TEMPLATE,
+        CiscoStructureUsage.CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS_ACTIVATE_SERVICE_TEMPLATE,
         CiscoStructureUsage.POLICY_MAP_EVENT_CLASS_ACTIVATE);
 
     // zone

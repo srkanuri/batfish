@@ -50,6 +50,13 @@ public enum CiscoStructureUsage implements StructureUsage {
   CLASS_MAP_ACTIVATED_SERVICE_TEMPLATE("class-map activate-service-template"),
   CLASS_MAP_SERVICE_TEMPLATE("class-map service-template"),
   CONTROL_PLANE_ACCESS_GROUP("control-plane ip access-group"),
+  CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_ACTIVATED_SERVICE_TEMPLATE(
+      "class-map type control subscriber match activated-service-template"),
+  CONTROL_SUBSCRIBER_CLASS_MAP_MATCH_SERVICE_TEMPLATE(
+      "class-map type control subscriber match service-template"),
+  CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS("policy-map type control event class"),
+  CONTROL_SUBSCRIBER_POLICY_MAP_EVENT_CLASS_ACTIVATE_SERVICE_TEMPLATE(
+      "policy-map type control subscriber event class activate service-template"),
   CONTROLLER_DEPI_TUNNEL("controller rf-channel depi-tunnel"),
   COPS_LISTENER_ACCESS_LIST("cops listener access-list"),
   CRYPTO_DYNAMIC_MAP_ACL("crypto dynamic-map acl"),
