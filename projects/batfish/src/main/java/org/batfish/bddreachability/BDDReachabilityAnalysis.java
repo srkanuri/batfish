@@ -165,7 +165,7 @@ public class BDDReachabilityAnalysis {
     Map<StateExpr, Map<StateExpr, BDD>> reachableStates = new HashMap<>();
     Multimap<StateExpr, StateExpr> dirty = HashMultimap.create();
     for (StateExpr root : _graphRoots.keySet()) {
-      reachableStates.put(root, new HashMap<>()).put(root, _graphRoots.get(root));
+      reachableStates.put(root, ImmutableMap.of(root, _graphRoots.get(root)));
       dirty.put(root, root);
     }
 
