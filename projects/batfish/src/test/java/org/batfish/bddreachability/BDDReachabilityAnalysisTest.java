@@ -10,7 +10,6 @@ import static org.batfish.bddreachability.TestNetwork.SOURCE_NAT_POOL_IP;
 import static org.batfish.datamodel.Configuration.DEFAULT_VRF_NAME;
 import static org.batfish.datamodel.matchers.FlowMatchers.hasDstIp;
 import static org.batfish.symbolic.bdd.BDDMatchers.intersects;
-import static org.batfish.symbolic.bdd.BDDMatchers.isEquivalentTo;
 import static org.batfish.symbolic.bdd.BDDMatchers.isOne;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -212,8 +211,8 @@ public final class BDDReachabilityAnalysisTest {
   public void testVrfAcceptBDDs() {
     assertThat(
         vrfAcceptBDD(_dstName),
-        isEquivalentTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
-    assertThat(vrfAcceptBDD(_srcName), isEquivalentTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
+        equalTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
+    assertThat(vrfAcceptBDD(_srcName), equalTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
   }
 
   @Test
@@ -238,28 +237,26 @@ public final class BDDReachabilityAnalysisTest {
   public void testBDDTransitions_PostInVrf_NodeAccept() {
     assertThat(
         bddTransition(_srcPostInVrf, new NodeAccept(_srcName)),
-        isEquivalentTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
+        equalTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
     assertThat(
         bddTransition(_dstPostInVrf, new NodeAccept(_dstName)),
-        isEquivalentTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
+        equalTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
   }
 
   @Test
   public void testBDDTransitions_PostInVrf_PreOutVrf() {
     assertThat(
-        bddTransition(_dstPostInVrf, _dstPreOutVrf),
-        isEquivalentTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
+        bddTransition(_dstPostInVrf, _dstPreOutVrf), equalTo(or(_link1SrcIpBDD, _link2SrcIpBDD)));
 
     assertThat(
         bddTransition(_srcPostInVrf, _srcPreOutVrf),
-        isEquivalentTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
+        equalTo(or(_link1DstIpBDD, _link2DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
   }
 
   @Test
   public void testBDDTransitions_PreInInterface_NodeDropAclIn() {
     NodeDropAclIn dstDropAclIn = new NodeDropAclIn(_dstName);
-    assertThat(
-        bddTransition(_dstPreInInterface1, dstDropAclIn), isEquivalentTo(dstIpBDD(_dstIface2Ip)));
+    assertThat(bddTransition(_dstPreInInterface1, dstDropAclIn), equalTo(dstIpBDD(_dstIface2Ip)));
     assertThat(bddTransition(_dstPreInInterface2, dstDropAclIn), nullValue());
   }
 
@@ -267,8 +264,7 @@ public final class BDDReachabilityAnalysisTest {
   public void testBDDTransitions_PreInInterface_PostInVrf() {
     // link1: not(_dstIface2Ip)
     assertThat(
-        bddTransition(_dstPreInInterface1, _dstPostInVrf),
-        isEquivalentTo(dstIpBDD(_dstIface2Ip).not()));
+        bddTransition(_dstPreInInterface1, _dstPostInVrf), equalTo(dstIpBDD(_dstIface2Ip).not()));
     // link2: universe
     assertThat(bddTransition(_dstPreInInterface2, _dstPostInVrf), isOne());
   }
@@ -288,9 +284,8 @@ public final class BDDReachabilityAnalysisTest {
 
     assertThat(nodeDropNullRoute, nullValue());
 
-    assertThat(nodeInterfaceNeighborUnreachable1, isEquivalentTo(_link1SrcIpBDD));
-    assertThat(
-        nodeInterfaceNeighborUnreachable2, isEquivalentTo(_link2SrcIpBDD.and(postNatAclBDD)));
+    assertThat(nodeInterfaceNeighborUnreachable1, equalTo(_link1SrcIpBDD));
+    assertThat(nodeInterfaceNeighborUnreachable2, equalTo(_link2SrcIpBDD.and(postNatAclBDD)));
 
     assertThat(
         bddIps(preOutEdge1),
@@ -299,7 +294,7 @@ public final class BDDReachabilityAnalysisTest {
         bddIps(preOutEdge2), containsInAnyOrder(_dstIface2Ip, NET._link2Dst.getAddress().getIp()));
 
     // ECMP: _dstIface1Ip is routed out both edges
-    assertThat(preOutEdge1.and(preOutEdge2), isEquivalentTo(dstIpBDD(_dstIface2Ip)));
+    assertThat(preOutEdge1.and(preOutEdge2), equalTo(dstIpBDD(_dstIface2Ip)));
   }
 
   @Test
@@ -311,30 +306,30 @@ public final class BDDReachabilityAnalysisTest {
     assertThat(
         bddTransition(
             _dstPreOutVrf, new NodeInterfaceNeighborUnreachable(_dstName, _dstIface1Name)),
-        isEquivalentTo(_dstIface1IpBDD));
+        equalTo(_dstIface1IpBDD));
     assertThat(
         bddTransition(
             _dstPreOutVrf, new NodeInterfaceNeighborUnreachable(_dstName, _dstIface2Name)),
-        isEquivalentTo(_dstIface2IpBDD));
+        equalTo(_dstIface2IpBDD));
     assertThat(
         bddTransition(_dstPreOutVrf, new NodeInterfaceNeighborUnreachable(_dstName, _link1DstName)),
-        isEquivalentTo(_link1DstIpBDD));
+        equalTo(_link1DstIpBDD));
     assertThat(
         bddTransition(_dstPreOutVrf, new NodeInterfaceNeighborUnreachable(_dstName, _link2DstName)),
-        isEquivalentTo(_link2DstIpBDD));
+        equalTo(_link2DstIpBDD));
   }
 
   @Test
   public void testBDDTransitions_PreOutVrf_PreOutEdge() {
     assertThat(
         bddTransition(_srcPreOutVrf, _srcPreOutEdge1),
-        isEquivalentTo(or(_link1DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
+        equalTo(or(_link1DstIpBDD, _dstIface1IpBDD, _dstIface2IpBDD)));
     assertThat(
         bddTransition(_srcPreOutVrf, _srcPreOutEdge2),
-        isEquivalentTo(or(_link2DstIpBDD, _dstIface2IpBDD)));
+        equalTo(or(_link2DstIpBDD, _dstIface2IpBDD)));
 
-    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge1), isEquivalentTo(_link1SrcIpBDD));
-    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge2), isEquivalentTo(_link2SrcIpBDD));
+    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge1), equalTo(_link1SrcIpBDD));
+    assertThat(bddTransition(_dstPreOutVrf, _dstPreOutEdge2), equalTo(_link2SrcIpBDD));
   }
 
   @Test
@@ -344,7 +339,7 @@ public final class BDDReachabilityAnalysisTest {
     assertThat(bddTransition(_srcPreOutEdgePostNat1, new NodeDropAclOut(_srcName)), nullValue());
     assertThat(
         bddTransition(_srcPreOutEdgePostNat2, new NodeDropAclOut(_srcName)),
-        isEquivalentTo(dstPortBDD(POST_SOURCE_NAT_ACL_DEST_PORT).not()));
+        equalTo(dstPortBDD(POST_SOURCE_NAT_ACL_DEST_PORT).not()));
   }
 
   @Test
@@ -354,7 +349,7 @@ public final class BDDReachabilityAnalysisTest {
     assertThat(bddTransition(_srcPreOutEdgePostNat1, _dstPreInInterface1), isOne());
     assertThat(
         bddTransition(_srcPreOutEdgePostNat2, _dstPreInInterface2),
-        isEquivalentTo(dstPortBDD(POST_SOURCE_NAT_ACL_DEST_PORT)));
+        equalTo(dstPortBDD(POST_SOURCE_NAT_ACL_DEST_PORT)));
   }
 
   @Test
@@ -383,7 +378,7 @@ public final class BDDReachabilityAnalysisTest {
     BDD postNatAclBDD = dstPortBDD(POST_SOURCE_NAT_ACL_DEST_PORT);
 
     BDD srcNatAclBDD = BDDAcl.create(NET._link2SrcSourceNatAcl).getBdd();
-    assertThat(srcNatAclBDD, isEquivalentTo(natAclIpBDD));
+    assertThat(srcNatAclBDD, equalTo(natAclIpBDD));
 
     BDD unNattedHeader = dstIpBDD.and(natAclIpBDD);
     BDD nattedHeader = dstIpBDD.and(natPoolIpBDD).and(postNatAclBDD);
@@ -429,7 +424,7 @@ public final class BDDReachabilityAnalysisTest {
     assertThat(inconsistency.getOriginateState(), equalTo(originateVrf));
     assertThat(
         inconsistency.getFinalStates(), equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
-    assertThat(inconsistency.getBDD(), isEquivalentTo(unNattedHeaderWithPostNatAclConstraint));
+    assertThat(inconsistency.getBDD(), equalTo(unNattedHeaderWithPostNatAclConstraint));
   }
 
   @Test
@@ -455,13 +450,13 @@ public final class BDDReachabilityAnalysisTest {
             .get(new PreOutEdgePostNat(_srcName, _link2SrcName, _dstName, _link2DstName))
             .get(originateVrf);
 
-    assertThat(preOutEdgePostNatLink2, isEquivalentTo(dstIpBDD.and(srcIpBDD)));
+    assertThat(preOutEdgePostNatLink2, equalTo(dstIpBDD.and(srcIpBDD)));
     List<MultipathInconsistency> inconsistencies = graph.computeMultipathInconsistencies();
     assertThat(inconsistencies, hasSize(1));
     MultipathInconsistency inconsistency = inconsistencies.get(0);
     assertThat(
         inconsistency.getFinalStates(), equalTo(ImmutableSet.of(Accept.INSTANCE, Drop.INSTANCE)));
-    assertThat(inconsistency.getBDD(), isEquivalentTo(dstIpBDD.and(srcIpBDD).and(postNatAclBDD)));
+    assertThat(inconsistency.getBDD(), equalTo(dstIpBDD.and(srcIpBDD).and(postNatAclBDD)));
 
     Flow flow = graph.multipathInconsistencyToFlow(inconsistency, FLOW_TAG);
     assertThat(flow, hasDstIp(_dstIface2Ip));
