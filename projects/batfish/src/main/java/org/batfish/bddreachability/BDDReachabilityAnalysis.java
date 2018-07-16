@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -182,8 +183,10 @@ public class BDDReachabilityAnalysis {
         Map<StateExpr, BDD> natRootLeafBDDs = rootToLeafBDDs.get(natRoot);
 
         if (natRootLeafBDDs == null) {
+          /*
           Map<StateExpr, Map<StateExpr, BDD>> statesReachableFromRoot =
               getStatesReachableFromRoot(natRoot);
+          */
           break;
         }
         checkNotNull(natRootLeafBDDs, "natRoot %s missing rootToLeafBDDs entry", natRoot);
@@ -381,9 +384,55 @@ public class BDDReachabilityAnalysis {
 
       dirty = newDirty;
 
+      Multimap<StateExpr, StateExpr> finalDirty = dirty;
+      List<StateExpr> violations =
+          _graphRoots
+              .keySet()
+              .stream()
+              .filter(dirty::containsKey)
+              .filter(
+                  root -> {
+                    BDD acceptBDD = reverseReachableStates.get(root).get(Accept.INSTANCE);
+                    BDD dropBDD = reverseReachableStates.get(root).get(Drop.INSTANCE);
+                    BDD neighborUnreachableBDD =
+                        reverseReachableStates.get(root).get(NeighborUnreachable.INSTANCE);
+                    boolean canReachAccept = acceptBDD != null;
+                    boolean canReachDrop = dropBDD != null;
+                    boolean canReachNeighborUnreachable = neighborUnreachableBDD != null;
+                    Collection<StateExpr> reachableLeaves = finalDirty.get(root);
+                    if (reachableLeaves.contains(Accept.INSTANCE)
+                        || reachableLeaves.contains(Drop.INSTANCE)) {
+                      if (canReachAccept && canReachDrop && !acceptBDD.and(dropBDD).isZero()) {
+                        return true;
+                      }
+                    }
+                    if (reachableLeaves.contains(Accept.INSTANCE)
+                        || reachableLeaves.contains(NeighborUnreachable.INSTANCE)) {
+                      if (canReachAccept
+                          && canReachNeighborUnreachable
+                          && !acceptBDD.and(neighborUnreachableBDD).isZero()) {
+                        return true;
+                      }
+                    }
+                    if (reachableLeaves.contains(NeighborUnreachable.INSTANCE)
+                        || reachableLeaves.contains(Drop.INSTANCE)) {
+                      if (canReachNeighborUnreachable
+                          && canReachDrop
+                          && !neighborUnreachableBDD.and(dropBDD).isZero()) {
+                        return true;
+                      }
+                    }
+                    return false;
+                  })
+              .collect(Collectors.toList());
+
       time = System.currentTimeMillis() - time;
       roundTimes.add(time);
       roundDirties.add(dirty.size());
+
+      if (violations.size() > 1) {
+        break;
+      }
     }
 
     return toImmutableMap(
