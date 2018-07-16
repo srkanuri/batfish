@@ -65,7 +65,7 @@ public class IsisTest {
     assertThat(route, isIsisRouteThat(hasDown()));
   }
 
-  private IncrementalDataPlane computeDataPlane() {
+  private IntermediateIncrementalDataPlane computeDataPlane() {
     NetworkFactory nf = new NetworkFactory();
     Configuration.Builder cb =
         nf.configurationBuilder().setConfigurationFormat(ConfigurationFormat.CISCO_IOS);
@@ -219,8 +219,8 @@ public class IsisTest {
             new BatfishLogger(BatfishLogger.LEVELSTR_OUTPUT, false),
             (s, i) -> new AtomicInteger());
     Topology topology = CommonUtil.synthesizeTopology(configurations);
-    IncrementalDataPlane dp =
-        (IncrementalDataPlane)
+    IntermediateIncrementalDataPlane dp =
+        (IntermediateIncrementalDataPlane)
             engine.computeDataPlane(false, configurations, topology, Collections.emptySet())
                 ._dataPlane;
     return dp;
@@ -228,7 +228,7 @@ public class IsisTest {
 
   @Test
   public void testL1AndL2Routes() {
-    IncrementalDataPlane dp = computeDataPlane();
+    IntermediateIncrementalDataPlane dp = computeDataPlane();
     SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> routes =
         IncrementalBdpEngine.getRoutes(dp);
 
@@ -303,7 +303,7 @@ public class IsisTest {
   @Ignore("https://github.com/batfish/batfish/issues/1703")
   @Test
   public void testLeakedRoutes() {
-    IncrementalDataPlane dp = computeDataPlane();
+    IntermediateIncrementalDataPlane dp = computeDataPlane();
     SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> routes =
         IncrementalBdpEngine.getRoutes(dp);
 
@@ -323,7 +323,7 @@ public class IsisTest {
   @Ignore("https://github.com/batfish/batfish/issues/1703")
   @Test
   public void testRedistributedRoutes() {
-    IncrementalDataPlane dp = computeDataPlane();
+    IntermediateIncrementalDataPlane dp = computeDataPlane();
     SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> routes =
         IncrementalBdpEngine.getRoutes(dp);
 

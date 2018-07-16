@@ -30,7 +30,7 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
 
   public static final String PLUGIN_NAME = "ibdp";
 
-  private final Map<IncrementalDataPlane, Map<Flow, Set<FlowTrace>>> _flowTraces;
+  private final Map<IntermediateIncrementalDataPlane, Map<Flow, Set<FlowTrace>>> _flowTraces;
 
   private IncrementalBdpEngine _engine;
 
@@ -52,7 +52,7 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
     ComputeDataPlaneResult answer =
         _engine.computeDataPlane(differentialContext, configurations, topology, externalAdverts);
     double averageRoutes =
-        ((IncrementalDataPlane) answer._dataPlane)
+        ((IntermediateIncrementalDataPlane) answer._dataPlane)
             .getNodes()
             .values()
             .stream()
@@ -79,7 +79,7 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
 
   @Override
   public Set<BgpAdvertisement> getAdvertisements() {
-    IncrementalDataPlane dp = loadDataPlane();
+    IntermediateIncrementalDataPlane dp = loadDataPlane();
     return dp.getNodes()
         .values()
         .stream()
@@ -99,7 +99,7 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
 
   @Override
   public List<Flow> getHistoryFlows(DataPlane dataPlane) {
-    IncrementalDataPlane dp = (IncrementalDataPlane) dataPlane;
+    IntermediateIncrementalDataPlane dp = (IntermediateIncrementalDataPlane) dataPlane;
     Map<Flow, Set<FlowTrace>> traces = _flowTraces.get(dp);
     if (traces == null) {
       return ImmutableList.of();
@@ -113,7 +113,7 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
 
   @Override
   public List<FlowTrace> getHistoryFlowTraces(DataPlane dataPlane) {
-    IncrementalDataPlane dp = (IncrementalDataPlane) dataPlane;
+    IntermediateIncrementalDataPlane dp = (IntermediateIncrementalDataPlane) dataPlane;
     Map<Flow, Set<FlowTrace>> traces = _flowTraces.get(dp);
     if (traces == null) {
       return ImmutableList.of();
@@ -123,19 +123,19 @@ public class IncrementalDataPlanePlugin extends DataPlanePlugin {
 
   @Override
   public SortedMap<String, SortedMap<String, SortedSet<AbstractRoute>>> getRoutes(DataPlane dp) {
-    return IncrementalBdpEngine.getRoutes((IncrementalDataPlane) dp);
+    return IncrementalBdpEngine.getRoutes((IntermediateIncrementalDataPlane) dp);
   }
 
   @Override
   public void processFlows(Set<Flow> flows, DataPlane dataPlane, boolean ignoreAcls) {
     _flowTraces.put(
-        (IncrementalDataPlane) dataPlane,
+        (IntermediateIncrementalDataPlane) dataPlane,
         TracerouteEngineImpl.getInstance()
             .processFlows(dataPlane, flows, dataPlane.getFibs(), ignoreAcls));
   }
 
-  private IncrementalDataPlane loadDataPlane() {
-    return (IncrementalDataPlane) _batfish.loadDataPlane();
+  private IntermediateIncrementalDataPlane loadDataPlane() {
+    return (IntermediateIncrementalDataPlane) _batfish.loadDataPlane();
   }
 
   @Override

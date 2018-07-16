@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.List;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.Prefix;
-import org.batfish.dataplane.ibdp.IncrementalDataPlane;
+import org.batfish.dataplane.ibdp.IntermediateIncrementalDataPlane;
 import org.batfish.dataplane.ibdp.PrefixTracer;
 import org.batfish.main.Batfish;
 import org.batfish.main.BatfishTestUtils;
@@ -45,7 +45,7 @@ public class BgpRouteMapTest {
             _folder);
     batfish.getSettings().setDataplaneEngineName(DP_ENGINE);
     batfish.computeDataPlane(false);
-    IncrementalDataPlane dp = (IncrementalDataPlane) batfish.loadDataPlane();
+    IntermediateIncrementalDataPlane dp = (IntermediateIncrementalDataPlane) batfish.loadDataPlane();
 
     // Test that /32 loopback route is sent to 1.1.1.3, but NOT 1.1.1.4
 
@@ -76,7 +76,7 @@ public class BgpRouteMapTest {
             _folder);
     batfish.getSettings().setDataplaneEngineName(DP_ENGINE);
     batfish.computeDataPlane(false);
-    IncrementalDataPlane dp = (IncrementalDataPlane) batfish.loadDataPlane();
+    IntermediateIncrementalDataPlane dp = (IntermediateIncrementalDataPlane) batfish.loadDataPlane();
 
     /*
      * Test exports: the /32 route should have been exported while the /31 should be blocked
