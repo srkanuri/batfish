@@ -510,6 +510,7 @@ public class BDDReachabilityAnalysis {
             })
         .collect(ImmutableList.toImmutableList());
   }
+
   /** Return a list of flows exhibiting multipath inconsistencies in the network. */
   public Set<Flow> multipathInconsistencies(String flowTag) {
     return computeMultipathInconsistencies()
