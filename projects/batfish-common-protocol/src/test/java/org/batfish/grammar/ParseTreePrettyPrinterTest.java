@@ -11,6 +11,7 @@ import org.batfish.common.ParseTreeSentences;
 import org.batfish.common.util.CommonUtil;
 import org.batfish.grammar.flattener.FlattenerLineMap;
 import org.batfish.grammar.recovery.RecoveryCombinedParser;
+import org.batfish.grammar.recovery.RecoveryExtractor;
 import org.junit.Test;
 
 public class ParseTreePrettyPrinterTest {
@@ -50,7 +51,7 @@ public class ParseTreePrettyPrinterTest {
     RecoveryCombinedParser cp = new RecoveryCombinedParser(configText, settings);
     ParserRuleContext tree = cp.parse();
     ParseTreeSentences ptSentencesLineNums =
-        ParseTreePrettyPrinter.getParseTreeSentences(tree, cp, true);
+        ParseTreePrettyPrinter.getParseTreeSentences(tree, cp, true, new RecoveryExtractor());
 
     /* Confirm printed parse tree includes line numbers when that option is set */
     assertThat(
@@ -89,7 +90,7 @@ public class ParseTreePrettyPrinterTest {
     RecoveryCombinedParser cp = new RecoveryCombinedParser(configText, settings, lineMap);
     ParserRuleContext tree = cp.parse();
     ParseTreeSentences ptSentencesLineNums =
-        ParseTreePrettyPrinter.getParseTreeSentences(tree, cp, true);
+        ParseTreePrettyPrinter.getParseTreeSentences(tree, cp, true, new RecoveryExtractor());
 
     /* Confirm printed parse tree includes original line numbers */
     assertThat(

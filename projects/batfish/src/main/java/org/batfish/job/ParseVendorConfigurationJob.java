@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.batfish.common.BatfishException;
 import org.batfish.common.ParseTreeSentences;
 import org.batfish.common.Warnings;
@@ -348,7 +349,10 @@ public class ParseVendorConfigurationJob extends BatfishJob<ParseVendorConfigura
       if (_settings.getPrintParseTree()) {
         _ptSentences =
             ParseTreePrettyPrinter.getParseTreeSentences(
-                tree, combinedParser, _settings.getPrintParseTreeLineNums());
+                tree,
+                combinedParser,
+                _settings.getPrintParseTreeLineNums(),
+                extractor instanceof ParseTreeListener ? (ParseTreeListener) extractor : null);
       }
       _logger.info("\tPost-processing...");
       extractor.processParseTree(tree);

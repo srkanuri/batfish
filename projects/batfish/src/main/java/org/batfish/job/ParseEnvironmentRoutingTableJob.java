@@ -131,7 +131,7 @@ public class ParseEnvironmentRoutingTableJob
       if (_settings.getPrintParseTree()) {
         _ptSentences =
             ParseTreePrettyPrinter.getParseTreeSentences(
-                tree, combinedParser, _settings.getPrintParseTreeLineNums());
+                tree, combinedParser, _settings.getPrintParseTreeLineNums(), null);
       }
       _logger.info("\tPost-processing...");
       extractor.processParseTree(tree);

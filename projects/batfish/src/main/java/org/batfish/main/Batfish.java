@@ -455,7 +455,7 @@ public class Batfish extends PluginConsumer implements IBatfish {
     } else {
       logger.info("OK, PRINTING PARSE TREE:\n");
       logger.info(
-          ParseTreePrettyPrinter.print(tree, parser, settings.getPrintParseTreeLineNums())
+          ParseTreePrettyPrinter.print(tree, parser, settings.getPrintParseTreeLineNums(), null)
               + "\n\n");
     }
     return tree;
