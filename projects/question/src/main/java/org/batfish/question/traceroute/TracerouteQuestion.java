@@ -9,6 +9,7 @@ import javax.annotation.Nullable;
 import org.batfish.common.BatfishException;
 import org.batfish.datamodel.Flow.Builder;
 import org.batfish.datamodel.questions.IPacketTraceQuestion;
+import org.batfish.specifier.FlatParametersInput;
 import org.batfish.specifier.FlexibleLocationSpecifierFactory;
 import org.batfish.specifier.InferFromLocationIpSpaceSpecifierFactory;
 
@@ -30,6 +31,8 @@ public final class TracerouteQuestion extends IPacketTraceQuestion {
   private static final String DEFAULT_SOURCE_IP_SPACE_SPECIFIER_FACTORY =
       InferFromLocationIpSpaceSpecifierFactory.NAME;
 
+  private static final String PROP_FLAT_INPUT = "flatInput";
+
   private static final String PROP_IGNORE_ACLS = "ignoreAcls";
 
   private static final String PROP_SOURCE_LOCATION_SPECIFIER_FACTORY =
@@ -40,6 +43,8 @@ public final class TracerouteQuestion extends IPacketTraceQuestion {
   private static final String PROP_SOURCE_IP_SPACE_SPECIFIER_FACTORY = "srcIpSpaceSpecifierFactory";
 
   private static final String PROP_SOURCE_IP_SPACE_SPECIFIER_INPUT = "srcIpSpace";
+
+  private String _flatInput = null;
 
   private boolean _ignoreAcls = false;
 
@@ -93,6 +98,10 @@ public final class TracerouteQuestion extends IPacketTraceQuestion {
     return "traceroute2";
   }
 
+  public void resolveFlatInput() {
+    FlatParametersInput flatParameters = new FlatParametersInput(_flatInput);
+  }
+
   @Override
   public String prettyPrint() {
     try {
@@ -127,6 +136,11 @@ public final class TracerouteQuestion extends IPacketTraceQuestion {
         throw new BatfishException("Both pretty and json printing failed\n");
       }
     }
+  }
+
+  @JsonProperty(PROP_FLAT_INPUT)
+  public void setFlatInput(String input) {
+    _flatInput = input;
   }
 
   @JsonProperty(PROP_IGNORE_ACLS)
