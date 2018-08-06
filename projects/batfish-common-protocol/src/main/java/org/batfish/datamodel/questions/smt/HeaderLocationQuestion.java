@@ -1,30 +1,32 @@
 package org.batfish.datamodel.questions.smt;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.batfish.datamodel.questions.InterfacesSpecifier;
+import org.batfish.datamodel.questions.NodesSpecifier;
 
 public class HeaderLocationQuestion extends HeaderQuestion {
 
   private static final boolean DEFAULT_NEGATE = false;
 
-  private static final String DEFAULT_FINAL_IFACE_REGEX = ".*";
+  private static final InterfacesSpecifier DEFAULT_FINAL_IFACE_REGEX = InterfacesSpecifier.ALL;
 
-  private static final String DEFAULT_FINAL_NODE_REGEX = ".*";
+  private static final NodesSpecifier DEFAULT_FINAL_NODE_REGEX = NodesSpecifier.ALL;
 
-  private static final String DEFAULT_INGRESS_NODE_REGEX = ".*";
+  private static final NodesSpecifier DEFAULT_INGRESS_NODE_REGEX = NodesSpecifier.ALL;
 
-  private static final String DEFAULT_FAIL_NODE1_REGEX = ".*";
+  private static final NodesSpecifier DEFAULT_FAIL_NODE1_REGEX = NodesSpecifier.ALL;
 
-  private static final String DEFAULT_FAIL_NODE2_REGEX = ".*";
+  private static final NodesSpecifier DEFAULT_FAIL_NODE2_REGEX = NodesSpecifier.ALL;
 
-  private static final String DEFAULT_NOT_FINAL_NODE_REGEX = "";
+  private static final NodesSpecifier DEFAULT_NOT_FINAL_NODE_REGEX = NodesSpecifier.NONE;
 
-  private static final String DEFAULT_NOT_FINAL_IFACE_REGEX = "";
+  private static final InterfacesSpecifier DEFAULT_NOT_FINAL_IFACE_REGEX = InterfacesSpecifier.NONE;
 
-  private static final String DEFAULT_NOT_INGRESS_NODE_REGEX = "";
+  private static final NodesSpecifier DEFAULT_NOT_INGRESS_NODE_REGEX = NodesSpecifier.NONE;
 
-  private static final String DEFAULT_NOT_FAIL_NODE1_REGEX = "";
+  private static final NodesSpecifier DEFAULT_NOT_FAIL_NODE1_REGEX = NodesSpecifier.NONE;
 
-  private static final String DEFAULT_NOT_FAIL_NODE2_REGEX = "";
+  private static final NodesSpecifier DEFAULT_NOT_FAIL_NODE2_REGEX = NodesSpecifier.NONE;
 
   private static final String PROP_NEGATE = "negate";
 
@@ -50,25 +52,25 @@ public class HeaderLocationQuestion extends HeaderQuestion {
 
   private boolean _negate;
 
-  private String _finalNodeRegex;
+  private NodesSpecifier _finalNodeRegex;
 
-  private String _finalIfaceRegex;
+  private InterfacesSpecifier _finalIfaceRegex;
 
-  private String _ingressNodeRegex;
+  private NodesSpecifier _ingressNodeRegex;
 
-  private String _failNode1Regex;
+  private NodesSpecifier _failNode1Regex;
 
-  private String _failNode2Regex;
+  private NodesSpecifier _failNode2Regex;
 
-  private String _notFinalNodeRegex;
+  private NodesSpecifier _notFinalNodeRegex;
 
-  private String _notFinalIfaceRegex;
+  private InterfacesSpecifier _notFinalIfaceRegex;
 
-  private String _notIngressNodeRegex;
+  private NodesSpecifier _notIngressNodeRegex;
 
-  private String _notFailNode1Regex;
+  private NodesSpecifier _notFailNode1Regex;
 
-  private String _notFailNode2Regex;
+  private NodesSpecifier _notFailNode2Regex;
 
   public HeaderLocationQuestion() {
     super();
@@ -106,42 +108,42 @@ public class HeaderLocationQuestion extends HeaderQuestion {
   }
 
   @JsonProperty(PROP_FINAL_NODE_REGEX)
-  public String getFinalNodeRegex() {
+  public NodesSpecifier getFinalNodeRegex() {
     return _finalNodeRegex;
   }
 
   @JsonProperty(PROP_FINAL_IFACE_REGEX)
-  public String getFinalIfaceRegex() {
+  public InterfacesSpecifier getFinalIfaceRegex() {
     return _finalIfaceRegex;
   }
 
   @JsonProperty(PROP_INGRESS_NODE_REGEX)
-  public String getIngressNodeRegex() {
+  public NodesSpecifier getIngressNodeRegex() {
     return _ingressNodeRegex;
   }
 
   @JsonProperty(FAIL_NODE1_REGEX_VAR)
-  public String getFailNode1Regex() {
+  public NodesSpecifier getFailNode1Regex() {
     return _failNode1Regex;
   }
 
   @JsonProperty(FAIL_NODE2_REGEX_VAR)
-  public String getFailNode2Regex() {
+  public NodesSpecifier getFailNode2Regex() {
     return _failNode2Regex;
   }
 
   @JsonProperty(PROP_NOT_FINAL_NODE_REGEX)
-  public String getNotFinalNodeRegex() {
+  public NodesSpecifier getNotFinalNodeRegex() {
     return _notFinalNodeRegex;
   }
 
   @JsonProperty(PROP_NOT_FINAL_IFACE_REGEX)
-  public String getNotFinalIfaceRegex() {
+  public InterfacesSpecifier getNotFinalIfaceRegex() {
     return _notFinalIfaceRegex;
   }
 
   @JsonProperty(PROP_NOT_INGRESS_NODE_REGEX)
-  public String getNotIngressNodeRegex() {
+  public NodesSpecifier getNotIngressNodeRegex() {
     return _notIngressNodeRegex;
   }
 
@@ -182,12 +184,12 @@ public class HeaderLocationQuestion extends HeaderQuestion {
   }
 
   @JsonProperty(NOT_FAIL_NODE1_REGEX_VAR)
-  public String getNotFailNode1Regex() {
+  public NodesSpecifier getNotFailNode1Regex() {
     return _notFailNode1Regex;
   }
 
   @JsonProperty(NOT_FAIL_NODE2_REGEX_VAR)
-  public String getNotFailNode2Regex() {
+  public NodesSpecifier getNotFailNode2Regex() {
     return _notFailNode2Regex;
   }
 
@@ -197,52 +199,52 @@ public class HeaderLocationQuestion extends HeaderQuestion {
   }
 
   @JsonProperty(PROP_FINAL_NODE_REGEX)
-  public void setFinalNodeRegex(String regex) {
+  public void setFinalNodeRegex(NodesSpecifier regex) {
     _finalNodeRegex = regex;
   }
 
   @JsonProperty(PROP_FINAL_IFACE_REGEX)
-  public void setFinalIfaceRegex(String regex) {
+  public void setFinalIfaceRegex(InterfacesSpecifier regex) {
     _finalIfaceRegex = regex;
   }
 
   @JsonProperty(PROP_INGRESS_NODE_REGEX)
-  public void setIngressNodeRegex(String regex) {
+  public void setIngressNodeRegex(NodesSpecifier regex) {
     _ingressNodeRegex = regex;
   }
 
   @JsonProperty(FAIL_NODE1_REGEX_VAR)
-  public void setFailNode1Regex(String regex) {
+  public void setFailNode1Regex(NodesSpecifier regex) {
     _failNode1Regex = regex;
   }
 
   @JsonProperty(FAIL_NODE2_REGEX_VAR)
-  public void setFailNode2Regex(String regex) {
+  public void setFailNode2Regex(NodesSpecifier regex) {
     _failNode2Regex = regex;
   }
 
   @JsonProperty(PROP_NOT_FINAL_NODE_REGEX)
-  public void setNotFinalNodeRegex(String notFinalNodeRegex) {
+  public void setNotFinalNodeRegex(NodesSpecifier notFinalNodeRegex) {
     _notFinalNodeRegex = notFinalNodeRegex;
   }
 
   @JsonProperty(PROP_NOT_FINAL_IFACE_REGEX)
-  public void setNotFinalIfaceRegex(String notFinalIfaceRegex) {
+  public void setNotFinalIfaceRegex(InterfacesSpecifier notFinalIfaceRegex) {
     _notFinalIfaceRegex = notFinalIfaceRegex;
   }
 
   @JsonProperty(PROP_NOT_INGRESS_NODE_REGEX)
-  public void setNotIngressNodeRegex(String notIngressNodeRegex) {
+  public void setNotIngressNodeRegex(NodesSpecifier notIngressNodeRegex) {
     _notIngressNodeRegex = notIngressNodeRegex;
   }
 
   @JsonProperty(NOT_FAIL_NODE1_REGEX_VAR)
-  public void setNotFailNode1Regex(String regex) {
+  public void setNotFailNode1Regex(NodesSpecifier regex) {
     _notFailNode1Regex = regex;
   }
 
   @JsonProperty(NOT_FAIL_NODE2_REGEX_VAR)
-  public void setNotFailNode2Regex(String regex) {
+  public void setNotFailNode2Regex(NodesSpecifier regex) {
     _notFailNode2Regex = regex;
   }
 }
