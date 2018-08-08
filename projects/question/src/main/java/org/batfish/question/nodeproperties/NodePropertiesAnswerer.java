@@ -238,15 +238,22 @@ public class NodePropertiesAnswerer extends Answerer {
     Map<String, Configuration> configurations = _batfish.loadConfigurations();
     Set<String> nodes = question.getNodeRegex().getMatchingNodes(_batfish);
 
-    TableMetadata tablePropertiesMetadata =
-        createPropertiesMetadata(question, configurations, nodes);
-    TableAnswerElement answer = new TableAnswerElement(tablePropertiesMetadata);
-
-    Multiset<Row> propertyRows =
-        rawPropertiesAnswer(question, configurations, nodes, tablePropertiesMetadata);
-    answer.postProcessAnswer(question, propertyRows);
-
+    TableMetadata tableMetadata = createMetadata(question);
+    TableAnswerElement answer = new TableAnswerElement(tableMetadata);
+    Multiset<Row> propertyRowsT1 =
+        rawAnswer(question, configurations, nodes, tableMetadata.toColumnMap());
+    answer.postProcessAnswer(question, propertyRowsT1);
     return answer;
+
+    // Vasu:: Moving this code to pre-processing stage of the outliers logic.
+    //    TableMetadata tablePropertiesMetadata =
+    //        createPropertiesMetadata(question, configurations, nodes);
+    //    TableAnswerElement answerProperties = new TableAnswerElement(tablePropertiesMetadata);
+    //
+    //    Multiset<Row> propertyRowsT2 =
+    //        rawPropertiesAnswer(question, configurations, nodes, tablePropertiesMetadata);
+    //    answerProperties.postProcessAnswer(question, propertyRowsT2);
+    //    return answerProperties;
   }
 
   @VisibleForTesting
